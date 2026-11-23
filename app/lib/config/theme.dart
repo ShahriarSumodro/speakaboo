@@ -89,5 +89,29 @@ class SpeakabooTheme {
         borderRadius: BorderRadius.circular(radiusMd),
       ),
     ),
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: surface,
+      indicatorColor: accent.withValues(alpha: 0.15),
+      labelTextStyle: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return const TextStyle(
+            fontSize: captionSize,
+            fontWeight: FontWeight.bold,
+            color: textPrimary,
+          );
+        }
+        return const TextStyle(
+          fontSize: captionSize,
+          fontWeight: FontWeight.normal,
+          color: textSecondary,
+        );
+      }),
+      iconTheme: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return const IconThemeData(color: accent, size: 26);
+        }
+        return const IconThemeData(color: textSecondary, size: 24);
+      }),
+    ),
   );
 }

@@ -10,7 +10,15 @@ import 'package:speakaboo/services/audio_service.dart';
 import 'package:speakaboo/providers/conversation_provider.dart';
 import 'package:speakaboo/widgets/character_face.dart';
 import 'package:speakaboo/widgets/correction_chip.dart';
+import 'package:speakaboo/widgets/empty_state.dart';
+import 'package:speakaboo/widgets/unlock_sheet.dart';
+import 'package:speakaboo/widgets/correction_detail_sheet.dart';
 import 'package:speakaboo/screens/talk_screen.dart';
+import 'package:speakaboo/screens/characters_screen.dart';
+import 'package:speakaboo/screens/missions_screen.dart';
+import 'package:speakaboo/screens/profile_screen.dart';
+import 'package:speakaboo/screens/onboarding_screen.dart';
+import 'package:speakaboo/screens/main_shell.dart';
 
 void main() {
   testWidgets('CharacterFace renders properly', (WidgetTester tester) async {
@@ -28,7 +36,6 @@ void main() {
     );
 
     expect(find.byType(CharacterFace), findsOneWidget);
-    // Unmount to cancel any timers
     await tester.pumpWidget(const SizedBox());
   });
 
@@ -106,8 +113,189 @@ void main() {
     expect(find.text('Welcome to my farm!'), findsOneWidget);
     expect(find.byType(CharacterFace), findsOneWidget);
 
-    // Unmount to cleanly cancel timers
     await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('MainShell renders bottom navigation and navigates between tabs',
+      (WidgetTester tester) async {
+    final api = ApiService(baseUrl: 'http://localhost:8000');
+    final audio = AudioService();
+    final conversation = ConversationProvider(api: api, audio: audio);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AudioService>.value(value: audio),
+          ChangeNotifierProvider<ConversationProvider>.value(
+              value: conversation),
+        ],
+        child: MaterialApp(
+          theme: SpeakabooTheme.theme,
+          home: const MainShell(),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    // Bottom Navigation Bar items
+    expect(find.text('Talk'), findsOneWidget);
+    expect(find.text('Characters'), findsOneWidget);
+    expect(find.text('Missions'), findsOneWidget);
+    expect(find.text('Profile'), findsOneWidget);
+
+    // Switch to Characters tab
+    await tester.tap(find.text('Characters'));
+    await tester.pump();
+    expect(find.text('Speaking Companions'), findsOneWidget);
+
+    // Switch to Missions tab
+    await tester.tap(find.text('Missions'));
+    await tester.pump();
+    expect(find.text("Today's Goals"), findsOneWidget);
+
+    // Switch to Profile tab
+    await tester.tap(find.text('Profile'));
+    await tester.pump();
+    expect(find.text('Learner Profile'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('CharactersScreen lists companions', (WidgetTester tester) async {
+    final api = ApiService();
+    final audio = AudioService();
+    final conv = ConversationProvider(api: api, audio: audio);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider<ConversationProvider>.value(
+        value: conv,
+        child: const MaterialApp(home: CharactersScreen()),
+      ),
+    );
+
+    expect(find.text('Farmer Reggie'), findsOneWidget);
+    expect(find.text('Detective Kabir'), findsOneWidget);
+    expect(find.text('Professor Anika'), findsOneWidget);
+  });
+
+  testWidgets('MissionsScreen displays streak and missions',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: MissionsScreen()),
+    );
+
+    expect(find.text('3 Day Streak!'), findsOneWidget);
+    expect(find.text('Daily Speaker'), findsOneWidget);
+    expect(find.text('Word Explorer'), findsOneWidget);
+  });
+
+  testWidgets('ProfileScreen displays stats and vocabulary notebook',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: ProfileScreen()),
+    );
+
+    expect(find.text('Learner (Anonymous)'), findsOneWidget);
+    expect(find.text('Vocabulary Notebook'), findsOneWidget);
+    expect(find.text('Parent Dashboard'), findsOneWidget);
+  });
+
+  testWidgets('OnboardingScreen displays level options and start button',
+      (WidgetTester tester) async {
+    bool finished = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OnboardingScreen(onFinish: () => finished = true),
+      ),
+    );
+
+    expect(find.text('Welcome to Speakaboo!'), findsOneWidget);
+    expect(find.text('Beginner'), findsOneWidget);
+    expect(find.text('Intermediate'), findsOneWidget);
+    expect(find.text('Advanced'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Start Speaking Practice'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Start Speaking Practice'));
+    expect(finished, isTrue);
+  });
+
+  testWidgets('EmptyStateWidget renders icon, text, and action button',
+      (WidgetTester tester) async {
+    bool tapped = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: EmptyStateWidget(
+            icon: Icons.history,
+            title: 'No Conversations Yet',
+            message: 'Tap the button below to start your first session.',
+            actionLabel: 'Start Practice',
+            onAction: () => tapped = true,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('No Conversations Yet'), findsOneWidget);
+    expect(find.text('Start Practice'), findsOneWidget);
+    await tester.tap(find.text('Start Practice'));
+    expect(tapped, isTrue);
+  });
+
+  testWidgets('UnlockSheet renders bKash and Nagad buttons',
+      (WidgetTester tester) async {
+    bool bkashTapped = false;
+    bool nagadTapped = false;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: UnlockSheet(
+            title: 'Detective Kabir',
+            priceText: '350 BDT',
+            onPayWithBkash: () => bkashTapped = true,
+            onPayWithNagad: () => nagadTapped = true,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Unlock Detective Kabir'), findsOneWidget);
+    expect(find.text('Pay with bKash'), findsOneWidget);
+    expect(find.text('Pay with Nagad'), findsOneWidget);
+
+    await tester.tap(find.text('Pay with bKash'));
+    expect(bkashTapped, isTrue);
+
+    await tester.tap(find.text('Pay with Nagad'));
+    expect(nagadTapped, isTrue);
+  });
+
+  testWidgets('CorrectionDetailSheet renders tip details',
+      (WidgetTester tester) async {
+    final correction = CorrectionData(
+      original: 'I goes',
+      better: 'I went',
+      reasonShort: 'Use past tense when describing completed actions.',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: CorrectionDetailSheet(correction: correction),
+        ),
+      ),
+    );
+
+    expect(find.text('Grammar & Speaking Tip'), findsOneWidget);
+    expect(find.text('"I goes"'), findsOneWidget);
+    expect(find.text('"I went"'), findsOneWidget);
+    expect(find.text('Use past tense when describing completed actions.'),
+        findsOneWidget);
+    expect(find.text('Got it!'), findsOneWidget);
   });
 
   test('Theme has correct colors', () {

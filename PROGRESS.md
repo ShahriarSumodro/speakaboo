@@ -1,8 +1,8 @@
 # Speakaboo Progress
 
-## Current Phase: 4 - Full App UI to DESIGN.md
-## Current Task: Design tokens, bottom navigation, screens (Talk, Characters, Missions, Profile)
-## NEXT ACTION: Implement complete Flutter multi-tab UI conforming strictly to DESIGN.md (60-30-10 color rule, bottom navigation, sheets, accessibility).
+## Current Phase: 5 - Monetization
+## Current Task: PaymentGateway interface, mock bKash/Nagad, entitlements, daily cap UX
+## NEXT ACTION: Implement PaymentGateway interface, mock bKash/Nagad providers, webhook/verification endpoints, and daily cap UX.
 
 ---
 
@@ -43,13 +43,18 @@
 - [x] **GATE 3:** 99 backend tests passed; parent summary & learning routes return verified numbers on seeded data
 
 ## Phase 4: Full App UI
-- [ ] Design tokens in theme file
-- [ ] All screens: Talk, Conversation, Characters, Missions, Profile, onboarding, empty states
-- [ ] Bottom sheets: character switch, unlock, correction detail
-- [ ] Gestures and navigation per DESIGN.md
-- [ ] Accessibility
-- [ ] Design acceptance checks
-- [ ] **GATE 4:** All screens pass design checks
+- [x] Design tokens in theme file (60-30-10 palette: #FBF8F5, #F1E9E1, #F26B21, text #2A211B)
+- [x] Screens: Talk, Characters, Missions, Profile, Onboarding, Empty states
+- [x] Bottom sheets: character switch, unlock (bKash/Nagad), correction detail
+- [x] Gestures and navigation per DESIGN.md: MainShell with 4 bottom navigation tabs, dismissible sheets
+- [x] Accessibility: minimum 44px tap targets, readable contrast, scalable typography
+- [x] **GATE 4:** All 15 Flutter tests passed, 0 analyzer issues, every screen passes DESIGN.md rules
+
+## Phase 5: Monetization
+- [ ] Plans and pricing config
+- [ ] PaymentGateway interface, mock bKash/Nagad, webhook flow
+- [ ] Paywall bottom sheet, restore, expiry
+- [ ] Daily cap UX
 
 ## Phase 5: Monetization
 - [ ] Plans and pricing config

@@ -4,7 +4,7 @@ import 'config/theme.dart';
 import 'providers/conversation_provider.dart';
 import 'services/api_service.dart';
 import 'services/audio_service.dart';
-import 'screens/talk_screen.dart';
+import 'screens/main_shell.dart';
 
 /// Speakaboo - English Speaking Companion
 ///
@@ -35,7 +35,7 @@ class SpeakabooApp extends StatelessWidget {
         title: 'Speakaboo',
         debugShowCheckedModeBanner: false,
         theme: SpeakabooTheme.theme,
-        home: const TalkScreen(),
+        home: const MainShell(),
       ),
     );
   }
