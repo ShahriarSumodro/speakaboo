@@ -29,7 +29,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   UsageInfo? _usage;
   ReferralInfo? _referral;
   int _vocabCount = 0;
-  bool _isLoading = true;
 
   @override
   void initState() {
@@ -46,7 +45,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (cachedProg is Map<String, dynamic>) {
       setState(() {
         _progress = LearningProgress.fromJson(cachedProg);
-        _isLoading = false;
       });
     }
 
@@ -64,7 +62,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _usage = usage;
         _referral = ref;
         _vocabCount = cards.length;
-        _isLoading = false;
       });
 
       await CacheService.set('prog_${auth.userId}', {
@@ -77,9 +74,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'accuracy_score': prog.accuracyScore,
       });
     } catch (_) {
-      if (_progress == null) {
-        setState(() => _isLoading = false);
-      }
     }
   }
 
@@ -171,7 +165,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: ageBand,
+                initialValue: ageBand,
                 decoration: const InputDecoration(labelText: 'Age Band'),
                 items: const [
                   DropdownMenuItem(value: 'kid', child: Text('Kid (6-12)')),
@@ -232,7 +226,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final plan = _usage?.plan.toUpperCase() ?? 'FREE PLAN';
     final xp = _progress?.xp ?? 0;
     final streak = _progress?.streakDays ?? 0;
-    final wordsSpoken = _progress?.totalWordsSpoken ?? 0;
 
     return Scaffold(
       appBar: AppBar(

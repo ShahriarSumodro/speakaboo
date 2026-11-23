@@ -82,12 +82,17 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
               }
               final auth = context.read<AuthProvider>();
               final ok = await auth.setParentPin(pin);
+              if (!ctx.mounted) return;
               if (ok) {
                 Navigator.pop(ctx);
-                setState(() => _isUnlocked = true);
-                _loadDashboardData();
+                if (mounted) {
+                  setState(() => _isUnlocked = true);
+                  _loadDashboardData();
+                }
               } else {
-                setState(() => _pinError = 'Could not set PIN');
+                if (mounted) {
+                  setState(() => _pinError = 'Could not set PIN');
+                }
               }
             },
             child: const Text('Save PIN'),
@@ -135,12 +140,17 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
               final pin = _pinController.text.trim();
               final auth = context.read<AuthProvider>();
               final valid = await auth.verifyParentPin(pin);
+              if (!ctx.mounted) return;
               if (valid) {
                 Navigator.pop(ctx);
-                setState(() => _isUnlocked = true);
-                _loadDashboardData();
+                if (mounted) {
+                  setState(() => _isUnlocked = true);
+                  _loadDashboardData();
+                }
               } else {
-                setState(() => _pinError = 'Incorrect PIN');
+                if (mounted) {
+                  setState(() => _pinError = 'Incorrect PIN');
+                }
               }
             },
             child: const Text('Unlock'),

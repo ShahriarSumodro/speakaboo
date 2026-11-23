@@ -60,7 +60,7 @@ class _ShadowingScreenState extends State<ShadowingScreen> {
         'speed_options': i.speedOptions,
       }).toList());
     } catch (_) {
-      if (_items.isEmpty) {
+      if (mounted) {
         setState(() => _isLoading = false);
       }
     }

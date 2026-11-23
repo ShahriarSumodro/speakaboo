@@ -101,7 +101,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen> {
 
       final paymentId = checkout['payment_id'] as String? ?? 'sandbox_pmt_${DateTime.now().millisecondsSinceEpoch}';
 
-      final verify = await api.verifyPayment(
+      await api.verifyPayment(
         paymentId: paymentId,
         gateway: gateway,
         verificationToken: 'sandbox_verified',

@@ -20,7 +20,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   String _selectedAgeBand = 'teen';
   String _selectedGoal = 'Daily Conversation';
   String _selectedLevel = 'beginner';
-  bool _isEvaluatingPlacement = false;
 
   final TextEditingController _diagnosticController = TextEditingController();
 
@@ -39,7 +38,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       return;
     }
 
-    setState(() => _isEvaluatingPlacement = true);
     try {
       final auth = context.read<AuthProvider>();
       final api = context.read<ApiService>();
@@ -51,7 +49,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
       setState(() {
         _selectedLevel = result.level;
-        _isEvaluatingPlacement = false;
       });
 
       if (mounted) {
@@ -83,7 +80,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         );
       }
     } catch (e) {
-      setState(() => _isEvaluatingPlacement = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Placement evaluation failed: $e')),

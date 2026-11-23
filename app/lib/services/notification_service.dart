@@ -3,7 +3,6 @@
 /// Implements gentle, frequency-capped daily practice triggers at the user's chosen time.
 library;
 
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class NotificationService {

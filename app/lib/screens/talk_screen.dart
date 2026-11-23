@@ -149,7 +149,7 @@ class _TalkScreenState extends State<TalkScreen> {
             tooltip: 'Finish & Summary',
             onPressed: () async {
               final summary = await conv.fetchSummary();
-              if (summary != null && context.mounted) {
+              if (summary != null && mounted) {
                 SessionSummarySheet.show(
                   context,
                   summary: summary,
@@ -350,7 +350,7 @@ class _TalkScreenState extends State<TalkScreen> {
             child: TextButton.icon(
               onPressed: () async {
                 final hint = await conv.fetchHint();
-                if (hint != null && context.mounted) {
+                if (hint != null && mounted) {
                   HintSheet.show(context, hint);
                 }
               },

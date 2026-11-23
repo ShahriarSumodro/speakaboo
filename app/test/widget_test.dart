@@ -934,6 +934,51 @@ void main() {
     expect(find.text('"Every observation matters."'), findsOneWidget);
   });
 
+  testWidgets('ShadowingScreen renders shadowing scripts and controls', (WidgetTester tester) async {
+    final mockClient = MockClient((request) async {
+      if (request.url.path.endsWith('/api/learning/shadowing')) {
+        return http.Response(
+          jsonEncode({
+            'items': [
+              {
+                'id': 'shad_morning',
+                'title': 'Morning Walk',
+                'difficulty': 'beginner',
+                'target_text': 'I enjoy walking in the fresh morning air.',
+                'reference_audio_url': '',
+                'speed_options': [0.8, 1.0, 1.2],
+              }
+            ]
+          }),
+          200,
+        );
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
+    final auth = AuthProvider(api: api);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
+        ],
+        child: const MaterialApp(home: ShadowingScreen()),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Shadowing Practice'), findsOneWidget);
+    expect(find.text('Morning Walk'), findsOneWidget);
+    expect(find.text('0.8x'), findsOneWidget);
+    expect(find.text('1.0x'), findsOneWidget);
+    expect(find.text('1.2x'), findsOneWidget);
+  });
+
   testWidgets('SettingsScreen renders settings items', (WidgetTester tester) async {
     final api = ApiService();
     final auth = AuthProvider(api: api);

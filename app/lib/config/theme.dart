@@ -7,7 +7,7 @@ library;
 
 import 'package:flutter/material.dart';
 
-/// Theme-aware design tokens accessible via Theme.of(context).extension<SpeakabooColors>()
+/// Theme-aware design tokens accessible via `Theme.of(context).extension<SpeakabooColors>()`
 /// or SpeakabooTheme.of(context).
 class SpeakabooColors extends ThemeExtension<SpeakabooColors> {
   final Color background;
