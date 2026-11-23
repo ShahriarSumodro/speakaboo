@@ -1,0 +1,15 @@
+"""
+Pytest configuration and shared fixtures for Speakaboo backend tests.
+"""
+
+import pytest
+from fastapi.testclient import TestClient
+
+from backend.main import app
+
+
+@pytest.fixture
+def client():
+    """Create a test client for the FastAPI app."""
+    with TestClient(app) as c:
+        yield c

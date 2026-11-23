@@ -1,0 +1,1 @@
+"""Speakaboo Backend - FastAPI Application"""
