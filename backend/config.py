@@ -91,6 +91,7 @@ class PaymentConfig:
 @dataclass(frozen=True)
 class FeatureFlags:
     constructive_criticism_mode: bool = False
+    multi_character_group_chat: bool = False
 
 
 @dataclass(frozen=True)
@@ -158,6 +159,7 @@ def load_settings() -> Settings:
         ),
         features=FeatureFlags(
             constructive_criticism_mode=_env_bool("CONSTRUCTIVE_CRITICISM_MODE", False),
+            multi_character_group_chat=_env_bool("MULTI_CHARACTER_GROUP_CHAT", False),
         ),
     )
 

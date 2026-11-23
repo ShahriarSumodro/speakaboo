@@ -121,10 +121,34 @@ class PaymentGateway(ABC):
 ### DeviceTransport (Phase 6)
 ```python
 class DeviceTransport(ABC):
-    async def connect(self, device_id: str) -> Connection
-    async def send_audio(self, connection: Connection, audio: bytes) -> None
-    async def receive_audio(self, connection: Connection) -> bytes
+    async def scan(self, timeout_seconds: float = 3.0) -> List[DeviceInfo]: ...
+    async def connect(self, device_id: str) -> bool: ...
+    async def disconnect(self) -> None: ...
+    async def send_audio_chunk(self, chunk: bytes) -> bool: ...
+    async def receive_audio_chunk(self) -> Optional[bytes]: ...
+    async def send_command(self, command: str, params: Optional[Dict[str, Any]] = None) -> bool: ...
+    async def get_events(self) -> List[DeviceEvent]: ...
 ```
+
+## Physical Toy Hardware Protocol (Bluetooth Low Energy)
+
+The Speakaboo mobile app communicates with the standalone physical companion toy via Bluetooth Low Energy (BLE 5.0+):
+
+### 1. GATT Services & Characteristics
+* **Speakaboo Control Service (`0000SPK0-0000-1000-8000-00805F9B34FB`)**:
+  * `0000SPK1`: Control & Feedback (Write/Notify) — RGB LED color states, volume control (0-100), mute.
+  * `0000SPK2`: Button & Sensor Events (Notify) — Push-to-Talk button (`PRESSED=0x01`, `RELEASED=0x02`), tap/shake sensor.
+  * `0000SPK3`: Battery & Power (Read/Notify) — Battery percentage (0-100), charging status (`CHARGING=0x01`, `FULL=0x02`).
+* **Speakaboo Audio Streaming Service (`0000SPKA-0000-1000-8000-00805F9B34FB`) / L2CAP CoC (PSM 0x0080)**:
+  * `Audio RX (Mic Stream)` (Notify): 16kHz 16-bit mono Opus-encoded (or raw PCM) audio stream chunked in 20ms frames.
+  * `Audio TX (Speaker Stream)` (Write Without Response): 16kHz mono Opus audio stream chunked for toy playback.
+
+### 2. Audio Framing & Bandwidth
+* BLE MTU negotiated up to 512 bytes.
+* Audio packets framed with a 2-byte header `[sequence_id: uint16]` + payload.
+* Standard Opus voice bitrate ~16-24 kbps ensures low latency (<150ms over air) without buffer underruns.
+
+---
 
 ## API Endpoints
 
@@ -161,6 +185,7 @@ class DeviceTransport(ABC):
 | Flag | Default | Description |
 |------|---------|-------------|
 | `constructive_criticism_mode` | `false` | Planned Phase 8: deeper feedback mode |
+| `multi_character_group_chat` | `false` | Phase 6: Multi-character group chat engine |
 
 ## Correction Output Schema (v1, extensible)
 

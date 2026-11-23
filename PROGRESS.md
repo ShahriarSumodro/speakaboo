@@ -1,8 +1,8 @@
 # Speakaboo Progress
 
-## Current Phase: 6 - Device Readiness
-## Current Task: DeviceTransport interface with BLE stub, pairing screen, and multi-character group chat stub
-## NEXT ACTION: Implement DeviceTransport interface with BLE stub, Bluetooth pairing screen, multi-character group chat design stub, and ARCHITECTURE.md hardware docs.
+## Current Phase: 7 - Hardening and Launch Prep
+## Current Task: Load testing, cost report, privacy policy & data deletion, analytics/crash hooks, README, and full regression
+## NEXT ACTION: Implement load test script, cost report estimator, privacy policy / parental consent / data deletion endpoint, crash/error reporting & analytics hooks, and comprehensive README.md.
 
 ---
 
@@ -58,9 +58,10 @@
 - [x] Entitlement enforcement in turn pipeline (blocks locked character practice and enforces daily practice limit)
 
 ## Phase 6: Device Readiness
-- [ ] DeviceTransport interface with BLE stub
-- [ ] Settings screen for pairing
-- [ ] Multi-character group chat design stub
+- [x] DeviceTransport interface with BLE stub
+- [x] Settings screen for pairing
+- [x] Multi-character group chat design stub (behind feature flag)
+- [x] Hardware BLE audio/control protocol documented in ARCHITECTURE.md
 
 ## Phase 7: Hardening and Launch Prep
 - [ ] Load test, cost report script
@@ -78,11 +79,17 @@
 (none)
 
 ## Last Test Results
-- **Backend pytest:** 105 passed, 0 failed (2026-11-23)
+- **Backend pytest:** 110 passed, 0 failed (2026-11-23)
 - **Flutter analyze:** No issues found (2026-11-23)
-- **Flutter test:** 16 passed, 0 failed (2026-11-23)
+- **Flutter test:** 17 passed, 0 failed (2026-11-23)
 
 ## Self-Critique Log
+
+### Phase 6 (2026-11-23)
+- ✅ BLE GATT hardware protocol documented in ARCHITECTURE.md including control service, audio RX/TX characteristics, L2CAP CoC, packet framing, and MTU.
+- ✅ DeviceTransport interface cleanly abstracts physical device communication; BleDeviceStub simulates scanning, push-to-talk button events, and audio relay in/out.
+- ✅ Flutter DevicePairingScreen provides clear status, scan, connect/disconnect, and audio relay switches per DESIGN.md.
+- ✅ Multi-character GroupChatEngine coordinates multi-turn dialogue with strict 2-sentence/under-180-char limits, kid safety redirection, and feature flag gating.
 
 ### Phase 5 (2026-11-23)
 - ✅ Hard Rule 8 respected: PaymentGateway interface with mock bKash and Nagad implementations. Real merchant integration ready without faking success in production paths.

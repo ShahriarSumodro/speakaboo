@@ -22,6 +22,7 @@ class SpeakabooTheme {
   // === Typography ===
   static const double baseFontSize = 17.0;
   static const double headingSize = 24.0;
+  static const double subheadingSize = 18.0;
   static const double captionSize = 13.0;
   static const double smallSize = 11.0;
 

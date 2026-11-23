@@ -19,6 +19,7 @@ import 'package:speakaboo/screens/characters_screen.dart';
 import 'package:speakaboo/screens/missions_screen.dart';
 import 'package:speakaboo/screens/profile_screen.dart';
 import 'package:speakaboo/screens/onboarding_screen.dart';
+import 'package:speakaboo/screens/device_pairing_screen.dart';
 import 'package:speakaboo/screens/main_shell.dart';
 
 void main() {
@@ -381,5 +382,29 @@ void main() {
     final correction = CorrectionData.fromJson(json);
     expect(correction.original, 'I goes');
     expect(correction.better, 'I go');
+  });
+
+  testWidgets('DevicePairingScreen renders toy list and switches',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: DevicePairingScreen()),
+    );
+
+    expect(find.text('Companion Toy (BLE)'), findsOneWidget);
+    expect(find.text('Nearby Companion Toys'), findsOneWidget);
+    expect(find.text('Speakaboo Toy (Puff)'), findsOneWidget);
+    expect(find.text('Relay Microphone Input'), findsOneWidget);
+    expect(find.text('Relay Speaker Output'), findsOneWidget);
+
+    // Tap scan toggle
+    await tester.tap(find.text('Scan'));
+    await tester.pump();
+    expect(find.text('Stop'), findsOneWidget);
+
+    // Tap connect on first toy
+    await tester.tap(find.text('Connect').first);
+    await tester.pump();
+    expect(find.text('Connected to Toy'), findsOneWidget);
+    expect(find.text('Disconnect'), findsOneWidget);
   });
 }
