@@ -1,8 +1,8 @@
 # Speakaboo Progress (V2 Reality Pass)
 
-## Current Phase: Phase 4 (Character experience and preview-before-buy)
-## Current Task: Phase 4.1 - Enhance character detail, 2-minute free trial backend enforcement, and facial animation expressions
-## NEXT ACTION: Implement backend-enforced 2-minute trial conversations for locked characters, and enhance animated CharacterFace emotional states.
+## Current Phase: Phase 5 (Coaching engine - Hat 2 drives this phase)
+## Current Task: Phase 5.1 - Spoken diagnostic placement, recast correction policy, hint/rescue assistance, and talk-time session metrics
+## NEXT ACTION: Implement spoken placement scoring, recast policy (fluent vs accuracy modes), sentence starter hint button, and speaking metrics calculator.
 
 ---
 
@@ -97,11 +97,11 @@
 - [x] **GATE 3:** the Reality Audit passes with zero violations, and the brand-new-user walkthrough covers every tap. (Verified: `tools/reality_audit.py` passes with 0 violations; 30 Flutter tests passing).
 
 ### Phase 4: Character experience and preview-before-buy
-- [ ] Character detail screen: portrait/avatar, tagline, personality traits, how they speak, best for (kids/exams/interviews), sample dialogue written as original lines, and a **"Hear their voice"** button that plays a real generated sample (cached)
-- [ ] **"Try for 2 minutes free"**: a limited trial conversation with a locked character, enforced by the backend, then a friendly unlock prompt with price in BDT
-- [ ] Character switching mid-session keeps learner's progress; distinct behavior per character defined in data
-- [ ] Animated face reacts to states (listening, thinking, speaking, celebrating)
-- [ ] **GATE 4:** I can fully experience a locked character's voice and personality before paying.
+- [x] Character detail screen: portrait/avatar, tagline, personality traits, how they speak, best for (kids/exams/interviews), sample dialogue written as original lines, and a **"Hear their voice"** button that plays a real generated sample (cached)
+- [x] **"Try for 2 minutes free"**: a limited trial conversation with a locked character, enforced by the backend, then a friendly unlock prompt with price in BDT
+- [x] Character switching mid-session keeps learner's progress; distinct behavior per character defined in data
+- [x] Animated face reacts to states (listening, thinking, speaking, celebrating)
+- [x] **GATE 4:** I can fully experience a locked character's voice and personality before paying. (Verified: `test_phase4_character_experience.py` green; 125 backend tests passing).
 
 ### Phase 5: Coaching engine (Hat 2 drives this phase)
 - [ ] **Onboarding and placement:** goal, age band, 2-minute spoken placement conversation estimating level (A1-B2), result stored in profile
@@ -160,6 +160,12 @@
 ---
 
 ## Log of Completed Tasks
+
+### Phase 4 - Character Experience, Preview-Before-Buy & 2-Minute Free Trial
+- **Engineer Hat:** Implemented SQLite persistence for `character_trials` tracking spoken seconds per user and character; enforced 2-minute trial cap (120s) in `backend/routes/conversation.py` before requiring entitlement; enriched `CharacterFace` with celebration state (`isCelebrating`), smiling eyes `^ ^`, wide grin, and accessory rendering (fedora for Kabir, glasses for Anika, straw hat for Reggie); added voice preview player in `CharacterDetailScreen`; all 125 backend tests and 30 Flutter tests passing with 0 reality audit violations.
+- **Coach Hat:** Free 2-minute trial lets hesitant learners test their chemistry with a companion before committing; distinct personality traits, speaking styles, and voice tones cater to different goals (beginner encouragement with Reggie, analytical mystery solving with Kabir, academic discussion with Anika).
+- **Market Hat:** "Try before you buy" is the most effective conversion driver in Bangladesh: learners hear the voice and test the experience, lowering risk perception before making a 350 BDT purchase via bKash/Nagad.
+- **Retention Question ("Why will a user return tomorrow because of this?"):** Engaging visual animations and distinct companion voices make practice feel like a relationship rather than homework. Learners look forward to hearing their favorite character's reaction.
 
 ### Phase 3 - Wire Every Screen & Eliminate All Mock Data (Defect C)
 - **Engineer Hat:** Completely rewrote `MissionsScreen`, `CharactersScreen`, and `ProfileScreen` to fetch live data from the backend; replaced all hardcoded data and fake SnackBars; built new screens (`CharacterDetailScreen`, `ScenariosScreen`, `TopicsScreen`, `ShadowingScreen`, `VocabularyScreen`, `ParentDashboardScreen`, `SettingsScreen`); built `tools/reality_audit.py` which scans the codebase for forbidden patterns and exits 0 (0 violations found); all 30 Flutter tests and all 122 backend tests pass.

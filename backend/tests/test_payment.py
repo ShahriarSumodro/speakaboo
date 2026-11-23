@@ -122,6 +122,8 @@ async def test_daily_cap_enforcement(repo, client):
     """Users exceeding daily cap get HTTP 403 with upgrade guidance."""
     user = User(id="u-capped", device_id="d-capped")
     await repo.create_user(user)
+    # Exhaust the 2-minute trial to test entitlement enforcement
+    await repo.increment_character_usage_seconds("u-locked-test", "locked_companion", 120.0)
 
     # Exhaust free limit (10 minutes)
     await repo.increment_usage("u-capped", minutes=10.5, date=dhaka_today())
@@ -148,6 +150,8 @@ async def test_locked_character_requires_unlock(repo, client):
     """Practicing with a locked character requires entitlement."""
     user = User(id="u-locked-test", device_id="d-locked")
     await repo.create_user(user)
+    # Exhaust the 2-minute trial to test entitlement enforcement
+    await repo.increment_character_usage_seconds("u-locked-test", "locked_companion", 120.0)
 
     # Create dummy locked character JSON in engine
     from backend.engine.characters import Character

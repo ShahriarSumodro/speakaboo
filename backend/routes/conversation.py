@@ -102,7 +102,7 @@ async def _check_entitlements_and_caps(state, character):
     settings = load_settings()
     repo = await get_repository()
 
-    # 1. Check Character Unlock Entitlement if character is locked
+    # 1. Check Character Unlock Entitlement if character is locked (allow 2-minute free trial)
     if character.locked:
         ents = await repo.get_entitlements(state.user_id)
         now = time.time()
@@ -111,10 +111,12 @@ async def _check_entitlements_and_caps(state, character):
             for e in ents
         )
         if not has_character:
-            raise HTTPException(
-                status_code=403,
-                detail=f"{character.name} is a premium companion. Please unlock to practice.",
-            )
+            seconds_used = await repo.get_character_usage_seconds(state.user_id, character.id)
+            if seconds_used >= 120.0:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Your 2-minute free trial with {character.name} has ended! Unlock {character.name} for {character.price_bdt} BDT to continue.",
+                )
 
     # 2. Check Daily Practice Cap
     ents = await repo.get_entitlements(state.user_id)
@@ -163,6 +165,19 @@ async def _record_turn_metrics(state, result):
                 correction=corr_dict,
                 context_sentence=result.user_transcript,
             )
+
+            # Track 2-minute trial seconds for locked character
+            character = load_character(state.character_id)
+            if character.locked:
+                ents = await repo.get_entitlements(state.user_id)
+                now = time.time()
+                has_character = any(
+                    e.type == "character" and e.value == character.id and (e.expires_at is None or e.expires_at > now)
+                    for e in ents
+                )
+                if not has_character:
+                    turn_sec = max(5.0, result.stt_seconds)
+                    await repo.increment_character_usage_seconds(state.user_id, character.id, turn_sec)
     except Exception as e:
         logger.warning(f"Could not record turn metrics: {e}")
 
@@ -174,6 +189,22 @@ async def start_conversation(request: StartConversationRequest):
         character = load_character(request.character_id)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Character not found: {request.character_id}")
+
+    if character.locked:
+        repo = await get_repository()
+        ents = await repo.get_entitlements(request.user_id)
+        now = time.time()
+        has_character = any(
+            e.type == "character" and e.value == character.id and (e.expires_at is None or e.expires_at > now)
+            for e in ents
+        )
+        if not has_character:
+            seconds_used = await repo.get_character_usage_seconds(request.user_id, character.id)
+            if seconds_used >= 120.0:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Your 2-minute free trial with {character.name} has ended! Unlock {character.name} for {character.price_bdt} BDT to continue.",
+                )
 
     engine = get_engine()
     state = engine.start_conversation(

@@ -1,9 +1,4 @@
-/// Animated character face widget.
-///
-/// Simple cartoon face with:
-/// - Mouth animation synced to audio playback
-/// - Idle blink animation
-/// - Different expressions for states
+/// Animated character face widget with dynamic emotional reactions.
 library;
 
 import 'dart:async';
@@ -11,11 +6,13 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
 
-/// Character face that animates based on state.
+/// Character face that animates based on state: listening, thinking, talking, celebrating.
 class CharacterFace extends StatefulWidget {
   final bool isTalking;
   final bool isListening;
   final bool isThinking;
+  final bool isCelebrating;
+  final String characterId;
   final double size;
 
   const CharacterFace({
@@ -23,6 +20,8 @@ class CharacterFace extends StatefulWidget {
     this.isTalking = false,
     this.isListening = false,
     this.isThinking = false,
+    this.isCelebrating = false,
+    this.characterId = 'rule_farmer',
     this.size = 200,
   });
 
@@ -36,9 +35,11 @@ class _CharacterFaceState extends State<CharacterFace>
   late AnimationController _blinkController;
   late AnimationController _talkController;
   late AnimationController _thinkController;
+  late AnimationController _celebrateController;
   late Animation<double> _blinkAnimation;
   late Animation<double> _talkAnimation;
   late Animation<double> _thinkAnimation;
+  late Animation<double> _celebrateAnimation;
 
   @override
   void initState() {
@@ -71,13 +72,22 @@ class _CharacterFaceState extends State<CharacterFace>
     _thinkAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       _thinkController,
     );
+
+    // Celebrate animation (gentle bounce / pulse)
+    _celebrateController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    _celebrateAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
+      CurvedAnimation(parent: _celebrateController, curve: Curves.easeInOut),
+    );
   }
 
   void _scheduleNextBlink() {
     _blinkTimer?.cancel();
     if (!mounted) return;
     _blinkTimer = Timer(Duration(milliseconds: 2000 + Random().nextInt(3000)), () async {
-      if (mounted && !widget.isTalking) {
+      if (mounted && !widget.isTalking && !widget.isCelebrating) {
         await _blinkController.forward();
         if (mounted) {
           await _blinkController.reverse();
@@ -106,6 +116,13 @@ class _CharacterFaceState extends State<CharacterFace>
       _thinkController.stop();
       _thinkController.reset();
     }
+
+    if (widget.isCelebrating && !oldWidget.isCelebrating) {
+      _celebrateController.repeat(reverse: true);
+    } else if (!widget.isCelebrating && oldWidget.isCelebrating) {
+      _celebrateController.stop();
+      _celebrateController.reset();
+    }
   }
 
   @override
@@ -114,6 +131,7 @@ class _CharacterFaceState extends State<CharacterFace>
     _blinkController.dispose();
     _talkController.dispose();
     _thinkController.dispose();
+    _celebrateController.dispose();
     super.dispose();
   }
 
@@ -123,17 +141,28 @@ class _CharacterFaceState extends State<CharacterFace>
       width: widget.size,
       height: widget.size,
       child: AnimatedBuilder(
-        animation: Listenable.merge([_blinkAnimation, _talkAnimation, _thinkAnimation]),
+        animation: Listenable.merge([
+          _blinkAnimation,
+          _talkAnimation,
+          _thinkAnimation,
+          _celebrateAnimation,
+        ]),
         builder: (context, child) {
-          return CustomPaint(
-            painter: _FacePainter(
-              blinkValue: _blinkAnimation.value,
-              talkValue: _talkAnimation.value,
-              isListening: widget.isListening,
-              isThinking: widget.isThinking,
-              thinkValue: _thinkAnimation.value,
+          final scale = widget.isCelebrating ? _celebrateAnimation.value : 1.0;
+          return Transform.scale(
+            scale: scale,
+            child: CustomPaint(
+              painter: _FacePainter(
+                blinkValue: _blinkAnimation.value,
+                talkValue: _talkAnimation.value,
+                isListening: widget.isListening,
+                isThinking: widget.isThinking,
+                isCelebrating: widget.isCelebrating,
+                thinkValue: _thinkAnimation.value,
+                characterId: widget.characterId,
+              ),
+              size: Size(widget.size, widget.size),
             ),
-            size: Size(widget.size, widget.size),
           );
         },
       ),
@@ -146,14 +175,18 @@ class _FacePainter extends CustomPainter {
   final double talkValue;
   final bool isListening;
   final bool isThinking;
+  final bool isCelebrating;
   final double thinkValue;
+  final String characterId;
 
   _FacePainter({
     required this.blinkValue,
     required this.talkValue,
     required this.isListening,
     required this.isThinking,
+    required this.isCelebrating,
     required this.thinkValue,
+    required this.characterId,
   });
 
   @override
@@ -169,63 +202,57 @@ class _FacePainter extends CustomPainter {
 
     // Face border
     final borderPaint = Paint()
-      ..color = SpeakabooTheme.accent.withValues(alpha: 0.3)
+      ..color = (isCelebrating ? SpeakabooTheme.accent : SpeakabooTheme.accent.withValues(alpha: 0.3))
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3;
+      ..strokeWidth = isCelebrating ? 4 : 3;
     canvas.drawCircle(center, radius * 0.9, borderPaint);
 
-    // Hat (farmer hat)
-    final hatPaint = Paint()..color = SpeakabooTheme.accent;
-    final hatPath = Path();
-    hatPath.moveTo(center.dx - radius * 0.7, center.dy - radius * 0.4);
-    hatPath.lineTo(center.dx + radius * 0.7, center.dy - radius * 0.4);
-    hatPath.lineTo(center.dx + radius * 0.5, center.dy - radius * 0.9);
-    hatPath.lineTo(center.dx - radius * 0.5, center.dy - radius * 0.9);
-    hatPath.close();
-    canvas.drawPath(hatPath, hatPaint);
-
-    // Hat brim
-    final brimPaint = Paint()
-      ..color = SpeakabooTheme.accent
-      ..style = PaintingStyle.fill;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(
-          center: Offset(center.dx, center.dy - radius * 0.4),
-          width: radius * 1.6,
-          height: radius * 0.15,
-        ),
-        const Radius.circular(4),
-      ),
-      brimPaint,
-    );
+    // Accessory by character
+    _drawAccessory(canvas, center, radius);
 
     // Eyes
     final eyePaint = Paint()..color = SpeakabooTheme.textPrimary;
     final eyeY = center.dy - radius * 0.1;
-    final eyeHeight = radius * 0.12 * blinkValue;
 
-    // Left eye
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(center.dx - radius * 0.25, eyeY),
-        width: radius * 0.15,
-        height: eyeHeight,
-      ),
-      eyePaint,
-    );
+    if (isCelebrating) {
+      // Joyful squinting curve eyes: ^ ^
+      final eyeArcPaint = Paint()
+        ..color = SpeakabooTheme.textPrimary
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..strokeCap = StrokeCap.round;
 
-    // Right eye
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(center.dx + radius * 0.25, eyeY),
-        width: radius * 0.15,
-        height: eyeHeight,
-      ),
-      eyePaint,
-    );
+      final leftEyePath = Path();
+      leftEyePath.moveTo(center.dx - radius * 0.35, eyeY);
+      leftEyePath.quadraticBezierTo(center.dx - radius * 0.25, eyeY - radius * 0.12, center.dx - radius * 0.15, eyeY);
+      canvas.drawPath(leftEyePath, eyeArcPaint);
 
-    // Eyebrows (slightly serious for farmer character)
+      final rightEyePath = Path();
+      rightEyePath.moveTo(center.dx + radius * 0.15, eyeY);
+      rightEyePath.quadraticBezierTo(center.dx + radius * 0.25, eyeY - radius * 0.12, center.dx + radius * 0.35, eyeY);
+      canvas.drawPath(rightEyePath, eyeArcPaint);
+    } else {
+      // Normal blinking oval eyes
+      final eyeHeight = radius * 0.12 * blinkValue;
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: Offset(center.dx - radius * 0.25, eyeY),
+          width: radius * 0.15,
+          height: eyeHeight,
+        ),
+        eyePaint,
+      );
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: Offset(center.dx + radius * 0.25, eyeY),
+          width: radius * 0.15,
+          height: eyeHeight,
+        ),
+        eyePaint,
+      );
+    }
+
+    // Eyebrows
     final browPaint = Paint()
       ..color = SpeakabooTheme.textPrimary
       ..strokeWidth = 2.5
@@ -251,8 +278,17 @@ class _FacePainter extends CustomPainter {
     final mouthY = center.dy + radius * 0.25;
     final mouthOpen = talkValue * radius * 0.15;
 
-    if (isListening) {
-      // Small open circle when listening
+    if (isCelebrating) {
+      // Wide joyful open grin
+      final grinPaint = Paint()..color = SpeakabooTheme.accent;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: Offset(center.dx, mouthY), width: radius * 0.35, height: radius * 0.2),
+          const Radius.circular(8),
+        ),
+        grinPaint,
+      );
+    } else if (isListening) {
       canvas.drawOval(
         Rect.fromCenter(
           center: Offset(center.dx, mouthY),
@@ -262,7 +298,6 @@ class _FacePainter extends CustomPainter {
         mouthPaint,
       );
     } else if (isThinking) {
-      // Three dots when thinking
       for (int i = 0; i < 3; i++) {
         final dotOffset = sin((thinkValue * 2 * pi) + (i * 0.8)) * 3;
         canvas.drawCircle(
@@ -275,7 +310,6 @@ class _FacePainter extends CustomPainter {
         );
       }
     } else if (mouthOpen > 1) {
-      // Talking mouth
       canvas.drawOval(
         Rect.fromCenter(
           center: Offset(center.dx, mouthY),
@@ -285,13 +319,12 @@ class _FacePainter extends CustomPainter {
         mouthPaint,
       );
     } else {
-      // Slight smile
       final smilePaint = Paint()
         ..color = SpeakabooTheme.textPrimary
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.5
         ..strokeCap = StrokeCap.round;
-      
+
       final smilePath = Path();
       smilePath.moveTo(center.dx - radius * 0.15, mouthY - 2);
       smilePath.quadraticBezierTo(
@@ -301,9 +334,9 @@ class _FacePainter extends CustomPainter {
       canvas.drawPath(smilePath, smilePaint);
     }
 
-    // Cheeks (subtle warm blush)
+    // Cheeks
     final cheekPaint = Paint()
-      ..color = SpeakabooTheme.accent.withValues(alpha: 0.15);
+      ..color = SpeakabooTheme.accent.withValues(alpha: isCelebrating ? 0.35 : 0.15);
     canvas.drawCircle(
       Offset(center.dx - radius * 0.4, mouthY - radius * 0.05),
       radius * 0.1,
@@ -316,12 +349,72 @@ class _FacePainter extends CustomPainter {
     );
   }
 
+  void _drawAccessory(Canvas canvas, Offset center, double radius) {
+    if (characterId == 'dhaka_detective') {
+      // Detective fedora / flat cap
+      final hatPaint = Paint()..color = const Color(0xFF4A3E38);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(
+            center: Offset(center.dx, center.dy - radius * 0.5),
+            width: radius * 1.5,
+            height: radius * 0.22,
+          ),
+          const Radius.circular(8),
+        ),
+        hatPaint,
+      );
+    } else if (characterId == 'professor_anika') {
+      // Scholar reading glasses
+      final glassPaint = Paint()
+        ..color = const Color(0xFF2C5E7A)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5;
+
+      final eyeY = center.dy - radius * 0.1;
+      canvas.drawCircle(Offset(center.dx - radius * 0.25, eyeY), radius * 0.14, glassPaint);
+      canvas.drawCircle(Offset(center.dx + radius * 0.25, eyeY), radius * 0.14, glassPaint);
+      canvas.drawLine(
+        Offset(center.dx - radius * 0.11, eyeY),
+        Offset(center.dx + radius * 0.11, eyeY),
+        glassPaint,
+      );
+    } else {
+      // Farmer Reggie straw hat
+      final hatPaint = Paint()..color = SpeakabooTheme.accent;
+      final hatPath = Path();
+      hatPath.moveTo(center.dx - radius * 0.7, center.dy - radius * 0.4);
+      hatPath.lineTo(center.dx + radius * 0.7, center.dy - radius * 0.4);
+      hatPath.lineTo(center.dx + radius * 0.5, center.dy - radius * 0.9);
+      hatPath.lineTo(center.dx - radius * 0.5, center.dy - radius * 0.9);
+      hatPath.close();
+      canvas.drawPath(hatPath, hatPaint);
+
+      final brimPaint = Paint()
+        ..color = SpeakabooTheme.accent
+        ..style = PaintingStyle.fill;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(
+            center: Offset(center.dx, center.dy - radius * 0.4),
+            width: radius * 1.6,
+            height: radius * 0.15,
+          ),
+          const Radius.circular(4),
+        ),
+        brimPaint,
+      );
+    }
+  }
+
   @override
   bool shouldRepaint(_FacePainter oldDelegate) {
     return blinkValue != oldDelegate.blinkValue ||
         talkValue != oldDelegate.talkValue ||
         isListening != oldDelegate.isListening ||
         isThinking != oldDelegate.isThinking ||
+        isCelebrating != oldDelegate.isCelebrating ||
+        characterId != oldDelegate.characterId ||
         thinkValue != oldDelegate.thinkValue;
   }
 }

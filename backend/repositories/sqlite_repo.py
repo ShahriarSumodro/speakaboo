@@ -85,6 +85,10 @@ class BaseRepository(ABC):
     async def get_profile(self, user_id: str) -> Optional[UserProfile]: ...
     @abstractmethod
     async def save_profile(self, profile: UserProfile) -> UserProfile: ...
+    @abstractmethod
+    async def get_character_usage_seconds(self, user_id: str, character_id: str) -> float: ...
+    @abstractmethod
+    async def increment_character_usage_seconds(self, user_id: str, character_id: str, seconds: float) -> float: ...
 
     # --- Conversations ---
     @abstractmethod
@@ -302,6 +306,16 @@ class SqliteRepository(BaseRepository):
                 updated_at REAL,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             );
+
+            -- Phase 4: Character Free Trials (2 minutes free per locked companion)
+            CREATE TABLE IF NOT EXISTS character_trials (
+                user_id TEXT NOT NULL,
+                character_id TEXT NOT NULL,
+                seconds_used REAL DEFAULT 0.0,
+                updated_at REAL,
+                PRIMARY KEY (user_id, character_id),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
             
             CREATE INDEX IF NOT EXISTS idx_users_device ON users(device_id);
             CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id);
@@ -407,6 +421,27 @@ class SqliteRepository(BaseRepository):
         )
         self._conn.commit()
         return profile
+
+    async def get_character_usage_seconds(self, user_id: str, character_id: str) -> float:
+        row = self._conn.execute(
+            "SELECT seconds_used FROM character_trials WHERE user_id = ? AND character_id = ?",
+            (user_id, character_id),
+        ).fetchone()
+        return float(row["seconds_used"]) if row else 0.0
+
+    async def increment_character_usage_seconds(self, user_id: str, character_id: str, seconds: float) -> float:
+        now = time.time()
+        self._conn.execute(
+            """INSERT INTO character_trials (user_id, character_id, seconds_used, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_id, character_id) DO UPDATE SET
+                seconds_used = seconds_used + excluded.seconds_used,
+                updated_at = excluded.updated_at
+            """,
+            (user_id, character_id, seconds, now),
+        )
+        self._conn.commit()
+        return await self.get_character_usage_seconds(user_id, character_id)
 
     # --- Conversations ---
     async def create_conversation(self, conv: Conversation) -> Conversation:
@@ -897,6 +932,7 @@ class SqliteRepository(BaseRepository):
         cursor.execute("DELETE FROM vocabulary_items WHERE user_id = ?", (user_id,))
         cursor.execute("DELETE FROM safety_flags WHERE user_id = ?", (user_id,))
         cursor.execute("DELETE FROM user_profiles WHERE user_id = ?", (user_id,))
+        cursor.execute("DELETE FROM character_trials WHERE user_id = ?", (user_id,))
         cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
         self._conn.commit()
         return True

@@ -65,6 +65,7 @@ class _TalkScreenState extends State<TalkScreen> {
                       isTalking: conv.status == ConversationStatus.playing,
                       isListening: conv.status == ConversationStatus.recording,
                       isThinking: conv.status == ConversationStatus.processing,
+                      characterId: conv.currentCharacterId ?? 'rule_farmer',
                       size: 200,
                     ),
                   ),
