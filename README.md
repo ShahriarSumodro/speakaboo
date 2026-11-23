@@ -105,21 +105,37 @@ Key environment variables:
 | `BASIC_DAILY_MINUTES` | `30` | Daily practice limit on Pro tier |
 | `MULTI_CHARACTER_GROUP_CHAT`| `false` | Enable multi-character dialogue engine |
 
-### 3. Run Backend
+### 3. Run Backend (Windows PowerShell)
 
-```bash
-# Start FastAPI with hot reload
-uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+```powershell
+# Start FastAPI backend server on port 8000
+python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
-API Documentation will be available at `http://localhost:8000/docs`.
+Interactive API documentation is accessible at `http://localhost:8000/docs` and health check at `http://localhost:8000/api/health`.
 
-### 4. Run Flutter Mobile App
+### 4. Connect Physical Android Phone via USB (Windows PowerShell)
 
-```bash
-cd app
+When testing on a physical Android phone over a USB cable:
+
+```powershell
+# 1. Enable USB Debugging on your phone, plug it into your PC, and verify connection
+adb devices
+
+# 2. Reverse port 8000 so requests from phone to localhost:8000 route to your PC
+adb reverse tcp:8000 tcp:8000
+
+# 3. Launch Flutter app on the connected phone
+Push-Location app
 flutter pub get
 flutter run
+Pop-Location
 ```
+
+> **Note on Backend URL Configuration:**
+> - By default, the app connects to `http://localhost:8000` (working seamlessly with `adb reverse`).
+> - You can pass a custom host at compile time:
+>   `flutter run --dart-define=BACKEND_URL=http://192.168.1.15:8000`
+> - **In-App Runtime Setting:** In `TalkScreen`, tap the Server Settings icon (`settings_ethernet`) in the header or long-press the Speakaboo title to open the Developer Server Dialog, test the connection, and change the server URL on the fly without recompiling.
 
 ---
 

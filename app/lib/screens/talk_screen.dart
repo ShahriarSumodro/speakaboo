@@ -10,6 +10,7 @@ import '../config/theme.dart';
 import '../providers/conversation_provider.dart';
 import '../widgets/character_face.dart';
 import '../widgets/correction_chip.dart';
+import '../widgets/dev_server_dialog.dart';
 
 class TalkScreen extends StatefulWidget {
   const TalkScreen({super.key});
@@ -98,15 +99,23 @@ class _TalkScreenState extends State<TalkScreen> {
       ),
       child: Row(
         children: [
-          Text(
-            conv.characterName ?? 'Speakaboo',
-            style: const TextStyle(
-              fontSize: SpeakabooTheme.headingSize,
-              fontWeight: FontWeight.bold,
-              color: SpeakabooTheme.textPrimary,
+          GestureDetector(
+            onLongPress: () => DevServerDialog.show(context),
+            child: Text(
+              conv.characterName ?? 'Speakaboo',
+              style: const TextStyle(
+                fontSize: SpeakabooTheme.headingSize,
+                fontWeight: FontWeight.bold,
+                color: SpeakabooTheme.textPrimary,
+              ),
             ),
           ),
           const Spacer(),
+          IconButton(
+            icon: const Icon(Icons.settings_ethernet, size: 20, color: SpeakabooTheme.textSecondary),
+            tooltip: 'Server Settings',
+            onPressed: () => DevServerDialog.show(context),
+          ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(

@@ -1,8 +1,8 @@
 # Speakaboo Progress (V2 Reality Pass)
 
 ## Current Phase: Phase 0 (Make it run on a real phone with real AI)
-## Current Task: Phase 0.1 - Fix Defect A (Backend URL, adb reverse docs, manifest permissions, dev server-URL setting)
-## NEXT ACTION: Implement runtime backend URL config in Flutter, update Android manifests & network security, and verify real phone connectivity setup.
+## Current Task: Phase 0.2 - Fix Defect B (Models, voices, startup validation, verify_providers.py, fallback models)
+## NEXT ACTION: Update Groq TTS to Orpheus with official voices, LLM to openai/gpt-oss-120b and fallback models, add startup model validation, create verify_providers.py.
 
 ---
 
@@ -11,7 +11,7 @@
 ### Flutter Screens
 | Screen / Component | Status | Proof / Evidence |
 |--------------------|--------|------------------|
-| `TalkScreen` | Partial | Talks to `/api/conversation/turn`, but uses hardcoded `'device-user'`, no streaming, no topic/scenario context. |
+| `TalkScreen` | Partial | Talks to `/api/conversation/turn`, dev server dialog wired, but uses hardcoded `'device-user'`, no streaming, no topic/scenario context. |
 | `CharactersScreen` | Fake | Hardcoded list in `characters_screen.dart`, wrong IDs (`eco_scholar`), mock unlock SnackBar. |
 | `MissionsScreen` | Fake | Hardcoded list in `missions_screen.dart`, reward claim only mutates local in-memory state. |
 | `ProfileScreen` | Fake | Hardcoded stats, Vocabulary & Parent Dashboard cards do not navigate to real screens (fake SnackBar). |
@@ -57,7 +57,7 @@
 ## Phases Checklist
 
 ### Phase 0: Make it run on a real phone with real AI
-- [ ] Fix defect A (backend URL, `adb reverse` docs, manifest permissions, dev server-URL setting)
+- [x] Fix defect A (backend URL, `adb reverse` docs, manifest permissions, dev server-URL setting)
 - [ ] Fix defect B (models, voices, startup validation, `verify_providers.py`, fallback models)
 - [ ] Backend refuses to start with missing real provider config in normal mode; `--test` or env flag only for pytest
 - [ ] README: exact steps to run backend, connect a phone over USB, and run the app (Windows PowerShell commands)
@@ -154,4 +154,9 @@
 ---
 
 ## Log of Completed Tasks
-- *None yet in V2. Initialized state files and verified audit defects.*
+
+### Phase 0 - Task 1: Fix Defect A (Phone connectivity, USB adb reverse, Manifest, Dev URL setting)
+- **Engineer Hat:** Updated default backend URL to `http://localhost:8000` with adb reverse compatibility; added `INTERNET`, `RECORD_AUDIO`, `MODIFY_AUDIO_SETTINGS`, `ACCESS_NETWORK_STATE` to Android manifest; added network security config for cleartext traffic on localhost/subnets; implemented runtime developer server dialog with live latency check and persistent custom URL storage; verified `flutter analyze` and `flutter test`.
+- **Coach Hat:** Eliminates connectivity dropouts on physical phones so students can begin speaking without setup frustration.
+- **Market Hat:** Enables zero-hassle testing on real, low-cost Android phones in Bangladesh using standard USB cables.
+- **Retention Question ("Why will a user return tomorrow because of this?"):** Eliminates Day 0 install crashes and connection timeouts; ensures the app connects reliably to the backend every single day.

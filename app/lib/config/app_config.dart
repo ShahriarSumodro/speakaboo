@@ -1,22 +1,68 @@
 /// Speakaboo App Configuration
 ///
-/// Centralized configuration constants.
+/// Centralized configuration constants and runtime settings.
 library;
+
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AppConfig {
   AppConfig._();
 
-  /// Backend URL - uses compile-time env or defaults to Android emulator host
-  static const String backendUrl = String.fromEnvironment(
+  static const String _storageKey = 'custom_backend_url';
+
+  /// Compile-time default backend URL - defaults to http://localhost:8000 for USB dev with adb reverse
+  static const String defaultBackendUrl = String.fromEnvironment(
     'BACKEND_URL',
-    defaultValue: 'http://10.0.2.2:8000',
+    defaultValue: 'http://localhost:8000',
   );
+
+  static String _activeBackendUrl = defaultBackendUrl;
+
+  /// Current backend URL (either runtime-configured or default)
+  static String get backendUrl => _activeBackendUrl;
+
+  /// Whether custom URL is set
+  static bool get isCustomBackendUrl => _activeBackendUrl != defaultBackendUrl;
+
+  /// Initialize config from persistent storage
+  static Future<void> init() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString(_storageKey);
+      if (saved != null && saved.trim().isNotEmpty) {
+        _activeBackendUrl = saved.trim();
+      }
+    } catch (_) {
+      // Fallback silently to defaultBackendUrl if SharedPreferences is not ready (e.g. in test env)
+      _activeBackendUrl = defaultBackendUrl;
+    }
+  }
+
+  /// Update backend URL at runtime (e.g. via Dev Server Dialog)
+  static Future<void> setBackendUrl(String url) async {
+    final cleaned = url.trim();
+    if (cleaned.isEmpty) return;
+    _activeBackendUrl = cleaned;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_storageKey, cleaned);
+    } catch (_) {}
+  }
+
+  /// Reset to compile-time default URL
+  static Future<void> resetBackendUrl() async {
+    _activeBackendUrl = defaultBackendUrl;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_storageKey);
+    } catch (_) {}
+  }
 
   /// App name
   static const String appName = 'Speakaboo';
 
   /// App version
-  static const String appVersion = '0.1.0';
+  static const String appVersion = '0.2.0';
 
   /// Audio recording settings
   static const int sampleRate = 16000;

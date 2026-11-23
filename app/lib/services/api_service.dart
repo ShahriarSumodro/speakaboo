@@ -97,12 +97,14 @@ class StartConversationResult {
 
 /// API client for the Speakaboo backend.
 class ApiService {
-  final String baseUrl;
+  final String? _customBaseUrl;
   final http.Client _client;
 
   ApiService({String? baseUrl, http.Client? client})
-      : baseUrl = baseUrl ?? AppConfig.backendUrl,
+      : _customBaseUrl = baseUrl,
         _client = client ?? http.Client();
+
+  String get baseUrl => _customBaseUrl ?? AppConfig.backendUrl;
 
   /// Check backend health.
   Future<Map<String, dynamic>> healthCheck() async {

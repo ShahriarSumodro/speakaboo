@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'config/app_config.dart';
 import 'config/theme.dart';
 import 'providers/conversation_provider.dart';
 import 'services/api_service.dart';
@@ -10,7 +11,9 @@ import 'screens/main_shell.dart';
 ///
 /// Main entry point.
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AppConfig.init();
   runApp(const SpeakabooApp());
 }
 
