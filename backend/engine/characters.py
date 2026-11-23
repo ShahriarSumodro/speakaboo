@@ -26,6 +26,10 @@ class Character:
     voice_id: str
     difficulty_tones: dict[str, str]
     greeting: str
+    tagline: str = ""
+    personality_traits: list[str] = field(default_factory=list)
+    sample_lines: list[str] = field(default_factory=list)
+    best_for: str = ""
     locked: bool = False
     price_bdt: int = 0
     feedback_style: str = ""
@@ -58,6 +62,10 @@ def load_character(character_id: str) -> Character:
         voice_id=data.get("voice_id", ""),
         difficulty_tones=data.get("difficulty_tones", {}),
         greeting=data.get("greeting", "Hello! Let's practice English!"),
+        tagline=data.get("tagline", data.get("description", "")),
+        personality_traits=data.get("personality_traits", []),
+        sample_lines=data.get("sample_lines", []),
+        best_for=data.get("best_for", ""),
         locked=data.get("locked", False),
         price_bdt=data.get("price_bdt", 0),
         feedback_style=data.get("feedback_style", ""),

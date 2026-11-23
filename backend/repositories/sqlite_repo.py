@@ -15,7 +15,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, timedelta
 
 from backend.models.user import (
-    User, Conversation, Turn, DailyUsage, Entitlement, MistakeLog, Plan,
+    User, UserProfile, AgeBand, Conversation, Turn, DailyUsage, Entitlement, MistakeLog, Plan,
 )
 from backend.models.learning import (
     UserProgress, Mission, UserMissionProgress, VocabularyItem, SafetyFlag,
@@ -81,6 +81,10 @@ class BaseRepository(ABC):
     async def update_user(self, user: User) -> User: ...
     @abstractmethod
     async def delete_user_data(self, user_id: str) -> bool: ...
+    @abstractmethod
+    async def get_profile(self, user_id: str) -> Optional[UserProfile]: ...
+    @abstractmethod
+    async def save_profile(self, profile: UserProfile) -> UserProfile: ...
 
     # --- Conversations ---
     @abstractmethod
@@ -282,6 +286,22 @@ class SqliteRepository(BaseRepository):
                 created_at REAL,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             );
+
+            -- Phase 1: User Profiles
+            CREATE TABLE IF NOT EXISTS user_profiles (
+                user_id TEXT PRIMARY KEY,
+                display_name TEXT DEFAULT 'Learner',
+                age_band TEXT DEFAULT 'kid',
+                goal TEXT DEFAULT 'confidence',
+                level TEXT DEFAULT 'beginner',
+                daily_goal_minutes INTEGER DEFAULT 10,
+                reminder_time TEXT DEFAULT '20:00',
+                theme TEXT DEFAULT 'system',
+                parent_pin_hash TEXT DEFAULT '',
+                language TEXT DEFAULT 'en',
+                updated_at REAL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
             
             CREATE INDEX IF NOT EXISTS idx_users_device ON users(device_id);
             CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id);
@@ -292,18 +312,27 @@ class SqliteRepository(BaseRepository):
             CREATE INDEX IF NOT EXISTS idx_user_missions ON user_missions(user_id, date);
             CREATE INDEX IF NOT EXISTS idx_vocab_user ON vocabulary_items(user_id, next_review_date);
             CREATE INDEX IF NOT EXISTS idx_safety_flags_user ON safety_flags(user_id);
+            CREATE INDEX IF NOT EXISTS idx_user_profiles_user ON user_profiles(user_id);
         """)
         self._conn.commit()
 
     async def close(self) -> None:
         if self._conn:
             self._conn.close()
+            self._conn = None
 
     # --- Users ---
     async def create_user(self, user: User) -> User:
         self._conn.execute(
             "INSERT INTO users (id, device_id, display_name, plan, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
             (user.id, user.device_id, user.display_name, user.plan.value, user.created_at, user.updated_at),
+        )
+        self._conn.execute(
+            """INSERT OR IGNORE INTO user_profiles (
+                user_id, display_name, age_band, goal, level,
+                daily_goal_minutes, reminder_time, theme, parent_pin_hash, language, updated_at
+            ) VALUES (?, ?, 'kid', 'confidence', 'beginner', 10, '20:00', 'system', '', 'en', ?)""",
+            (user.id, user.display_name or "Learner", user.created_at),
         )
         self._conn.commit()
         return user
@@ -324,6 +353,60 @@ class SqliteRepository(BaseRepository):
         )
         self._conn.commit()
         return user
+
+    async def get_profile(self, user_id: str) -> Optional[UserProfile]:
+        row = self._conn.execute("SELECT * FROM user_profiles WHERE user_id = ?", (user_id,)).fetchone()
+        if not row:
+            return None
+        return UserProfile(
+            user_id=row["user_id"],
+            display_name=row["display_name"],
+            age_band=AgeBand(row["age_band"]),
+            goal=row["goal"],
+            level=row["level"],
+            daily_goal_minutes=row["daily_goal_minutes"],
+            reminder_time=row["reminder_time"],
+            theme=row["theme"],
+            parent_pin_hash=row["parent_pin_hash"] or "",
+            language=row["language"] or "en",
+            updated_at=row["updated_at"],
+        )
+
+    async def save_profile(self, profile: UserProfile) -> UserProfile:
+        profile.updated_at = time.time()
+        self._conn.execute(
+            """INSERT INTO user_profiles (
+                user_id, display_name, age_band, goal, level,
+                daily_goal_minutes, reminder_time, theme, parent_pin_hash, language, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                display_name=excluded.display_name,
+                age_band=excluded.age_band,
+                goal=excluded.goal,
+                level=excluded.level,
+                daily_goal_minutes=excluded.daily_goal_minutes,
+                reminder_time=excluded.reminder_time,
+                theme=excluded.theme,
+                parent_pin_hash=excluded.parent_pin_hash,
+                language=excluded.language,
+                updated_at=excluded.updated_at
+            """,
+            (
+                profile.user_id,
+                profile.display_name,
+                profile.age_band.value if isinstance(profile.age_band, AgeBand) else profile.age_band,
+                profile.goal,
+                profile.level,
+                profile.daily_goal_minutes,
+                profile.reminder_time,
+                profile.theme,
+                profile.parent_pin_hash,
+                profile.language,
+                profile.updated_at,
+            ),
+        )
+        self._conn.commit()
+        return profile
 
     # --- Conversations ---
     async def create_conversation(self, conv: Conversation) -> Conversation:
@@ -813,6 +896,7 @@ class SqliteRepository(BaseRepository):
         cursor.execute("DELETE FROM user_missions WHERE user_id = ?", (user_id,))
         cursor.execute("DELETE FROM vocabulary_items WHERE user_id = ?", (user_id,))
         cursor.execute("DELETE FROM safety_flags WHERE user_id = ?", (user_id,))
+        cursor.execute("DELETE FROM user_profiles WHERE user_id = ?", (user_id,))
         cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
         self._conn.commit()
         return True

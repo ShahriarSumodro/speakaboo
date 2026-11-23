@@ -17,6 +17,12 @@ class Plan(str, Enum):
     PREMIUM = "premium"
 
 
+class AgeBand(str, Enum):
+    KID = "kid"
+    TEEN = "teen"
+    ADULT = "adult"
+
+
 @dataclass
 class User:
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
@@ -24,6 +30,21 @@ class User:
     display_name: str = ""
     plan: Plan = Plan.FREE
     created_at: float = field(default_factory=time.time)
+    updated_at: float = field(default_factory=time.time)
+
+
+@dataclass
+class UserProfile:
+    user_id: str
+    display_name: str = "Learner"
+    age_band: AgeBand = AgeBand.KID
+    goal: str = "confidence"  # confidence, school, ielts, job
+    level: str = "beginner"   # beginner, intermediate, advanced
+    daily_goal_minutes: int = 10
+    reminder_time: str = "20:00"  # 8 PM local time
+    theme: str = "system"     # system, light, dark
+    parent_pin_hash: str = ""
+    language: str = "en"
     updated_at: float = field(default_factory=time.time)
 
 

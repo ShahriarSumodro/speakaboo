@@ -11,7 +11,7 @@ _repo: Optional[BaseRepository] = None
 async def get_repository() -> BaseRepository:
     """Get or initialize the shared repository instance."""
     global _repo
-    if _repo is None:
+    if _repo is None or getattr(_repo, "_conn", True) is None:
         _repo = SqliteRepository("speakaboo.db")
         await _repo.initialize()
     return _repo

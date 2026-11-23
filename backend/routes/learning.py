@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from backend.repositories import get_repository
 from backend.repositories.sqlite_repo import BaseRepository
+from backend.engine.auth_token import get_current_user_id, verify_user_access
 from backend.engine.gamification import GamificationEngine
 from backend.engine.missions import MissionsEngine
 from backend.engine.scenarios import ScenarioEngine
@@ -115,8 +116,13 @@ class ReviewWordRequest(BaseModel):
 # --- Progress & Gamification ---
 
 @router.get("/progress/{user_id}", response_model=ProgressResponse)
-async def get_progress(user_id: str, repo: BaseRepository = Depends(get_repository)):
+async def get_progress(
+    user_id: str,
+    repo: BaseRepository = Depends(get_repository),
+    current_user_id: str = Depends(get_current_user_id),
+):
     """Get learner XP, level, and streak info."""
+    verify_user_access(current_user_id, user_id)
     engine = GamificationEngine(repo)
     p = await engine.get_progress(user_id)
     return ProgressResponse(
@@ -131,8 +137,13 @@ async def get_progress(user_id: str, repo: BaseRepository = Depends(get_reposito
 
 
 @router.post("/freeze/{user_id}", response_model=ProgressResponse)
-async def add_streak_freeze(user_id: str, repo: BaseRepository = Depends(get_repository)):
+async def add_streak_freeze(
+    user_id: str,
+    repo: BaseRepository = Depends(get_repository),
+    current_user_id: str = Depends(get_current_user_id),
+):
     """Add a streak freeze to the user's account."""
+    verify_user_access(current_user_id, user_id)
     engine = GamificationEngine(repo)
     p = await engine.use_streak_freeze(user_id)
     return ProgressResponse(
@@ -149,16 +160,27 @@ async def add_streak_freeze(user_id: str, repo: BaseRepository = Depends(get_rep
 # --- Daily Missions ---
 
 @router.get("/missions/{user_id}", response_model=List[MissionResponse])
-async def get_missions(user_id: str, repo: BaseRepository = Depends(get_repository)):
+async def get_missions(
+    user_id: str,
+    repo: BaseRepository = Depends(get_repository),
+    current_user_id: str = Depends(get_current_user_id),
+):
     """Get user's daily missions and progress."""
+    verify_user_access(current_user_id, user_id)
     engine = MissionsEngine(repo)
     missions = await engine.get_user_missions(user_id)
     return [MissionResponse(**m) for m in missions]
 
 
 @router.post("/missions/{user_id}/claim/{mission_id}", response_model=ClaimRewardResponse)
-async def claim_mission(user_id: str, mission_id: str, repo: BaseRepository = Depends(get_repository)):
+async def claim_mission(
+    user_id: str,
+    mission_id: str,
+    repo: BaseRepository = Depends(get_repository),
+    current_user_id: str = Depends(get_current_user_id),
+):
     """Claim XP reward for completed mission."""
+    verify_user_access(current_user_id, user_id)
     engine = MissionsEngine(repo)
     xp = await engine.claim_reward(user_id, mission_id)
     if xp is None:
@@ -304,8 +326,13 @@ async def evaluate_shadowing(
 # --- Vocabulary Notebook ---
 
 @router.get("/vocabulary/{user_id}", response_model=List[VocabularyItemResponse])
-async def get_vocabulary(user_id: str, repo: BaseRepository = Depends(get_repository)):
+async def get_vocabulary(
+    user_id: str,
+    repo: BaseRepository = Depends(get_repository),
+    current_user_id: str = Depends(get_current_user_id),
+):
     """Get user's vocabulary notebook items."""
+    verify_user_access(current_user_id, user_id)
     engine = VocabularyEngine(repo)
     items = await engine.get_notebook(user_id)
     return [
@@ -323,8 +350,13 @@ async def get_vocabulary(user_id: str, repo: BaseRepository = Depends(get_reposi
 
 
 @router.get("/vocabulary/{user_id}/due", response_model=List[VocabularyItemResponse])
-async def get_due_vocabulary(user_id: str, repo: BaseRepository = Depends(get_repository)):
+async def get_due_vocabulary(
+    user_id: str,
+    repo: BaseRepository = Depends(get_repository),
+    current_user_id: str = Depends(get_current_user_id),
+):
     """Get vocabulary items due for review today."""
+    verify_user_access(current_user_id, user_id)
     engine = VocabularyEngine(repo)
     items = await engine.get_due_words(user_id)
     return [
@@ -343,9 +375,13 @@ async def get_due_vocabulary(user_id: str, repo: BaseRepository = Depends(get_re
 
 @router.post("/vocabulary/{user_id}", response_model=VocabularyItemResponse)
 async def add_vocabulary_word(
-    user_id: str, request: AddWordRequest, repo: BaseRepository = Depends(get_repository)
+    user_id: str,
+    request: AddWordRequest,
+    repo: BaseRepository = Depends(get_repository),
+    current_user_id: str = Depends(get_current_user_id),
 ):
     """Manually add a word or phrase to the vocabulary notebook."""
+    verify_user_access(current_user_id, user_id)
     engine = VocabularyEngine(repo)
     item = await engine.add_word(
         user_id=user_id,
@@ -366,9 +402,14 @@ async def add_vocabulary_word(
 
 @router.post("/vocabulary/{user_id}/review/{item_id}", response_model=VocabularyItemResponse)
 async def review_vocabulary_word(
-    user_id: str, item_id: str, request: ReviewWordRequest, repo: BaseRepository = Depends(get_repository)
+    user_id: str,
+    item_id: str,
+    request: ReviewWordRequest,
+    repo: BaseRepository = Depends(get_repository),
+    current_user_id: str = Depends(get_current_user_id),
 ):
     """Submit review result for a vocabulary item."""
+    verify_user_access(current_user_id, user_id)
     engine = VocabularyEngine(repo)
     item = await engine.review_word(item_id, request.remembered)
     if not item:

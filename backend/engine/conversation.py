@@ -2,14 +2,15 @@
 Conversation engine for Speakaboo.
 
 Manages one conversation turn: audio in → transcript → safety → LLM → TTS → audio out.
-Maintains rolling history with a token budget.
+Maintains rolling history with a token budget and supports both synchronous and SSE streaming turns.
 """
 
 import logging
 import time
 import uuid
+import base64
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, AsyncGenerator
 
 from backend.providers.base import (
     SttProvider, LlmProvider, TtsProvider,
@@ -42,6 +43,7 @@ class TurnResult:
     llm_tokens_in: int = 0
     llm_tokens_out: int = 0
     latency_ms: float = 0.0
+    cost_usd: float = 0.0
     safety_blocked: bool = False
     safety_redirect: str = ""
 
@@ -104,10 +106,7 @@ class ConversationEngine:
         audio_format: str = "wav",
         max_llm_retries: int = 2,
     ) -> TurnResult:
-        """Process one conversation turn.
-        
-        Pipeline: audio → STT → safety → LLM → correction parse → safety → TTS → result
-        """
+        """Process one conversation turn synchronously."""
         start_time = time.time()
         turn_id = str(uuid.uuid4())
 
@@ -120,7 +119,6 @@ class ConversationEngine:
         user_text = stt_result.text.strip()
 
         if not user_text:
-            # Empty transcription — user was silent or audio was noise
             return TurnResult(
                 conversation_id=conversation_id,
                 turn_id=turn_id,
@@ -138,7 +136,6 @@ class ConversationEngine:
         blocked_category = check_content_safety(user_text, is_user_message=True)
         if blocked_category:
             redirect = get_redirect_message(blocked_category)
-            # Generate TTS for the redirect
             redirect_audio = await self._synthesize_chunks(redirect, character.voice_id)
             return TurnResult(
                 conversation_id=conversation_id,
@@ -160,11 +157,7 @@ class ConversationEngine:
         # --- Step 4: Build messages for LLM ---
         system_prompt = build_system_prompt(character, level)
         messages = [Message(role="system", content=system_prompt)]
-
-        # Add trimmed history
         messages.extend(self._trim_history(state.history))
-
-        # Add current user message
         messages.append(Message(role="user", content=user_text))
 
         # --- Step 5: LLM call with JSON parsing and retry ---
@@ -186,31 +179,19 @@ class ConversationEngine:
             except ValueError as e:
                 logger.warning(f"LLM JSON parse failed (attempt {attempt + 1}): {e}")
                 if attempt < max_llm_retries - 1:
-                    # Add a hint to the messages for retry
-                    messages.append(Message(
-                        role="assistant",
-                        content=llm_result.content,
-                    ))
-                    messages.append(Message(
-                        role="user",
-                        content="Please respond with VALID JSON only, following the exact format specified.",
-                    ))
+                    messages.append(Message(role="assistant", content=llm_result.content))
+                    messages.append(Message(role="user", content="Please respond with VALID JSON only, following the exact format specified."))
 
         if response is None:
-            # Fallback: create a generic response
             logger.error("All LLM JSON parse attempts failed, using fallback")
-            response = TurnResponse(
-                reply="Good try! Let's keep practicing.",
-            )
+            response = TurnResponse(reply="Good try! Let's keep practicing.")
 
         # --- Step 6: Safety check on AI reply ---
         try:
             check_content_safety(response.reply, is_user_message=False)
         except SafetyError:
             logger.error("AI reply blocked by safety filter, using fallback")
-            response = TurnResponse(
-                reply="Let's keep practicing! What else would you like to talk about?",
-            )
+            response = TurnResponse(reply="Let's keep practicing! What else would you like to talk about?")
 
         # --- Step 7: TTS ---
         audio_chunks = await self._synthesize_chunks(response.reply, character.voice_id)
@@ -224,11 +205,19 @@ class ConversationEngine:
         state.last_turn_at = time.time()
 
         latency_ms = (time.time() - start_time) * 1000
+
+        # Cost tracking (USD)
+        stt_cost = (stt_result.duration_seconds / 60.0) * 0.006
+        llm_cost = (llm_tokens_in / 1_000_000) * 0.59 + (llm_tokens_out / 1_000_000) * 0.79
+        tts_cost = (tts_chars / 1000.0) * 0.015
+        cost_usd = round(stt_cost + llm_cost + tts_cost, 6)
+
         logger.info(
             f"Turn complete: {latency_ms:.0f}ms, "
             f"STT={stt_result.duration_seconds:.1f}s, "
             f"LLM={llm_tokens_in}+{llm_tokens_out} tokens, "
             f"TTS={tts_chars} chars, "
+            f"Cost=${cost_usd:.5f}, "
             f"level={level}"
         )
 
@@ -244,13 +233,194 @@ class ConversationEngine:
             llm_tokens_in=llm_tokens_in,
             llm_tokens_out=llm_tokens_out,
             latency_ms=latency_ms,
+            cost_usd=cost_usd,
         )
 
+    async def stream_turn(
+        self,
+        conversation_id: str,
+        audio: bytes,
+        character: Character,
+        audio_format: str = "wav",
+        max_llm_retries: int = 2,
+    ) -> AsyncGenerator[dict, None]:
+        """Stream a turn using event dictionaries for low-latency audio playback."""
+        start_time = time.time()
+        turn_id = str(uuid.uuid4())
+
+        state = self._conversations.get(conversation_id)
+        if not state:
+            raise ValueError(f"Conversation not found: {conversation_id}")
+
+        # 1. STT
+        stt_result = await self._stt.transcribe(audio, format=audio_format)
+        user_text = stt_result.text.strip()
+
+        yield {
+            "event": "transcript",
+            "data": {
+                "transcript": user_text,
+                "duration_seconds": stt_result.duration_seconds,
+            },
+        }
+
+        if not user_text:
+            yield {
+                "event": "turn_complete",
+                "data": {
+                    "turn_id": turn_id,
+                    "reply": "I didn't catch that. Could you try again?",
+                    "correction": None,
+                    "new_words": [],
+                    "level": "beginner",
+                    "audio_chunks": [],
+                    "latency_ms": (time.time() - start_time) * 1000,
+                    "cost_usd": 0.0,
+                    "safety_blocked": False,
+                    "stt_seconds": stt_result.duration_seconds,
+                },
+            }
+            return
+
+        # 2. Safety Check
+        blocked_category = check_content_safety(user_text, is_user_message=True)
+        if blocked_category:
+            redirect = get_redirect_message(blocked_category)
+            yield {
+                "event": "safety",
+                "data": {
+                    "blocked": True,
+                    "category": blocked_category,
+                    "redirect": redirect,
+                },
+            }
+            redirect_audio = await self._synthesize_chunks(redirect, character.voice_id)
+            for idx, chunk in enumerate(redirect_audio):
+                yield {
+                    "event": "audio_chunk",
+                    "data": {
+                        "index": idx,
+                        "text": redirect,
+                        "audio_base64": base64.b64encode(chunk).decode(),
+                    },
+                }
+            yield {
+                "event": "turn_complete",
+                "data": {
+                    "turn_id": turn_id,
+                    "reply": redirect,
+                    "correction": None,
+                    "new_words": [],
+                    "level": estimate_level(state.user_transcripts),
+                    "audio_chunks": [base64.b64encode(c).decode() for c in redirect_audio],
+                    "latency_ms": (time.time() - start_time) * 1000,
+                    "cost_usd": 0.0,
+                    "safety_blocked": True,
+                    "stt_seconds": stt_result.duration_seconds,
+                },
+            }
+            return
+
+        # 3. Level & Messages
+        state.user_transcripts.append(user_text)
+        level = estimate_level(state.user_transcripts)
+
+        system_prompt = build_system_prompt(character, level)
+        messages = [Message(role="system", content=system_prompt)]
+        messages.extend(self._trim_history(state.history))
+        messages.append(Message(role="user", content=user_text))
+
+        # 4. LLM
+        response = None
+        llm_tokens_in = 0
+        llm_tokens_out = 0
+
+        for attempt in range(max_llm_retries):
+            llm_result = await self._llm.chat(messages=messages, json_mode=True)
+            llm_tokens_in = llm_result.tokens_in
+            llm_tokens_out = llm_result.tokens_out
+            try:
+                response = parse_turn_response(llm_result.content)
+                break
+            except ValueError as e:
+                if attempt < max_llm_retries - 1:
+                    messages.append(Message(role="assistant", content=llm_result.content))
+                    messages.append(Message(role="user", content="Please respond with VALID JSON only."))
+
+        if response is None:
+            response = TurnResponse(reply="Good try! Let's keep practicing.")
+
+        try:
+            check_content_safety(response.reply, is_user_message=False)
+        except SafetyError:
+            response = TurnResponse(reply="Let's keep practicing! What else would you like to talk about?")
+
+        yield {
+            "event": "reply_start",
+            "data": {
+                "reply": response.reply,
+                "correction": response.correction.__dict__ if response.correction else None,
+                "new_words": response.new_words,
+            },
+        }
+
+        # 5. Synthesize & stream chunks
+        chunks = self._split_text(response.reply, max_chars=200)
+        audio_b64_list = []
+
+        for idx, chunk in enumerate(chunks):
+            cache_key = f"{character.voice_id}:{chunk}"
+            if cache_key in self._tts_cache:
+                audio_bytes = self._tts_cache[cache_key]
+            else:
+                synth_res = await self._tts.synthesize(chunk, character.voice_id)
+                audio_bytes = synth_res.audio
+                self._tts_cache[cache_key] = audio_bytes
+
+            b64_str = base64.b64encode(audio_bytes).decode()
+            audio_b64_list.append(b64_str)
+
+            yield {
+                "event": "audio_chunk",
+                "data": {
+                    "index": idx,
+                    "text": chunk,
+                    "audio_base64": b64_str,
+                },
+            }
+
+        # 6. Update State
+        state.history.append(Message(role="user", content=user_text))
+        state.history.append(Message(role="assistant", content=response.reply))
+        state.turn_count += 1
+        state.total_stt_seconds += stt_result.duration_seconds
+        state.last_turn_at = time.time()
+
+        latency_ms = (time.time() - start_time) * 1000
+        tts_chars = len(response.reply)
+        stt_cost = (stt_result.duration_seconds / 60.0) * 0.006
+        llm_cost = (llm_tokens_in / 1_000_000) * 0.59 + (llm_tokens_out / 1_000_000) * 0.79
+        tts_cost = (tts_chars / 1000.0) * 0.015
+        cost_usd = round(stt_cost + llm_cost + tts_cost, 6)
+
+        yield {
+            "event": "turn_complete",
+            "data": {
+                "turn_id": turn_id,
+                "reply": response.reply,
+                "correction": response.correction.__dict__ if response.correction else None,
+                "new_words": response.new_words,
+                "level": level,
+                "audio_chunks": audio_b64_list,
+                "latency_ms": latency_ms,
+                "cost_usd": cost_usd,
+                "safety_blocked": False,
+                "stt_seconds": stt_result.duration_seconds,
+            },
+        }
+
     async def _synthesize_chunks(self, text: str, voice_id: str) -> list[bytes]:
-        """Split text into ≤200 char chunks and synthesize each.
-        
-        Uses TTS cache for repeated phrases.
-        """
+        """Split text into ≤200 char chunks and synthesize each."""
         chunks = self._split_text(text, max_chars=200)
         audio_chunks = []
 
@@ -280,7 +450,6 @@ class ConversationEngine:
                 chunks.append(remaining)
                 break
 
-            # Find the last sentence boundary within max_chars
             segment = remaining[:max_chars]
             last_period = segment.rfind(".")
             last_excl = segment.rfind("!")
@@ -291,13 +460,11 @@ class ConversationEngine:
                 chunks.append(remaining[:best_break + 1].strip())
                 remaining = remaining[best_break + 1:].strip()
             else:
-                # No good sentence boundary, break at last space
                 last_space = segment.rfind(" ")
                 if last_space > 20:
                     chunks.append(remaining[:last_space].strip())
                     remaining = remaining[last_space:].strip()
                 else:
-                    # No good break point, force break
                     chunks.append(remaining[:max_chars].strip())
                     remaining = remaining[max_chars:].strip()
 
@@ -314,10 +481,8 @@ class ConversationEngine:
         if total_chars <= max_chars:
             return list(history)
 
-        # Remove oldest messages (keeping pairs) until within budget
         trimmed = list(history)
         while trimmed and sum(len(m.content) for m in trimmed) > max_chars:
-            # Remove oldest pair (user + assistant)
             if len(trimmed) >= 2:
                 trimmed = trimmed[2:]
             else:

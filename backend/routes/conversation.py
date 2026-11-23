@@ -1,45 +1,72 @@
 """
 Conversation routes for Speakaboo.
 
-Handles the core turn-based conversation flow.
+Handles both synchronous turn-based conversation and low-latency SSE streaming turns.
+Enforces character entitlement and daily practice limit checks.
 """
 
 import base64
 import json
 import logging
 import time
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
-from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, AsyncGenerator
 
-from backend.providers.base import ProviderError, RateLimitError
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+
+from backend.config import load_settings
 from backend.engine.characters import load_character
 from backend.engine.conversation import ConversationEngine, TurnResult
 from backend.engine.correction import TurnResponse
+from backend.providers.base import ProviderError, RateLimitError
 from backend.providers.mock import MockSttProvider, MockLlmProvider, MockTtsProvider
+from backend.providers.groq_stt import GroqSttProvider
+from backend.providers.groq_llm import GroqLlmProvider
+from backend.providers.groq_tts import GroqTtsProvider
+from backend.repositories import get_repository
+from backend.models.learning import SafetyFlag
+from backend.engine.missions import MissionsEngine
+from backend.engine.vocabulary import VocabularyEngine
+from backend.engine.auth_token import get_current_user_id
 
 logger = logging.getLogger("speakaboo.routes.conversation")
 
 router = APIRouter(prefix="/api/conversation", tags=["conversation"])
 
-# Initialize with mock providers (will be replaced with real providers from config)
 _engine: Optional[ConversationEngine] = None
 
 
 def get_engine() -> ConversationEngine:
-    """Get or create the conversation engine."""
+    """Get or create the conversation engine with configured providers."""
     global _engine
     if _engine is None:
-        _engine = ConversationEngine(
-            stt=MockSttProvider(),
-            llm=MockLlmProvider(),
-            tts=MockTtsProvider(),
-        )
+        settings = load_settings()
+        if settings.server.test_mode or settings.stt.provider == "mock":
+            _engine = ConversationEngine(
+                stt=MockSttProvider(),
+                llm=MockLlmProvider(),
+                tts=MockTtsProvider(),
+            )
+        else:
+            _engine = ConversationEngine(
+                stt=GroqSttProvider(api_key=settings.stt.api_key, model=settings.stt.model),
+                llm=GroqLlmProvider(
+                    api_key=settings.llm.api_key,
+                    model=settings.llm.model,
+                    fallback_models=list(settings.llm.fallback_models),
+                ),
+                tts=GroqTtsProvider(
+                    api_key=settings.tts.api_key,
+                    model=settings.tts.model,
+                    default_voice=settings.tts.voice,
+                ),
+            )
     return _engine
 
 
 def set_engine(engine: ConversationEngine) -> None:
-    """Set the conversation engine (for testing or config-based initialization)."""
+    """Set the conversation engine (e.g. for testing)."""
     global _engine
     _engine = engine
 
@@ -66,54 +93,12 @@ class TurnResponseModel(BaseModel):
     audio_base64: list[str] = []
     level: str
     latency_ms: float
+    cost_usd: float = 0.0
     safety_blocked: bool = False
 
 
-@router.post("/start", response_model=StartConversationResponse)
-async def start_conversation(request: StartConversationRequest):
-    """Start a new conversation with a character."""
-    try:
-        character = load_character(request.character_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Character not found: {request.character_id}")
-
-    engine = get_engine()
-    state = engine.start_conversation(
-        character_id=request.character_id,
-        user_id=request.user_id,
-        conversation_id=request.conversation_id,
-    )
-
-    return StartConversationResponse(
-        conversation_id=state.id,
-        character_name=character.name,
-        greeting=character.greeting,
-    )
-
-
-@router.post("/turn", response_model=TurnResponseModel)
-async def process_turn(
-    conversation_id: str = Form(...),
-    audio: UploadFile = File(...),
-    audio_format: str = Form("wav"),
-):
-    """Process one conversation turn.
-    
-    Upload audio, get back transcript + AI reply + correction + audio.
-    """
-    engine = get_engine()
-    state = engine.get_conversation(conversation_id)
-    if not state:
-        raise HTTPException(status_code=404, detail=f"Conversation not found: {conversation_id}")
-
-    try:
-        character = load_character(state.character_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=500, detail="Character data missing")
-
-    # Daily Cap & Character Entitlement check
-    from backend.repositories import get_repository
-    from backend.config import load_settings
+async def _check_entitlements_and_caps(state, character):
+    """Enforce character unlock entitlements and daily practice limits."""
     settings = load_settings()
     repo = await get_repository()
 
@@ -147,7 +132,82 @@ async def process_turn(
             detail=f"Daily limit of {daily_cap} minutes reached. Come back tomorrow or upgrade for more practice time!",
         )
 
-    # Read audio
+
+async def _record_turn_metrics(state, result):
+    """Record metrics, gamification XP, and vocabulary into repository."""
+    try:
+        repo = await get_repository()
+        if result.safety_blocked:
+            await repo.log_safety_flag(
+                SafetyFlag(
+                    user_id=state.user_id,
+                    category=result.response.reply,
+                    snippet=result.user_transcript[:100],
+                )
+            )
+        else:
+            minutes = max(0.01, result.stt_seconds / 60.0)
+            await repo.increment_usage(state.user_id, minutes)
+            await repo.record_activity(state.user_id, xp_earned=10 + int(minutes * 20))
+
+            missions = MissionsEngine(repo)
+            await missions.track_speaking_time(state.user_id, minutes)
+            if result.response.new_words:
+                await missions.track_new_words(state.user_id, len(result.response.new_words))
+
+            vocab = VocabularyEngine(repo)
+            corr_dict = result.response.correction.__dict__ if result.response.correction else None
+            await vocab.add_from_turn(
+                user_id=state.user_id,
+                new_words=result.response.new_words,
+                correction=corr_dict,
+                context_sentence=result.user_transcript,
+            )
+    except Exception as e:
+        logger.warning(f"Could not record turn metrics: {e}")
+
+
+@router.post("/start", response_model=StartConversationResponse)
+async def start_conversation(request: StartConversationRequest):
+    """Start a new conversation with a character."""
+    try:
+        character = load_character(request.character_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Character not found: {request.character_id}")
+
+    engine = get_engine()
+    state = engine.start_conversation(
+        character_id=request.character_id,
+        user_id=request.user_id,
+        conversation_id=request.conversation_id,
+    )
+
+    return StartConversationResponse(
+        conversation_id=state.id,
+        character_name=character.name,
+        greeting=character.greeting,
+    )
+
+
+@router.post("/turn", response_model=TurnResponseModel)
+async def process_turn(
+    conversation_id: str = Form(...),
+    audio: UploadFile = File(...),
+    audio_format: str = Form("wav"),
+):
+    """Process one conversation turn synchronously."""
+    engine = get_engine()
+    state = engine.get_conversation(conversation_id)
+    if not state:
+        raise HTTPException(status_code=404, detail=f"Conversation not found: {conversation_id}")
+
+    try:
+        character = load_character(state.character_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=500, detail="Character data missing")
+
+    await _check_entitlements_and_caps(state, character)
+
     audio_bytes = await audio.read()
     if not audio_bytes:
         raise HTTPException(status_code=400, detail="Empty audio file")
@@ -169,45 +229,9 @@ async def process_turn(
         logger.error(f"Provider error: {e}")
         raise HTTPException(status_code=503, detail="Service temporarily unavailable. Please try again.")
 
-    # Encode audio chunks as base64 for JSON response
     audio_b64 = [base64.b64encode(chunk).decode() for chunk in result.audio_chunks]
 
-    # Asynchronously record learning progress & safety flags if repo is available
-    try:
-        from backend.repositories import get_repository
-        from backend.models.learning import SafetyFlag
-        from backend.engine.missions import MissionsEngine
-        from backend.engine.vocabulary import VocabularyEngine
-
-        repo = await get_repository()
-        if result.safety_blocked:
-            await repo.log_safety_flag(
-                SafetyFlag(
-                    user_id=state.user_id,
-                    category=result.response.reply,
-                    snippet=result.user_transcript[:100],
-                )
-            )
-        else:
-            minutes = max(0.01, result.stt_seconds / 60.0)
-            await repo.increment_usage(state.user_id, minutes)
-            await repo.record_activity(state.user_id, xp_earned=10 + int(minutes * 20))
-            
-            missions = MissionsEngine(repo)
-            await missions.track_speaking_time(state.user_id, minutes)
-            if result.response.new_words:
-                await missions.track_new_words(state.user_id, len(result.response.new_words))
-
-            vocab = VocabularyEngine(repo)
-            corr_dict = result.response.correction.__dict__ if result.response.correction else None
-            await vocab.add_from_turn(
-                user_id=state.user_id,
-                new_words=result.response.new_words,
-                correction=corr_dict,
-                context_sentence=result.user_transcript,
-            )
-    except Exception as e:
-        logger.warning(f"Could not record turn metrics: {e}")
+    await _record_turn_metrics(state, result)
 
     return TurnResponseModel(
         conversation_id=result.conversation_id,
@@ -219,5 +243,79 @@ async def process_turn(
         audio_base64=audio_b64,
         level=result.level,
         latency_ms=result.latency_ms,
+        cost_usd=result.cost_usd,
         safety_blocked=result.safety_blocked,
+    )
+
+
+@router.post("/stream-turn")
+async def process_stream_turn(
+    conversation_id: str = Form(...),
+    audio: UploadFile = File(...),
+    audio_format: str = Form("wav"),
+):
+    """Process a turn with Server-Sent Events (SSE) streaming.
+    
+    Streams transcript early, then reply text and TTS audio chunks sentence-by-sentence.
+    """
+    engine = get_engine()
+    state = engine.get_conversation(conversation_id)
+    if not state:
+        raise HTTPException(status_code=404, detail=f"Conversation not found: {conversation_id}")
+
+    try:
+        character = load_character(state.character_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=500, detail="Character data missing")
+
+    await _check_entitlements_and_caps(state, character)
+
+    audio_bytes = await audio.read()
+    if not audio_bytes:
+        raise HTTPException(status_code=400, detail="Empty audio file")
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        try:
+            async for ev in engine.stream_turn(
+                conversation_id=conversation_id,
+                audio=audio_bytes,
+                character=character,
+                audio_format=audio_format,
+            ):
+                event_name = ev.get("event", "message")
+                event_data = json.dumps(ev.get("data", {}))
+                yield f"event: {event_name}\ndata: {event_data}\n\n"
+
+                # When turn complete is reached, record metrics in repository
+                if event_name == "turn_complete":
+                    d = ev.get("data", {})
+                    # Lightweight TurnResult dummy for metric recorder
+                    dummy_res = TurnResult(
+                        conversation_id=conversation_id,
+                        turn_id=d.get("turn_id", ""),
+                        user_transcript=state.user_transcripts[-1] if state.user_transcripts else "",
+                        response=TurnResponse(
+                            reply=d.get("reply", ""),
+                            new_words=d.get("new_words", []),
+                        ),
+                        audio_chunks=[],
+                        level=d.get("level", "beginner"),
+                        stt_seconds=d.get("stt_seconds", 1.0),
+                        safety_blocked=d.get("safety_blocked", False),
+                    )
+                    await _record_turn_metrics(state, dummy_res)
+
+        except Exception as e:
+            logger.error(f"Error in stream_turn event generator: {e}")
+            err_data = json.dumps({"error": str(e)})
+            yield f"event: error\ndata: {err_data}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )

@@ -13,6 +13,7 @@ from typing import Dict, Any
 
 from backend.repositories import get_repository
 from backend.repositories.sqlite_repo import BaseRepository
+from backend.engine.auth_token import get_current_user_id, verify_user_access
 
 router = APIRouter(prefix="/api/privacy", tags=["privacy"])
 
@@ -84,12 +85,14 @@ async def get_parental_consent() -> Dict[str, str]:
 async def delete_user_account_and_data(
     user_id: str,
     repo: BaseRepository = Depends(get_repository),
+    current_user_id: str = Depends(get_current_user_id),
 ) -> DeleteDataResponse:
     """
     Completely and irreversibly purge all learner data:
     user profile, conversation history, turn transcripts, gamification progress,
     missions, vocabulary notebook, mistakes, and safety logs.
     """
+    verify_user_access(current_user_id, user_id)
     user = await repo.get_user(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
