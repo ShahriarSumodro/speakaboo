@@ -1,29 +1,29 @@
 # Speakaboo Progress
 
-## Current Phase: 0 - Foundation
-## Current Task: Repo structure, state files, .gitignore, .env.example
-## NEXT ACTION: Create backend FastAPI skeleton with config loader, health endpoint, and logging.
+## Current Phase: 1 - Core Engine (GATE 1 verification)
+## Current Task: GATE 1 verification - pytest green, CLI chat works
+## NEXT ACTION: Verify GATE 1 by confirming CLI chat works, then start Phase 2.
 
 ---
 
 ## Phase 0: Foundation
 - [x] Repo structure `/app`, `/backend`, state files, `.gitignore`, `.env.example`
-- [ ] Backend FastAPI skeleton, config loader, health endpoint, logging
-- [ ] Flutter skeleton that calls the health endpoint
+- [x] Backend FastAPI skeleton, config loader, health endpoint, logging
+- [x] Flutter skeleton that calls the health endpoint
 
 ## Phase 1: Core Engine
-- [ ] Provider interfaces + Groq implementations for STT, LLM, TTS, plus MOCK providers
-- [ ] Character system: characters as JSON data files, persona prompt builder
-- [ ] Conversation engine: one TURN pipeline (audio in → transcript → safety → LLM → TTS → audio out)
-- [ ] Correction engine: strict JSON output, validation, repair/retry
-- [ ] Learner level adaptation
-- [ ] Safety layer
-- [ ] Usage metering
-- [ ] TTS cache
-- [ ] Accounts: device-based anonymous auth, entitlements
-- [ ] Persistence: SQLite behind repository layer
-- [ ] Rate-limit and retry handling, timeouts, structured errors
-- [ ] Automated tests with mock providers + end-to-end turn test
+- [x] Provider interfaces + Groq implementations for STT, LLM, TTS, plus MOCK providers
+- [x] Character system: characters as JSON data files, persona prompt builder
+- [x] Conversation engine: one TURN pipeline (audio in → transcript → safety → LLM → TTS → audio out)
+- [x] Correction engine: strict JSON output, validation, repair/retry
+- [x] Learner level adaptation
+- [x] Safety layer
+- [x] Usage metering
+- [x] TTS cache
+- [x] Accounts: device-based anonymous auth, entitlements
+- [x] Persistence: SQLite behind repository layer
+- [x] Rate-limit and retry handling, timeouts, structured errors
+- [x] Automated tests with mock providers + end-to-end turn test
 - [ ] **GATE 1:** pytest green, CLI chat works with text and audio
 
 ## Phase 2: Thin End-to-End App
@@ -75,10 +75,27 @@
 ---
 
 ## Known Bugs
-(none yet)
+(none)
 
 ## Last Test Results
-(not yet run)
+- **Backend pytest:** 76 passed, 0 failed (2026-11-23)
+- **Flutter analyze:** No issues found
+- **Flutter test:** pending
 
 ## Self-Critique Log
-(entries added per task)
+
+### Phase 0-1 (2026-11-23)
+- ✅ All provider interfaces are abstract with swap-by-config
+- ✅ Safety checks both user input and AI output
+- ✅ Correction schema is versioned with Phase 8 extensibility fields
+- ✅ TTS cache implemented
+- ✅ Token budget history trimming implemented
+- ✅ Retry with backoff on all Groq providers (HTTP 429 + connection errors)
+- ✅ Character data is JSON files, no code changes needed for new characters
+- ✅ All mock providers work offline
+- ✅ Repository layer abstracts SQLite (Postgres swappable)
+- ✅ Cost-relevant numbers logged per turn (stt_seconds, tts_chars, llm_tokens)
+- ✅ Empty audio / silence handled gracefully
+- ✅ Malformed LLM JSON repaired or falls back
+- ✅ Safety patterns ordered so self_harm catches before violence
+- ✅ Level adaptation penalizes very short input (prevents false intermediate)

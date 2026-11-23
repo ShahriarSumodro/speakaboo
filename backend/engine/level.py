@@ -90,10 +90,19 @@ def estimate_level(recent_transcripts: list[str], window: int = 5) -> str:
         score += 1
 
     # Higher unique word ratio suggests richer vocabulary
-    if unique_ratio > 0.8:
-        score += 1
-    elif unique_ratio > 0.6:
-        score += 0.5
+    # But only meaningful with enough words (>10), otherwise short sentences
+    # always look unique
+    if len(all_words) > 10:
+        if unique_ratio > 0.8:
+            score += 1
+        elif unique_ratio > 0.6:
+            score += 0.5
+
+    # Penalty for very short input (few words total = likely beginner)
+    if len(all_words) < 5:
+        score -= 1
+    elif len(all_words) < 10:
+        score -= 0.5
 
     # Map score to level
     if score >= 4:

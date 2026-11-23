@@ -41,7 +41,7 @@ class TestContentSafety:
 
     def test_ai_output_raises_safety_error(self):
         with pytest.raises(SafetyError):
-            check_content_safety("Let me tell you about weapons and guns", is_user_message=False)
+            check_content_safety("I will kill the enemy with a gun", is_user_message=False)
 
     def test_redirect_messages_exist(self):
         for category in ["violence", "sexual", "self_harm", "drugs", "personal_info_request"]:

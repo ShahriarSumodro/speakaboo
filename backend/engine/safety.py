@@ -16,14 +16,14 @@ logger = logging.getLogger("speakaboo.engine.safety")
 # Blocklist categories with patterns
 # These are checked against both user input and AI output
 BLOCKED_PATTERNS: dict[str, list[str]] = {
+    "self_harm": [
+        r"\b(suicide|self.?harm|cut myself|kill myself|end my life|want to die)\b",
+    ],
     "violence": [
-        r"\b(kill|murder|shoot|stab|attack|bomb|weapon|gun|knife|fight|hurt|beat up|punch)\b",
+        r"\b(kill|murder|shoot|stab|attack|bomb|weapons?|guns?|knife|fight|hurt|beat up|punch)\b",
     ],
     "sexual": [
         r"\b(sex|porn|nude|naked|nsfw|xxx|erotic|orgasm|genital)\b",
-    ],
-    "self_harm": [
-        r"\b(suicide|self.?harm|cut myself|kill myself|end my life|want to die)\b",
     ],
     "drugs": [
         r"\b(cocaine|heroin|meth|marijuana|weed|drug dealer|get high|smoke weed)\b",
