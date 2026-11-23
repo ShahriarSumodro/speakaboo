@@ -12,6 +12,8 @@ import '../providers/conversation_provider.dart';
 import '../widgets/character_face.dart';
 import '../widgets/correction_chip.dart';
 import '../widgets/dev_server_dialog.dart';
+import '../widgets/hint_sheet.dart';
+import '../widgets/session_summary_sheet.dart';
 
 class TalkScreen extends StatefulWidget {
   const TalkScreen({super.key});
@@ -95,6 +97,7 @@ class _TalkScreenState extends State<TalkScreen> {
   }
 
   Widget _buildHeader(ConversationProvider conv) {
+    final isFluency = conv.practiceMode == 'fluency';
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: SpeakabooTheme.spacingMd,
@@ -114,10 +117,50 @@ class _TalkScreenState extends State<TalkScreen> {
             ),
           ),
           const Spacer(),
+          // Mode chip
+          InkWell(
+            onTap: () {
+              final newMode = isFluency ? 'accuracy' : 'fluency';
+              conv.setPracticeMode(newMode);
+            },
+            borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: isFluency ? Colors.teal.shade50 : Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm),
+                border: Border.all(
+                  color: isFluency ? Colors.teal.shade300 : Colors.amber.shade300,
+                ),
+              ),
+              child: Text(
+                isFluency ? 'Fluency' : 'Accuracy',
+                style: TextStyle(
+                  fontSize: SpeakabooTheme.smallSize,
+                  fontWeight: FontWeight.w600,
+                  color: isFluency ? Colors.teal.shade800 : Colors.brown,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
           IconButton(
-            icon: const Icon(Icons.settings_ethernet, size: 20, color: SpeakabooTheme.textSecondary),
-            tooltip: 'Server Settings',
-            onPressed: () => DevServerDialog.show(context),
+            icon: const Icon(Icons.flag_outlined, size: 20, color: SpeakabooTheme.accent),
+            tooltip: 'Finish & Summary',
+            onPressed: () async {
+              final summary = await conv.fetchSummary();
+              if (summary != null && context.mounted) {
+                SessionSummarySheet.show(
+                  context,
+                  summary: summary,
+                  onRetellDrill: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Drill: Speak your previous answer in 45s! Hold mic to start.')),
+                    );
+                  },
+                );
+              }
+            },
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -300,6 +343,36 @@ class _TalkScreenState extends State<TalkScreen> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // "Help me say it" button
+        if (isReady && conv.messages.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: TextButton.icon(
+              onPressed: () async {
+                final hint = await conv.fetchHint();
+                if (hint != null && context.mounted) {
+                  HintSheet.show(context, hint);
+                }
+              },
+              icon: const Icon(Icons.lightbulb_outline, size: 18, color: SpeakabooTheme.accent),
+              label: const Text(
+                'Help me say it',
+                style: TextStyle(
+                  fontSize: SpeakabooTheme.captionSize,
+                  fontWeight: FontWeight.bold,
+                  color: SpeakabooTheme.accent,
+                ),
+              ),
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                backgroundColor: SpeakabooTheme.accent.withValues(alpha: 0.08),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
+                ),
+              ),
+            ),
+          ),
         if (statusText.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: SpeakabooTheme.spacingSm),

@@ -26,9 +26,11 @@ from backend.providers.groq_llm import GroqLlmProvider
 from backend.providers.groq_tts import GroqTtsProvider
 from backend.repositories import get_repository
 from backend.models.learning import SafetyFlag
+from backend.models.user import MistakeLog
 from backend.engine.missions import MissionsEngine
 from backend.engine.vocabulary import VocabularyEngine
 from backend.engine.auth_token import get_current_user_id
+from backend.engine.placement import evaluate_placement
 
 logger = logging.getLogger("speakaboo.routes.conversation")
 
@@ -75,12 +77,36 @@ class StartConversationRequest(BaseModel):
     user_id: str
     character_id: str
     conversation_id: Optional[str] = None
+    practice_mode: Optional[str] = "accuracy"
+    coach_mode: Optional[str] = "balanced"
+    age_band: Optional[str] = None
 
 
 class StartConversationResponse(BaseModel):
     conversation_id: str
     character_name: str
     greeting: str
+
+
+class HintRequest(BaseModel):
+    conversation_id: str
+
+
+class HintResponse(BaseModel):
+    conversation_id: str
+    sentence_starter: str
+    model_answer: str
+    vocabulary_hints: list[str]
+
+
+class SummaryRequest(BaseModel):
+    conversation_id: str
+
+
+class PlacementRequest(BaseModel):
+    user_id: str
+    spoken_text: str
+    duration_seconds: float = 30.0
 
 
 class TurnResponseModel(BaseModel):
@@ -95,6 +121,26 @@ class TurnResponseModel(BaseModel):
     latency_ms: float
     cost_usd: float = 0.0
     safety_blocked: bool = False
+
+
+def _categorize_error(original: str, better: str, reason: str) -> str:
+    """Categorize grammar mistakes to track learner error patterns (Bengali learner hypotheses)."""
+    import re
+    orig_l = original.lower()
+    reason_l = reason.lower()
+    if any(s in reason_l for s in ["agreement", "subject-verb"]):
+        return "subject_verb_agreement"
+    if "preposition" in reason_l or any(re.search(rf"\b{p}\b", orig_l) for p in ["in", "on", "at", "to", "for", "with", "by", "from"]):
+        return "prepositions"
+    if "article" in reason_l or re.search(r"\b(a|an|the)\b", orig_l):
+        return "articles"
+    if any(k in reason_l for k in ["tense", "past", "went", "did", "was", "were"]) or (
+        "verb" in reason_l and "subject-verb" not in reason_l
+    ):
+        return "tenses_and_verbs"
+    if any(s in reason_l for s in ["plural", "singular"]):
+        return "subject_verb_agreement"
+    return "word_choice"
 
 
 async def _check_entitlements_and_caps(state, character):
@@ -166,6 +212,22 @@ async def _record_turn_metrics(state, result):
                 context_sentence=result.user_transcript,
             )
 
+            # Record mistake category in mistake_logs
+            if corr_dict and corr_dict.get("original") and corr_dict.get("better"):
+                cat = _categorize_error(
+                    corr_dict.get("original", ""),
+                    corr_dict.get("better", ""),
+                    corr_dict.get("reason_short", ""),
+                )
+                await repo.log_mistake(
+                    MistakeLog(
+                        user_id=state.user_id,
+                        category=cat,
+                        original=corr_dict.get("original", ""),
+                        better=corr_dict.get("better", ""),
+                    )
+                )
+
             # Track 2-minute trial seconds for locked character
             character = load_character(state.character_id)
             if character.locked:
@@ -207,10 +269,20 @@ async def start_conversation(request: StartConversationRequest):
                 )
 
     engine = get_engine()
+    age_band = request.age_band
+    if not age_band:
+        repo = await get_repository()
+        prof = await repo.get_profile(request.user_id)
+        if prof and prof.age_band:
+            age_band = prof.age_band.value if hasattr(prof.age_band, "value") else str(prof.age_band)
+
     state = engine.start_conversation(
         character_id=request.character_id,
         user_id=request.user_id,
         conversation_id=request.conversation_id,
+        practice_mode=request.practice_mode or "accuracy",
+        coach_mode=request.coach_mode or "balanced",
+        age_band=age_band or "teen",
     )
 
     return StartConversationResponse(
@@ -350,3 +422,81 @@ async def process_stream_turn(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@router.post("/hint", response_model=HintResponse)
+async def get_conversation_hint(request: HintRequest):
+    """Generate a pedagogical sentence starter, model answer, and vocabulary hint."""
+    engine = get_engine()
+    state = engine.get_conversation(request.conversation_id)
+    if not state:
+        raise HTTPException(status_code=404, detail=f"Conversation not found: {request.conversation_id}")
+
+    hint = engine.get_hint(request.conversation_id)
+    return HintResponse(**hint)
+
+
+@router.post("/summary")
+async def get_session_summary(request: SummaryRequest):
+    """Retrieve pedagogical coaching summary and retention hook for the session."""
+    engine = get_engine()
+    state = engine.get_conversation(request.conversation_id)
+    if not state:
+        raise HTTPException(status_code=404, detail=f"Conversation not found: {request.conversation_id}")
+
+    return engine.get_session_summary(request.conversation_id)
+
+
+@router.post("/placement")
+async def assess_placement(
+    request: PlacementRequest,
+    current_user_id: str = Depends(get_current_user_id),
+):
+    """Evaluate a spoken placement diagnostic and persist estimated level to profile."""
+    if request.user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Cannot update placement for another user")
+
+    result = evaluate_placement(request.spoken_text, request.duration_seconds)
+    repo = await get_repository()
+    profile = await repo.get_profile(request.user_id)
+    if not profile:
+        from backend.models.user import UserProfile
+        profile = UserProfile(user_id=request.user_id)
+    profile.level = result.level
+    await repo.save_profile(profile)
+
+    return {
+        "user_id": request.user_id,
+        "level": result.level,
+        "cefr_level": result.cefr_level,
+        "cefr_score": result.cefr_score,
+        "wpm": result.wpm,
+        "vocabulary_variety": result.vocabulary_variety,
+        "summary": result.summary,
+        "strengths": result.strengths,
+        "recommendations": result.recommendations,
+    }
+
+
+@router.get("/mistakes/{user_id}")
+async def get_mistakes(
+    user_id: str,
+    current_user_id: str = Depends(get_current_user_id),
+):
+    """Retrieve recurring error categories and mistake logs for a learner."""
+    if user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Cannot access other user's mistakes")
+
+    repo = await get_repository()
+    mistakes = await repo.get_mistakes(user_id)
+    return [
+        {
+            "id": m.id,
+            "category": m.category,
+            "original": m.original,
+            "better": m.better,
+            "count": m.count,
+            "last_seen_at": m.last_seen_at,
+        }
+        for m in mistakes
+    ]

@@ -242,3 +242,153 @@ class VocabCard {
     );
   }
 }
+
+class ConversationHint {
+  final String conversationId;
+  final String sentenceStarter;
+  final String modelAnswer;
+  final List<String> vocabularyHints;
+
+  ConversationHint({
+    required this.conversationId,
+    required this.sentenceStarter,
+    required this.modelAnswer,
+    required this.vocabularyHints,
+  });
+
+  factory ConversationHint.fromJson(Map<String, dynamic> json) {
+    return ConversationHint(
+      conversationId: json['conversation_id'] ?? '',
+      sentenceStarter: json['sentence_starter'] ?? '',
+      modelAnswer: json['model_answer'] ?? '',
+      vocabularyHints: List<String>.from(json['vocabulary_hints'] ?? []),
+    );
+  }
+}
+
+class SessionSummary {
+  final String conversationId;
+  final int turnCount;
+  final double learnerTalkTimeSeconds;
+  final double botTalkTimeSeconds;
+  final double talkTimeRatio;
+  final double wpm;
+  final double averageTurnLengthWords;
+  final int clarityScore;
+  final String clarityLabel;
+  final String clarityNote;
+  final List<String> strengths;
+  final List<String> patternsToWorkOn;
+  final String concreteNextStep;
+  final List<Map<String, dynamic>> sayThisBetter;
+  final String tomorrowHook;
+
+  SessionSummary({
+    required this.conversationId,
+    required this.turnCount,
+    required this.learnerTalkTimeSeconds,
+    required this.botTalkTimeSeconds,
+    required this.talkTimeRatio,
+    required this.wpm,
+    required this.averageTurnLengthWords,
+    required this.clarityScore,
+    required this.clarityLabel,
+    required this.clarityNote,
+    required this.strengths,
+    required this.patternsToWorkOn,
+    required this.concreteNextStep,
+    required this.sayThisBetter,
+    required this.tomorrowHook,
+  });
+
+  factory SessionSummary.fromJson(Map<String, dynamic> json) {
+    final clarity = json['clarity_indicator'] as Map<String, dynamic>? ?? {};
+    return SessionSummary(
+      conversationId: json['conversation_id'] ?? '',
+      turnCount: json['turn_count'] ?? 0,
+      learnerTalkTimeSeconds: (json['learner_talk_time_seconds'] ?? 0).toDouble(),
+      botTalkTimeSeconds: (json['bot_talk_time_seconds'] ?? 0).toDouble(),
+      talkTimeRatio: (json['talk_time_ratio'] ?? 0).toDouble(),
+      wpm: (json['wpm'] ?? 0).toDouble(),
+      averageTurnLengthWords: (json['average_turn_length_words'] ?? 0).toDouble(),
+      clarityScore: clarity['score'] ?? 80,
+      clarityLabel: clarity['label'] ?? 'Approximate Clarity',
+      clarityNote: clarity['note'] ?? 'Approximate estimate based on speech-to-text confidence and phrasing cadence.',
+      strengths: List<String>.from(json['strengths'] ?? []),
+      patternsToWorkOn: List<String>.from(json['patterns_to_work_on'] ?? []),
+      concreteNextStep: json['concrete_next_step'] ?? '',
+      sayThisBetter: (json['say_this_better'] as List<dynamic>?)
+              ?.map((c) => Map<String, dynamic>.from(c as Map))
+              .toList() ??
+          [],
+      tomorrowHook: json['tomorrow_hook'] ?? '',
+    );
+  }
+}
+
+class PlacementResult {
+  final String userId;
+  final String level;
+  final String cefrLevel;
+  final double cefrScore;
+  final double wpm;
+  final double vocabularyVariety;
+  final String summary;
+  final List<String> strengths;
+  final List<String> recommendations;
+
+  PlacementResult({
+    required this.userId,
+    required this.level,
+    required this.cefrLevel,
+    required this.cefrScore,
+    required this.wpm,
+    required this.vocabularyVariety,
+    required this.summary,
+    required this.strengths,
+    required this.recommendations,
+  });
+
+  factory PlacementResult.fromJson(Map<String, dynamic> json) {
+    return PlacementResult(
+      userId: json['user_id'] ?? '',
+      level: json['level'] ?? 'beginner',
+      cefrLevel: json['cefr_level'] ?? 'A1',
+      cefrScore: (json['cefr_score'] ?? 1.0).toDouble(),
+      wpm: (json['wpm'] ?? 0).toDouble(),
+      vocabularyVariety: (json['vocabulary_variety'] ?? 0).toDouble(),
+      summary: json['summary'] ?? '',
+      strengths: List<String>.from(json['strengths'] ?? []),
+      recommendations: List<String>.from(json['recommendations'] ?? []),
+    );
+  }
+}
+
+class MistakeLogItem {
+  final String id;
+  final String category;
+  final String original;
+  final String better;
+  final int count;
+  final double lastSeenAt;
+
+  MistakeLogItem({
+    required this.id,
+    required this.category,
+    required this.original,
+    required this.better,
+    required this.count,
+    required this.lastSeenAt,
+  });
+
+  factory MistakeLogItem.fromJson(Map<String, dynamic> json) {
+    return MistakeLogItem(
+      id: json['id'] ?? '',
+      category: json['category'] ?? '',
+      original: json['original'] ?? '',
+      better: json['better'] ?? '',
+      count: json['count'] ?? 1,
+      lastSeenAt: (json['last_seen_at'] ?? 0).toDouble(),
+    );
+  }
+}

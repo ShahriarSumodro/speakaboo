@@ -300,6 +300,9 @@ class ApiService {
     required String characterId,
     String? scenarioId,
     String? topicId,
+    String? practiceMode,
+    String? coachMode,
+    String? ageBand,
   }) async {
     final response = await _client
         .post(
@@ -310,6 +313,9 @@ class ApiService {
             'character_id': characterId,
             if (scenarioId != null) 'scenario_id': scenarioId,
             if (topicId != null) 'topic_id': topicId,
+            if (practiceMode != null) 'practice_mode': practiceMode,
+            if (coachMode != null) 'coach_mode': coachMode,
+            if (ageBand != null) 'age_band': ageBand,
           }),
         )
         .timeout(AppConfig.requestTimeout);
@@ -318,6 +324,78 @@ class ApiService {
       throw ApiException('Failed to start conversation', response.statusCode);
     }
     return StartConversationResult.fromJson(jsonDecode(response.body));
+  }
+
+  /// Get sentence starter, model answer, and vocabulary hint for active conversation.
+  Future<ConversationHint> getConversationHint(String conversationId) async {
+    final response = await _client
+        .post(
+          Uri.parse('$baseUrl/api/conversation/hint'),
+          headers: _headers(),
+          body: jsonEncode({'conversation_id': conversationId}),
+        )
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to load hint', response.statusCode);
+    }
+    return ConversationHint.fromJson(jsonDecode(response.body));
+  }
+
+  /// Get end-of-session summary, talk-time ratio, clarity indicator, and tomorrow hook.
+  Future<SessionSummary> getConversationSummary(String conversationId) async {
+    final response = await _client
+        .post(
+          Uri.parse('$baseUrl/api/conversation/summary'),
+          headers: _headers(),
+          body: jsonEncode({'conversation_id': conversationId}),
+        )
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to load session summary', response.statusCode);
+    }
+    return SessionSummary.fromJson(jsonDecode(response.body));
+  }
+
+  /// Submit spoken placement test diagnostic and update user level.
+  Future<PlacementResult> submitPlacementTest({
+    required String userId,
+    required String spokenText,
+    double durationSeconds = 30.0,
+  }) async {
+    final response = await _client
+        .post(
+          Uri.parse('$baseUrl/api/conversation/placement'),
+          headers: _headers(),
+          body: jsonEncode({
+            'user_id': userId,
+            'spoken_text': spokenText,
+            'duration_seconds': durationSeconds,
+          }),
+        )
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to submit placement test', response.statusCode);
+    }
+    return PlacementResult.fromJson(jsonDecode(response.body));
+  }
+
+  /// Get mistake logs and recurring error categories for learner.
+  Future<List<MistakeLogItem>> getMistakeLogs(String userId) async {
+    final response = await _client
+        .get(
+          Uri.parse('$baseUrl/api/conversation/mistakes/$userId'),
+          headers: _headers(),
+        )
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to load mistake logs', response.statusCode);
+    }
+    final list = jsonDecode(response.body) as List<dynamic>;
+    return list.map((m) => MistakeLogItem.fromJson(m as Map<String, dynamic>)).toList();
   }
 
   /// Send an audio turn and get the AI response (blocking fallback).

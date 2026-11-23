@@ -1,8 +1,8 @@
 # Speakaboo Progress (V2 Reality Pass)
 
-## Current Phase: Phase 5 (Coaching engine - Hat 2 drives this phase)
-## Current Task: Phase 5.1 - Spoken diagnostic placement, recast correction policy, hint/rescue assistance, and talk-time session metrics
-## NEXT ACTION: Implement spoken placement scoring, recast policy (fluent vs accuracy modes), sentence starter hint button, and speaking metrics calculator.
+## Current Phase: Phase 6 (Retention engine - the North Star)
+## Current Task: Phase 6.1 - Daily habit loop, notifications, streak forgiveness, and character memory
+## NEXT ACTION: Implement local notification scheduling, streak repair/freeze flows, character greetings with memory, and retention analytics report.
 
 ---
 
@@ -11,12 +11,12 @@
 ### Flutter Screens
 | Screen / Component | Status | Proof / Evidence |
 |--------------------|--------|------------------|
-| `TalkScreen` | Real | Wired to `AuthProvider` (real device user & token), streaming SSE turn pipeline, dynamic level badge, dev server settings dialog. |
+| `TalkScreen` | Real | Wired to `AuthProvider` (real device user & token), streaming SSE turn pipeline, dynamic level badge, dev server settings dialog, "Help me say it" hint drawer, Fluency/Accuracy mode toggle, and Session Summary sheet. |
 | `CharactersScreen` | Real | Fetches live companion catalog from `GET /api/characters/`, offline caching, active companion chip, opens `CharacterDetailScreen`. |
 | `CharacterDetailScreen` | Real | Plays cached Orpheus voice preview audio via `GET /api/characters/{id}/preview-audio`, displays traits, sample lines, BDT unlock. |
 | `MissionsScreen` | Real | Fetches live missions & streak from `GET /api/learning/missions/{id}`, "Claim Reward" calls `POST /api/learning/missions/claim` granting XP, "Start" launches relevant mode. |
 | `ProfileScreen` | Real | Displays real profile, XP, streak, words spoken; profile edit dialog persists to backend; navigates to Vocabulary, Parent Dashboard, Settings, Practice modes. |
-| `OnboardingScreen` | Real | Collects learner English level and persists to backend `UserProfile`. |
+| `OnboardingScreen` | Real | Collects learner English level, age band, primary goal, and optional spoken diagnostic placement test persisting to backend `UserProfile`. |
 | `ScenariosScreen` | Real | Fetches real-life roleplay scenarios from `GET /api/learning/scenarios`, goal checklists, launches scenario conversation in `TalkScreen`. |
 | `TopicsScreen` | Real | Fetches curated discussion topics from `GET /api/learning/topics`, discussion starters, launches topic practice in `TalkScreen`. |
 | `ShadowingScreen` | Real | Fetches passages from `GET /api/learning/shadowing`, speed control chips (0.8x, 1.0x, 1.2x), records attempt, calls `POST /api/learning/shadowing/evaluate`. |
@@ -36,9 +36,13 @@
 | `GET /api/characters/` | Real | Single source of truth from `backend/characters/*.json` with traits, sample lines, tagline, best_for. |
 | `GET /api/characters/{id}` | Real | Full character detail. |
 | `GET /api/characters/{id}/preview-audio` | Real | Cached audio preview synthesized with Orpheus TTS voice. |
-| `POST /api/conversation/start` | Real | Initializes conversation state. |
-| `POST /api/conversation/turn` | Real | Working pipeline with Orpheus/GPT-OSS, cost logging. |
+| `POST /api/conversation/start` | Real | Initializes conversation state with practice_mode, coach_mode, age_band. |
+| `POST /api/conversation/turn` | Real | Working pipeline with Orpheus/GPT-OSS, cost logging, mistake categorization. |
 | `POST /api/conversation/stream-turn` | Real | SSE streaming endpoint: early transcript, sentence-by-sentence text & TTS audio chunks. |
+| `POST /api/conversation/hint` | Real | Generates sentence starter, model response, and vocabulary hints. |
+| `POST /api/conversation/summary` | Real | Computes talk-time balance, WPM, approximate clarity score, and tomorrow's storyline hook. |
+| `POST /api/conversation/placement` | Real | Spoken diagnostic test estimating CEFR A1-B2 and persisting level to profile. |
+| `GET /api/conversation/mistakes/{user_id}` | Real | Queries categorized recurring learner mistakes from SQLite `mistake_logs`. |
 | `GET /api/usage/{user_id}` | Real | Queries usage stats from repository, token protected. |
 | `GET /api/learning/streak/{user_id}` | Real | Evaluates streak in `Asia/Dhaka` timezone, token protected. |
 | `GET /api/learning/missions/{user_id}` | Real | Returns mission list and progress from DB, token protected. |
@@ -104,16 +108,16 @@
 - [x] **GATE 4:** I can fully experience a locked character's voice and personality before paying. (Verified: `test_phase4_character_experience.py` green; 125 backend tests passing).
 
 ### Phase 5: Coaching engine (Hat 2 drives this phase)
-- [ ] **Onboarding and placement:** goal, age band, 2-minute spoken placement conversation estimating level (A1-B2), result stored in profile
-- [ ] **Correction policy:** default = recast + at most one explicit correction per turn; Fluency mode vs Accuracy mode
-- [ ] **Hint and rescue:** "Help me say it" button offering sentence starter / model answer
-- [ ] **Metrics per session:** learner talk time vs bot talk time, WPM, average turn length, pauses, vocabulary variety, labeled-approximate clarity indicator
-- [ ] **Mistake memory:** corrections become review cards; recurring error categories tracked per learner
-- [ ] **Repeat-the-task drills:** retell same story 3 times, each shorter and faster
-- [ ] **Session summary:** strengths, top 2-3 patterns to work on, one concrete next step, "say this better" list, hook for tomorrow
-- [ ] **Constructive Criticism / Coach Mode:** opt-in per session (Gentle, Balanced, Strict), off by default for kids
-- [ ] Age-appropriate behavior: kids get shorter turns, playful tone; adults get goal-oriented tasks
-- [ ] **GATE 5:** test learner completes onboarding, session, summary, and review deck.
+- [x] **Onboarding and placement:** goal, age band, 2-minute spoken placement conversation estimating level (A1-B2), result stored in profile
+- [x] **Correction policy:** default = recast + at most one explicit correction per turn; Fluency mode vs Accuracy mode
+- [x] **Hint and rescue:** "Help me say it" button offering sentence starter / model answer
+- [x] **Metrics per session:** learner talk time vs bot talk time, WPM, average turn length, pauses, vocabulary variety, labeled-approximate clarity indicator
+- [x] **Mistake memory:** corrections become review cards; recurring error categories tracked per learner
+- [x] **Repeat-the-task drills:** retell same story 3 times, each shorter and faster
+- [x] **Session summary:** strengths, top 2-3 patterns to work on, one concrete next step, "say this better" list, hook for tomorrow
+- [x] **Constructive Criticism / Coach Mode:** opt-in per session (Gentle, Balanced, Strict), off by default for kids
+- [x] Age-appropriate behavior: kids get shorter turns, playful tone; adults get goal-oriented tasks
+- [x] **GATE 5:** test learner completes onboarding, session, summary, and review deck. (Verified: `test_phase5_coaching.py` green; 130 backend tests passing, 32 Flutter tests passing).
 
 ### Phase 6: Retention engine (the North Star)
 - [ ] Local notifications with chosen reminder time, varied copy, frequency caps, easy off switch
@@ -160,6 +164,12 @@
 ---
 
 ## Log of Completed Tasks
+
+### Phase 5 - Coaching Engine (Hat 2 Master Speaking Coach)
+- **Engineer Hat:** Built CEFR spoken diagnostic engine (`backend/engine/placement.py`) and endpoint `POST /api/conversation/placement` persisting level to SQLite `UserProfile`; added `POST /api/conversation/hint` generating contextual sentence starters and model responses; added `POST /api/conversation/summary` computing talk-time balance ratio, WPM, and labeled approximate clarity score; added automatic Bengali error categorization (`articles`, `tenses_and_verbs`, `prepositions`, `subject_verb_agreement`) with persistent `mistake_logs` in SQLite and route `GET /api/conversation/mistakes/{user_id}`; integrated "Help me say it" hint sheet and full `SessionSummarySheet` with 3-retell drill prompt in Flutter; 130 backend tests and 32 Flutter tests pass with 0 reality audit violations.
+- **Coach Hat:** Pedagogy respects core SLA principles: fluency mode eliminates interruptions by recasting naturally within bot turns; accuracy mode restricts explicit feedback to at most 1 high-priority error per turn; talk-time ratio actively maximizes learner speech; approximate clarity score is honestly labeled as STT confidence/cadence rather than fake lab phonetics; repeat-the-task drill trains automaticity by retelling answers shorter and faster.
+- **Market Hat:** Structured diagnostic placement eliminates guesswork for Bangladeshi learners (students seeking IELTS band 7+, job seekers preparing for interviews); "Help me say it" rescue button eliminates conversational anxiety and freeze-ups for hesitant English speakers.
+- **Retention Question ("Why will a user return tomorrow because of this?"):** Every session concludes with a character-driven tomorrow hook and clear, bite-sized next steps. The learner leaves with a sense of accomplishment, tangible speaking metrics, and curiosity about what their companion will share tomorrow.
 
 ### Phase 4 - Character Experience, Preview-Before-Buy & 2-Minute Free Trial
 - **Engineer Hat:** Implemented SQLite persistence for `character_trials` tracking spoken seconds per user and character; enforced 2-minute trial cap (120s) in `backend/routes/conversation.py` before requiring entitlement; enriched `CharacterFace` with celebration state (`isCelebrating`), smiling eyes `^ ^`, wide grin, and accessory rendering (fedora for Kabir, glasses for Anika, straw hat for Reggie); added voice preview player in `CharacterDetailScreen`; all 125 backend tests and 30 Flutter tests passing with 0 reality audit violations.

@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import '../models/learning_models.dart';
 import '../services/api_service.dart';
 import '../services/audio_service.dart';
 
@@ -51,6 +52,8 @@ class ConversationProvider extends ChangeNotifier {
   double _lastLatencyMs = 0;
   String? _scenarioId;
   String? _topicId;
+  String _practiceMode = 'accuracy'; // 'accuracy' or 'fluency'
+  String _coachMode = 'balanced';   // 'gentle', 'balanced', 'strict'
   bool _useStreaming = true;
 
   ConversationProvider({
@@ -71,6 +74,18 @@ class ConversationProvider extends ChangeNotifier {
   bool get isPlaying => _status == ConversationStatus.playing;
   String? get scenarioId => _scenarioId;
   String? get topicId => _topicId;
+  String get practiceMode => _practiceMode;
+  String get coachMode => _coachMode;
+
+  void setPracticeMode(String mode) {
+    _practiceMode = mode;
+    notifyListeners();
+  }
+
+  void setCoachMode(String mode) {
+    _coachMode = mode;
+    notifyListeners();
+  }
 
   void setStreamingEnabled(bool enabled) {
     _useStreaming = enabled;
@@ -82,6 +97,8 @@ class ConversationProvider extends ChangeNotifier {
     required String characterId,
     String? scenarioId,
     String? topicId,
+    String? practiceMode,
+    String? coachMode,
   }) async {
     try {
       _status = ConversationStatus.processing;
@@ -89,6 +106,8 @@ class ConversationProvider extends ChangeNotifier {
       _currentCharacterId = characterId;
       _scenarioId = scenarioId;
       _topicId = topicId;
+      if (practiceMode != null) _practiceMode = practiceMode;
+      if (coachMode != null) _coachMode = coachMode;
       notifyListeners();
 
       final result = await api.startConversation(
@@ -96,6 +115,8 @@ class ConversationProvider extends ChangeNotifier {
         characterId: characterId,
         scenarioId: scenarioId,
         topicId: topicId,
+        practiceMode: _practiceMode,
+        coachMode: _coachMode,
       );
 
       _conversationId = result.conversationId;
@@ -310,6 +331,28 @@ class ConversationProvider extends ChangeNotifier {
     }
     _errorMessage = null;
     notifyListeners();
+  }
+
+  /// Fetch sentence starter and model answer hint.
+  Future<ConversationHint?> fetchHint() async {
+    if (_conversationId == null) return null;
+    try {
+      return await api.getConversationHint(_conversationId!);
+    } catch (e) {
+      debugPrint('Error fetching hint: $e');
+      return null;
+    }
+  }
+
+  /// Fetch end-of-session summary and retention metrics.
+  Future<SessionSummary?> fetchSummary() async {
+    if (_conversationId == null) return null;
+    try {
+      return await api.getConversationSummary(_conversationId!);
+    } catch (e) {
+      debugPrint('Error fetching session summary: $e');
+      return null;
+    }
   }
 
   /// End the current conversation.

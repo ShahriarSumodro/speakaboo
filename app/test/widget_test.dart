@@ -17,7 +17,10 @@ import 'package:speakaboo/widgets/empty_state.dart';
 import 'package:speakaboo/widgets/unlock_sheet.dart';
 import 'package:speakaboo/widgets/daily_cap_sheet.dart';
 import 'package:speakaboo/widgets/correction_detail_sheet.dart';
+import 'package:speakaboo/widgets/hint_sheet.dart';
+import 'package:speakaboo/widgets/session_summary_sheet.dart';
 import 'package:speakaboo/models/character.dart';
+import 'package:speakaboo/models/learning_models.dart';
 import 'package:speakaboo/screens/talk_screen.dart';
 import 'package:speakaboo/screens/characters_screen.dart';
 import 'package:speakaboo/screens/character_detail_screen.dart';
@@ -460,21 +463,101 @@ void main() {
   testWidgets('OnboardingScreen displays level options and start button',
       (WidgetTester tester) async {
     bool finished = false;
+    final mockClient = MockClient((request) async => http.Response('{}', 200));
+    final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
+    final auth = AuthProvider(api: api);
+
     await tester.pumpWidget(
-      MaterialApp(
-        home: OnboardingScreen(onFinish: () => finished = true),
+      MultiProvider(
+        providers: [
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
+        ],
+        child: MaterialApp(
+          home: OnboardingScreen(onFinish: () => finished = true),
+        ),
       ),
     );
 
     expect(find.text('Welcome to Speakaboo!'), findsOneWidget);
-    expect(find.text('Beginner'), findsOneWidget);
-    expect(find.text('Intermediate'), findsOneWidget);
-    expect(find.text('Advanced'), findsOneWidget);
+    expect(find.text('Child (6-12)'), findsOneWidget);
+    expect(find.text('Daily Conversation'), findsOneWidget);
+    expect(find.textContaining('Beginner'), findsOneWidget);
+    expect(find.textContaining('Intermediate'), findsOneWidget);
+    expect(find.textContaining('Advanced'), findsOneWidget);
 
     await tester.ensureVisible(find.text('Start Speaking Practice'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Start Speaking Practice'));
     expect(finished, isTrue);
+  });
+
+  testWidgets('HintSheet renders sentence starter, model answer, and vocabulary',
+      (WidgetTester tester) async {
+    final hint = ConversationHint(
+      conversationId: 'c1',
+      sentenceStarter: 'I really enjoy...',
+      modelAnswer: 'I really enjoy reading books and learning English.',
+      vocabularyHints: ['enjoy', 'favorite', 'relaxing'],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: HintSheet(hint: hint),
+        ),
+      ),
+    );
+
+    expect(find.text('Help Me Say It'), findsOneWidget);
+    expect(find.text('I really enjoy...'), findsOneWidget);
+    expect(find.text('I really enjoy reading books and learning English.'), findsOneWidget);
+    expect(find.text('enjoy'), findsOneWidget);
+    expect(find.text('favorite'), findsOneWidget);
+    expect(find.text('relaxing'), findsOneWidget);
+  });
+
+  testWidgets('SessionSummarySheet renders talk time, pace, clarity, and tomorrow hook',
+      (WidgetTester tester) async {
+    final summary = SessionSummary(
+      conversationId: 'c1',
+      turnCount: 4,
+      learnerTalkTimeSeconds: 42.0,
+      botTalkTimeSeconds: 28.0,
+      talkTimeRatio: 0.60,
+      wpm: 84.0,
+      averageTurnLengthWords: 8.5,
+      clarityScore: 88,
+      clarityLabel: 'Approximate Clarity',
+      clarityNote: 'Approximate estimate based on speech-to-text confidence and phrasing cadence.',
+      strengths: ['High learner talk time', 'Good conversational tempo'],
+      patternsToWorkOn: ['Past tense consistency'],
+      concreteNextStep: 'Repeat your best answer today in 30 seconds to lock in fluency.',
+      sayThisBetter: [],
+      tomorrowHook: 'Tomorrow Kabir has a special riddle prepared!',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SessionSummarySheet(summary: summary),
+        ),
+      ),
+    );
+
+    expect(find.text('Speaking Session Summary'), findsOneWidget);
+    expect(find.text('60%'), findsOneWidget);
+    expect(find.text('84 WPM'), findsOneWidget);
+    expect(find.text('88%'), findsOneWidget);
+    expect(find.text('Approximate Clarity'), findsOneWidget);
+    expect(find.text('High learner talk time'), findsOneWidget);
+    expect(find.text('Past tense consistency'), findsOneWidget);
+
+    await tester.scrollUntilVisible(find.text('Repeat-the-Task Fluency Drill'), 100);
+    expect(find.text('Repeat-the-Task Fluency Drill'), findsOneWidget);
+
+    await tester.scrollUntilVisible(find.text('Tomorrow Kabir has a special riddle prepared!'), 100);
+    expect(find.text('Tomorrow Kabir has a special riddle prepared!'), findsOneWidget);
   });
 
   testWidgets('EmptyStateWidget renders icon, text, and action button',

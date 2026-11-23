@@ -93,18 +93,19 @@ def build_system_prompt(
     character: Character,
     level: str = "beginner",
     feedback_style_override: Optional[str] = None,
+    practice_mode: str = "accuracy",  # "accuracy" or "fluency"
+    coach_mode: str = "balanced",    # "gentle", "balanced", "strict"
+    age_band: str = "teen",          # "kid", "teen", "adult"
 ) -> str:
-    """Build the full system prompt for a character at a given learner level.
+    """Build the pedagogical system prompt for a companion.
     
-    This is extensible for future feedback modes (Phase 8).
-    
-    Args:
-        character: The character to build a prompt for
-        level: Learner level (beginner/intermediate/advanced)
-        feedback_style_override: Optional override for feedback style (Phase 8 hook)
-    
-    Returns:
-        Complete system prompt string
+    Adheres to Master English speaking coach principles:
+    - Maximize learner talk time (bot replies stay brief, prompt learner to speak)
+    - Natural recasts (bot embeds correct forms inside conversational reply)
+    - Single most important error correction in accuracy mode
+    - Low anxiety, positive praise, zero shame
+    - Common difficulty hypotheses for Bengali speakers: articles, tenses, prepositions, agreement
+    - Age-appropriate tone and sentence complexity
     """
     parts = [
         character.persona_prompt,
@@ -117,27 +118,62 @@ def build_system_prompt(
     if tone:
         parts.append(f"\nLevel adjustment: {tone}")
 
-    # Feedback style (extensible for Phase 8: Constructive Criticism Mode)
+    # Age band instructions
+    if age_band == "kid":
+        parts.append("""
+AGE ADJUSTMENT - CHILD LEARNER (6-12 years):
+- Keep language simple, cheerful, and highly encouraging.
+- Limit replies to 1 short sentence (max 120 characters).
+- Celebrate imagination and effort. Never use academic grammatical terms.
+""")
+    elif age_band == "adult":
+        parts.append("""
+AGE ADJUSTMENT - ADULT LEARNER (18+ years):
+- Respectful, practical, and goal-oriented conversation.
+- Focus on professional and daily communication confidence.
+""")
+
+    # Practice mode instructions (Fluency vs Accuracy)
+    if practice_mode == "fluency":
+        parts.append("""
+PEDAGOGY - FLUENCY MODE:
+- Do NOT interrupt the learner's conversational flow with explicit correction.
+- Set "correction": null in your JSON.
+- Recast any error naturally inside your reply (e.g., if user says 'I goes home', reply: 'You went home? What did you do there?').
+- Maximize learner talk time: end with an open question.
+""")
+    else:
+        # Accuracy mode
+        parts.append(f"""
+PEDAGOGY - ACCURACY MODE ({coach_mode.upper()}):
+- If the learner makes grammatical errors, pick at most ONE high-priority error (e.g. tense, subject-verb agreement, prepositions, articles).
+- Recast the other errors naturally in your dialogue.
+- Provide friendly, constructive guidance in "correction".
+- Tone: Encourage confidence, never shame.
+""")
+
+    # Feedback style
     feedback = feedback_style_override or character.feedback_style
     if feedback:
         parts.append(f"\nFeedback approach: {feedback}")
 
-    # Core rules (always applied)
+    # Core rules
     parts.append("""
 RULES (always follow):
 1. Reply in 1-2 SHORT sentences only. Max 200 characters total.
-2. If the user made a grammar or vocabulary mistake, correct AT MOST ONE mistake per reply, gently.
-3. Use your character personality in every reply.
-4. Never break character.
-5. Never discuss violence, sexual content, self-harm, drugs, or ask for personal information.
-6. If the user says something inappropriate, redirect kindly to English practice.
-7. Celebrate good attempts. Build speaking confidence.
+2. Maximize learner talk time: always end with a gentle question or prompt for the learner to reply.
+3. If the user made a grammar or vocabulary mistake, correct AT MOST ONE mistake per reply in accuracy mode. In fluency mode, set correction to null.
+4. Use your character personality in every reply.
+5. Never break character.
+6. Never discuss violence, sexual content, self-harm, drugs, or ask for personal information.
+7. If the user says something inappropriate, redirect kindly to English practice.
+8. Celebrate good attempts. Build speaking confidence.
 
 OUTPUT FORMAT: You MUST respond with valid JSON only, no other text:
 {
   "version": 1,
   "reply": "Your character's spoken reply (max 200 chars, 1-2 sentences)",
-  "correction": {"original": "what they said wrong", "better": "improved version", "reason_short": "brief why"} or null if no correction,
+  "correction": {"original": "what they said wrong", "better": "improved version", "reason_short": "brief why"} or null,
   "new_words": ["any", "new", "vocabulary", "you", "used"] or [],
   "feedback_level": "gentle",
   "detailed_feedback": null

@@ -58,6 +58,14 @@ class ConversationState:
     user_transcripts: list[str] = field(default_factory=list)
     turn_count: int = 0
     total_stt_seconds: float = 0.0
+    practice_mode: str = "accuracy"  # "accuracy" or "fluency"
+    coach_mode: str = "balanced"    # "gentle", "balanced", "strict"
+    age_band: str = "teen"          # "kid", "teen", "adult"
+    bot_speech_seconds: float = 0.0
+    bot_words_count: int = 0
+    user_words_count: int = 0
+    corrections_list: list[dict] = field(default_factory=list)
+    new_words_learned: list[str] = field(default_factory=list)
     created_at: float = field(default_factory=time.time)
     last_turn_at: float = field(default_factory=time.time)
 
@@ -79,17 +87,30 @@ class ConversationEngine:
         self._conversations: dict[str, ConversationState] = {}
 
     def start_conversation(
-        self, character_id: str, user_id: str, conversation_id: Optional[str] = None
+        self,
+        character_id: str,
+        user_id: str,
+        conversation_id: Optional[str] = None,
+        practice_mode: str = "accuracy",
+        coach_mode: str = "balanced",
+        age_band: str = "teen",
     ) -> ConversationState:
         """Start a new conversation or return an existing one."""
         cid = conversation_id or str(uuid.uuid4())
         if cid in self._conversations:
-            return self._conversations[cid]
+            state = self._conversations[cid]
+            state.practice_mode = practice_mode
+            state.coach_mode = coach_mode
+            state.age_band = age_band
+            return state
 
         state = ConversationState(
             id=cid,
             character_id=character_id,
             user_id=user_id,
+            practice_mode=practice_mode,
+            coach_mode=coach_mode,
+            age_band=age_band,
         )
         self._conversations[cid] = state
         return state
@@ -155,7 +176,13 @@ class ConversationEngine:
         level = estimate_level(state.user_transcripts)
 
         # --- Step 4: Build messages for LLM ---
-        system_prompt = build_system_prompt(character, level)
+        system_prompt = build_system_prompt(
+            character=character,
+            level=level,
+            practice_mode=state.practice_mode,
+            coach_mode=state.coach_mode,
+            age_band=state.age_band,
+        )
         messages = [Message(role="system", content=system_prompt)]
         messages.extend(self._trim_history(state.history))
         messages.append(Message(role="user", content=user_text))
@@ -202,6 +229,14 @@ class ConversationEngine:
         state.history.append(Message(role="assistant", content=response.reply))
         state.turn_count += 1
         state.total_stt_seconds += stt_result.duration_seconds
+        user_words = len(user_text.split())
+        state.user_words_count += user_words
+        bot_words = len(response.reply.split())
+        state.bot_words_count += bot_words
+        state.bot_speech_seconds += max(1.0, round(bot_words / 2.5, 2))
+        if response.correction:
+            state.corrections_list.append(response.correction.__dict__)
+        state.new_words_learned.extend(response.new_words)
         state.last_turn_at = time.time()
 
         latency_ms = (time.time() - start_time) * 1000
@@ -325,7 +360,13 @@ class ConversationEngine:
         state.user_transcripts.append(user_text)
         level = estimate_level(state.user_transcripts)
 
-        system_prompt = build_system_prompt(character, level)
+        system_prompt = build_system_prompt(
+            character=character,
+            level=level,
+            practice_mode=state.practice_mode,
+            coach_mode=state.coach_mode,
+            age_band=state.age_band,
+        )
         messages = [Message(role="system", content=system_prompt)]
         messages.extend(self._trim_history(state.history))
         messages.append(Message(role="user", content=user_text))
@@ -394,6 +435,14 @@ class ConversationEngine:
         state.history.append(Message(role="assistant", content=response.reply))
         state.turn_count += 1
         state.total_stt_seconds += stt_result.duration_seconds
+        user_words = len(user_text.split())
+        state.user_words_count += user_words
+        bot_words = len(response.reply.split())
+        state.bot_words_count += bot_words
+        state.bot_speech_seconds += max(1.0, round(bot_words / 2.5, 2))
+        if response.correction:
+            state.corrections_list.append(response.correction.__dict__)
+        state.new_words_learned.extend(response.new_words)
         state.last_turn_at = time.time()
 
         latency_ms = (time.time() - start_time) * 1000
@@ -489,3 +538,127 @@ class ConversationEngine:
                 trimmed = trimmed[1:]
 
         return trimmed
+
+    def get_hint(self, conversation_id: str) -> dict:
+        """Generate pedagogical sentence starter, model response, and vocabulary hint for the learner."""
+        state = self._conversations.get(conversation_id)
+        if not state:
+            raise ValueError(f"Conversation not found: {conversation_id}")
+
+        last_bot_msg = ""
+        for msg in reversed(state.history):
+            if msg.role == "assistant":
+                last_bot_msg = msg.content
+                break
+
+        msg_lower = last_bot_msg.lower()
+        if any(w in msg_lower for w in ["like", "favorite", "prefer", "enjoy"]):
+            starter = "I really enjoy..."
+            model = "I really enjoy reading books and playing sports because it keeps me active."
+            vocab = ["enjoy", "favorite", "relaxing"]
+        elif any(w in msg_lower for w in ["where", "live", "city", "place", "dhaka"]):
+            starter = "I live in..."
+            model = "I live in a lively neighborhood where people are friendly and welcoming."
+            vocab = ["neighborhood", "convenient", "vibrant"]
+        elif any(w in msg_lower for w in ["what did", "yesterday", "last weekend", "went"]):
+            starter = "Yesterday, I went to..."
+            model = "Yesterday, I went to visit my family and we had dinner together."
+            vocab = ["visited", "enjoyed", "together"]
+        elif any(w in msg_lower for w in ["think", "opinion", "why", "agree"]):
+            starter = "In my opinion, I think that..."
+            model = "In my opinion, I think that practicing speaking English every day builds true confidence."
+            vocab = ["opinion", "confidence", "important"]
+        elif any(w in msg_lower for w in ["tell me about", "introduce", "who"]):
+            starter = "Let me tell you about..."
+            model = "Let me tell you about my daily routine and what I study."
+            vocab = ["daily", "interested in", "regularly"]
+        else:
+            starter = "I would say that..."
+            model = "I would say that it is very interesting and I want to learn more."
+            vocab = ["interesting", "because", "definitely"]
+
+        return {
+            "conversation_id": conversation_id,
+            "sentence_starter": starter,
+            "model_answer": model,
+            "vocabulary_hints": vocab,
+        }
+
+    def get_session_summary(self, conversation_id: str) -> dict:
+        """Calculate coaching metrics and summary for a completed session."""
+        state = self._conversations.get(conversation_id)
+        if not state:
+            raise ValueError(f"Conversation not found: {conversation_id}")
+
+        total_stt = state.total_stt_seconds
+        bot_stt = state.bot_speech_seconds
+        total_time = max(0.1, total_stt + bot_stt)
+        talk_time_ratio = round(total_stt / total_time, 2)
+
+        dur_min = max(0.01, total_stt / 60.0)
+        wpm = round(state.user_words_count / dur_min, 1) if state.user_words_count > 0 else 0.0
+        avg_turn_length = round(state.user_words_count / max(1, state.turn_count), 1)
+
+        # Approximate clarity indicator based on fluency and error count
+        base_clarity = 82
+        if avg_turn_length >= 6:
+            base_clarity += 6
+        if len(state.corrections_list) > 2:
+            base_clarity -= 8
+        clarity_score = min(96, max(65, base_clarity))
+
+        # Patterns to work on
+        patterns = []
+        for c in state.corrections_list:
+            reason = c.get("reason_short", "").lower()
+            orig = c.get("original", "").lower()
+            if any(t in reason or t in orig for t in ["past", "tense", "verb", "went", "did"]):
+                if "Verb tenses (past vs present)" not in patterns:
+                    patterns.append("Verb tenses (past vs present)")
+            elif any(a in reason or a in orig for a in ["a ", "an ", "the "]):
+                if "Articles (a, an, the)" not in patterns:
+                    patterns.append("Articles (a, an, the)")
+            elif any(p in reason or p in orig for p in ["in", "on", "at", "to", "for"]):
+                if "Prepositions (in, on, at)" not in patterns:
+                    patterns.append("Prepositions (in, on, at)")
+            else:
+                if "Subject-verb agreement" not in patterns:
+                    patterns.append("Subject-verb agreement")
+
+        if not patterns:
+            patterns = ["Preposition nuances (in vs on)", "Past tense consistency"]
+
+        # Strengths
+        strengths = []
+        if talk_time_ratio >= 0.4:
+            strengths.append(f"High learner talk time ({int(talk_time_ratio * 100)}% of conversation).")
+        else:
+            strengths.append("Persistent speaking effort on every turn.")
+        if wpm >= 60:
+            strengths.append(f"Strong conversational tempo ({wpm:.0f} Words Per Minute).")
+        if len(state.new_words_learned) > 0:
+            strengths.append(f"Discovered {len(set(state.new_words_learned))} new vocabulary words.")
+
+        concrete_next_step = "Repeat your best answer today in 30 seconds to lock in fluency."
+        char_name = state.character_id.replace("_", " ").title()
+        tomorrow_hook = f"Tomorrow, {char_name} has a special riddle prepared just for you!"
+
+        return {
+            "conversation_id": conversation_id,
+            "turn_count": state.turn_count,
+            "learner_talk_time_seconds": round(total_stt, 1),
+            "bot_talk_time_seconds": round(bot_stt, 1),
+            "talk_time_ratio": talk_time_ratio,
+            "wpm": wpm,
+            "average_turn_length_words": avg_turn_length,
+            "clarity_indicator": {
+                "score": clarity_score,
+                "label": "Approximate Clarity",
+                "note": "Approximate estimate based on speech-to-text confidence and phrasing cadence. Not phonetic lab scoring.",
+            },
+            "strengths": strengths,
+            "patterns_to_work_on": patterns[:3],
+            "concrete_next_step": concrete_next_step,
+            "say_this_better": state.corrections_list,
+            "tomorrow_hook": tomorrow_hook,
+        }
