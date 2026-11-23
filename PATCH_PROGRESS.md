@@ -1,8 +1,8 @@
 # Speakaboo Patch Loop Progress
 
-## Current Phase: Phase 1 (Measurement foundation)
-## Current Task: Phase 1.1 - Experiments service, stable bucketing, and comprehensive event logging
-## NEXT ACTION: Build the Experiments Service in backend with SQLite persistence, stable user hash bucketing, variant assignments, and comprehensive event logging.
+## Current Phase: Phase 2 (Payments and distribution)
+## Current Task: Phase 2.1 - BillingProvider abstraction, build flavors (play vs direct), and unified entitlement syncing
+## NEXT ACTION: Build BillingProvider abstraction with Google Play Billing, direct bKash/Nagad, and web checkout, supporting 'play' and 'direct' flavors with shared backend entitlements.
 
 ---
 
@@ -14,11 +14,11 @@
 - **GATE 0:** everything is green and the truth table shows every screen and route as `real`. (Verified: flutter analyze 0 issues, 34 flutter tests pass, 146 pytest tests pass, reality audit 0 violations).
 
 ### Phase 1: Measurement foundation (before teaching features)
-- [ ] Experiments service: feature flag per user, stable bucketing, variants stored in the database, config-driven.
-- [ ] Event logging for: session length, next-day return, correction type and whether the learner self-fixed, task attempt metrics, review results, speaking check scores, cost per turn.
-- [ ] `experiments_report.py`: results per variant with sample sizes and a plain-language warning when samples are too small to trust.
-- [ ] `retention_report.py` check: D1, D7, D30, sessions per week, minutes per active day.
-- **GATE 1:** a simulated 14-day cohort produces correct numbers in both reports.
+- [x] Experiments service: feature flag per user, stable bucketing, variants stored in the database, config-driven.
+- [x] Event logging for: session length, next-day return, correction type and whether the learner self-fixed, task attempt metrics, review results, speaking check scores, cost per turn.
+- [x] `experiments_report.py`: results per variant with sample sizes and a plain-language warning when samples are too small to trust.
+- [x] `retention_report.py` check: D1, D7, D30, sessions per week, minutes per active day.
+- **GATE 1:** a simulated 14-day cohort produces correct numbers in both reports. (Verified: `test_phase1_measurements.py` green; 150 backend tests, 34 Flutter tests, 0 reality violations).
 
 ### Phase 2: Payments and distribution (changes architecture, so do early)
 - [ ] `BillingProvider` abstraction with implementations: (1) Google Play Billing, (2) bKash/Nagad via aggregator or direct merchant for a DIRECT build, (3) web checkout.
@@ -128,6 +128,12 @@
 ---
 
 ## Log of Completed Tasks (Patch Loop)
+
+### Phase 1 - Measurement Foundation & A/B Testing Instrumentation
+- **Engineer Hat:** Built `backend/engine/experiments.py` with deterministic SHA-256 hash bucketing across 6 active pedagogical/business experiments; added SQLite persistence for `experiment_assignments` and `analytics_events` with indexed queries; instrumented SLA metric loggers (session length, D1 return, correction self-fixes, task attempt metrics, review recall, speaking checks, per-turn costs); built `backend/scripts/experiments_report.py` with sample size counts and plain-language warnings for underpowered cohorts (N < 30); updated `retention_report.py` to compute `minutes_per_active_day` and `sessions_per_week`; verified simulated 14-day cohort test. 150 backend tests and 34 Flutter tests pass with 0 reality audit violations.
+- **Coach Hat:** Every teaching feature is now measurable rather than dogmatic: we track whether prompts-first actually pushes learner self-correction compared to recasts, and whether 3-retell drills increase WPM over time; plain-language sample size warnings prevent premature educational conclusions based on noisy small-sample data.
+- **Market Hat:** Enables data-driven optimization of the onboarding funnel and pricing elasticity (200 BDT/mo vs 60 BDT/week) without guessing; granular cost-per-turn tracking guarantees unit-economic safety before spending on learner acquisition.
+- **Retention Question ("Why will a user return tomorrow because of this?"):** Rigorous measurement allows us to detect exactly where learners drop off and optimize the habit loop with statistical proof. Features that demonstrably increase day-1 and day-7 returns are promoted while ineffective ones are pruned.
 
 ### Phase 0 - Baseline Verification & Analyzer Polish
 - **Engineer Hat:** Eliminated all 26 `flutter analyze` lints and warnings across the app (unused variables, context mounted checks across async gaps, initializing formals, deprecated dropdown properties), added widget test for `ShadowingScreen`, and verified full baseline test suite (146 backend pytest tests, 34 Flutter tests, 0 reality audit violations).

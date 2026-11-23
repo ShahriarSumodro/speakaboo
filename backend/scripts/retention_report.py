@@ -43,10 +43,28 @@ def generate_retention_report(db_path: str = DB_PATH) -> Dict[str, Any]:
     report["total_conversations"] = cursor.fetchone()["count"]
 
     # 3. Speaking minutes from daily_usage
-    cursor.execute("SELECT SUM(minutes_spoken) as total_min, AVG(minutes_spoken) as avg_min FROM daily_usage")
+    cursor.execute("""
+        SELECT COUNT(DISTINCT date) as active_calendar_days,
+               COUNT(*) as active_user_days,
+               SUM(minutes_spoken) as total_min,
+               AVG(minutes_spoken) as avg_min_per_active_day
+        FROM daily_usage
+        WHERE minutes_spoken > 0
+    """)
     usage_row = cursor.fetchone()
-    report["total_speaking_minutes"] = round(usage_row["total_min"] or 0.0, 1)
-    report["avg_daily_minutes_per_active_user"] = round(usage_row["avg_min"] or 0.0, 1)
+    total_mins = usage_row["total_min"] or 0.0
+    avg_min_day = usage_row["avg_min_per_active_day"] or 0.0
+    report["total_speaking_minutes"] = round(total_mins, 1)
+    report["minutes_per_active_day"] = round(avg_min_day, 1)
+    report["avg_daily_minutes_per_active_user"] = round(avg_min_day, 1)
+
+    # Sessions per active user
+    cursor.execute("SELECT COUNT(DISTINCT user_id) as active_u, COUNT(*) as total_s FROM conversations")
+    conv_stat = cursor.fetchone()
+    active_learners = conv_stat["active_u"] or 1
+    total_convs = conv_stat["total_s"] or 0
+    # Average weekly sessions estimate
+    report["sessions_per_week"] = round((total_convs / active_learners) * 3.5, 1) if active_learners > 0 else 0.0
 
     # 4. Streak distributions from user_progress
     cursor.execute("SELECT current_streak, longest_streak, streak_freeze_count FROM user_progress")

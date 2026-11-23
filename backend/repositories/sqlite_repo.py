@@ -164,6 +164,30 @@ class BaseRepository(ABC):
     @abstractmethod
     async def get_payments_by_user(self, user_id: str) -> List[dict]: ...
 
+    # --- Experiments & Analytics ---
+    @abstractmethod
+    async def get_experiment_assignment(self, user_id: str, experiment_id: str) -> Optional[str]: ...
+    @abstractmethod
+    async def record_experiment_assignment(self, user_id: str, experiment_id: str, variant: str) -> None: ...
+    @abstractmethod
+    async def record_analytics_event(
+        self,
+        user_id: str,
+        event_name: str,
+        metric_value: float = 0.0,
+        metadata: Optional[Dict[str, Any]] = None,
+        session_id: str = "",
+        experiment_id: str = "",
+        variant: str = "",
+    ) -> str: ...
+    @abstractmethod
+    async def get_analytics_events(
+        self,
+        event_name: Optional[str] = None,
+        experiment_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]: ...
+
 
 # Default Daily Missions pool
 DEFAULT_MISSIONS = [
@@ -372,6 +396,30 @@ class SqliteRepository(BaseRepository):
                 updated_at REAL NOT NULL,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             );
+
+            -- Patch Phase 1: Teaching & Pedagogical Experiments
+            CREATE TABLE IF NOT EXISTS experiment_assignments (
+                user_id TEXT NOT NULL,
+                experiment_id TEXT NOT NULL,
+                variant TEXT NOT NULL,
+                assigned_at REAL NOT NULL,
+                PRIMARY KEY (user_id, experiment_id),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+
+            -- Patch Phase 1: Granular Analytics & Pedagogical Event Logging
+            CREATE TABLE IF NOT EXISTS analytics_events (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                session_id TEXT DEFAULT '',
+                event_name TEXT NOT NULL,
+                experiment_id TEXT DEFAULT '',
+                variant TEXT DEFAULT '',
+                metric_value REAL DEFAULT 0.0,
+                metadata_json TEXT DEFAULT '{}',
+                timestamp REAL NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
             
             CREATE INDEX IF NOT EXISTS idx_users_device ON users(device_id);
             CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id);
@@ -384,6 +432,10 @@ class SqliteRepository(BaseRepository):
             CREATE INDEX IF NOT EXISTS idx_safety_flags_user ON safety_flags(user_id);
             CREATE INDEX IF NOT EXISTS idx_user_profiles_user ON user_profiles(user_id);
             CREATE INDEX IF NOT EXISTS idx_payments_user ON payments(user_id);
+            CREATE INDEX IF NOT EXISTS idx_exp_assignments ON experiment_assignments(user_id, experiment_id);
+            CREATE INDEX IF NOT EXISTS idx_events_name ON analytics_events(event_name);
+            CREATE INDEX IF NOT EXISTS idx_events_user ON analytics_events(user_id);
+            CREATE INDEX IF NOT EXISTS idx_events_exp ON analytics_events(experiment_id, variant);
         """)
 
         # Migrations for existing user_progress table
@@ -1167,9 +1219,100 @@ class SqliteRepository(BaseRepository):
         cursor.execute("DELETE FROM character_memories WHERE user_id = ?", (user_id,))
         cursor.execute("DELETE FROM referrals WHERE referrer_user_id = ? OR referee_user_id = ?", (user_id, user_id))
         cursor.execute("DELETE FROM payments WHERE user_id = ?", (user_id,))
+        cursor.execute("DELETE FROM experiment_assignments WHERE user_id = ?", (user_id,))
+        cursor.execute("DELETE FROM analytics_events WHERE user_id = ?", (user_id,))
         cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
         self._conn.commit()
         return True
+
+    # --- Experiments & Analytics ---
+    async def get_experiment_assignment(self, user_id: str, experiment_id: str) -> Optional[str]:
+        cursor = self._conn.execute(
+            "SELECT variant FROM experiment_assignments WHERE user_id = ? AND experiment_id = ?",
+            (user_id, experiment_id),
+        )
+        row = cursor.fetchone()
+        return row[0] if row else None
+
+    async def record_experiment_assignment(self, user_id: str, experiment_id: str, variant: str) -> None:
+        self._conn.execute(
+            """
+            INSERT OR REPLACE INTO experiment_assignments (user_id, experiment_id, variant, assigned_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (user_id, experiment_id, variant, time.time()),
+        )
+        self._conn.commit()
+
+    async def record_analytics_event(
+        self,
+        user_id: str,
+        event_name: str,
+        metric_value: float = 0.0,
+        metadata: Optional[Dict[str, Any]] = None,
+        session_id: str = "",
+        experiment_id: str = "",
+        variant: str = "",
+    ) -> str:
+        import uuid
+        event_id = str(uuid.uuid4())
+        meta_json = json.dumps(metadata or {})
+        self._conn.execute(
+            """
+            INSERT INTO analytics_events (
+                id, user_id, session_id, event_name, experiment_id, variant, metric_value, metadata_json, timestamp
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                event_id,
+                user_id,
+                session_id,
+                event_name,
+                experiment_id,
+                variant,
+                float(metric_value),
+                meta_json,
+                time.time(),
+            ),
+        )
+        self._conn.commit()
+        return event_id
+
+    async def get_analytics_events(
+        self,
+        event_name: Optional[str] = None,
+        experiment_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        query = "SELECT * FROM analytics_events WHERE 1=1"
+        params = []
+        if event_name:
+            query += " AND event_name = ?"
+            params.append(event_name)
+        if experiment_id:
+            query += " AND experiment_id = ?"
+            params.append(experiment_id)
+        if user_id:
+            query += " AND user_id = ?"
+            params.append(user_id)
+        query += " ORDER BY timestamp ASC"
+
+        cursor = self._conn.execute(query, params)
+        rows = cursor.fetchall()
+        result = []
+        for r in rows:
+            result.append({
+                "id": r["id"],
+                "user_id": r["user_id"],
+                "session_id": r["session_id"],
+                "event_name": r["event_name"],
+                "experiment_id": r["experiment_id"],
+                "variant": r["variant"],
+                "metric_value": r["metric_value"],
+                "metadata": json.loads(r["metadata_json"] or "{}"),
+                "timestamp": r["timestamp"],
+            })
+        return result
 
     # --- Helpers ---
     @staticmethod
