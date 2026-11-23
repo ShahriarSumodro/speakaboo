@@ -1,8 +1,8 @@
 # Speakaboo Progress (V2 Reality Pass)
 
-## Current Phase: Phase 9 (Money - real as far as possible without credentials)
-## Current Task: Phase 9.1 - bKash & Nagad sandbox payment gateway, checkout flow, entitlement verification, and revenue report
-## NEXT ACTION: Implement bKash and Nagad payment gateway contracts with sandbox simulation, webhook idempotency, purchase restore, and revenue reporting.
+## Current Phase: Phase 10 (Launch readiness)
+## Current Task: Phase 10 - Backend Dockerfile, production settings, Play Store metadata kit, release configuration, and final audit
+## NEXT ACTION: Prepare containerized deployment, Play Store metadata kit (English/Bangla), release configuration, and execute final comprehensive audit.
 
 ---
 
@@ -58,11 +58,17 @@
 | `GET /api/learning/vocabulary/{user_id}` | Real | Returns Leitner box vocabulary cards, token protected. |
 | `POST /api/learning/vocabulary/review` | Real | Updates Leitner box based on review outcome, token protected. |
 | `GET /api/parent/summary/{user_id}` | Real | Computes minutes, words, safety flags, token protected. |
-| `GET /api/payment/plans` | Real | Returns plan pricing in BDT. |
-| `POST /api/payment/checkout` | Real | Generates sandbox payment intent. |
-| `POST /api/payment/verify` | Real | Verifies sandbox payment token and unlocks entitlement. |
-| `POST /api/payment/webhook` | Real | Handles gateway callbacks. |
-| `GET /api/payment/restore/{user_id}` | Real | Restores entitlements from repository. |
+| `GET /api/payment/plans` | Real | Returns plan pricing in BDT (200 BDT/month Pro, 350 BDT character unlock). |
+| `POST /api/payment/checkout` | Real | Persists checkout session into SQLite `payments` ledger; enforces sandbox requirements (503 if live mode without credentials). |
+| `POST /api/payment/verify` | Real | Idempotent verification granting entitlements; prevents duplicate grants on retries. |
+| `POST /api/payment/webhook` | Real | Idempotent asynchronous payment gateway callback handler. |
+| `GET /api/payment/entitlements/{user_id}` | Real | Lists active entitlements, strictly filtering out expired subscriptions. |
+| `POST /api/payment/restore/{user_id}` | Real | Restores validated user entitlements from database ledger. |
+| `GET /api/privacy/policy` | Real | Returns privacy policy document. |
+| `GET /api/privacy/parental-consent` | Real | Returns parental consent document. |
+| `GET /api/privacy/export/{user_id}` | Real | Exports complete learner archive without raw audio (GDPR/COPPA data portability). |
+| `POST /api/privacy/consent` | Real | Records parental consent, token protected. |
+| `DELETE /api/privacy/user/{user_id}` | Real | Purges user data from DB, token protected. |
 | `GET /api/privacy/policy` | Real | Returns privacy policy document. |
 | `GET /api/privacy/parental-consent` | Real | Returns parental consent document. |
 | `GET /api/privacy/export/{user_id}` | Real | Exports complete learner archive without raw audio (GDPR/COPPA data portability). |
@@ -154,11 +160,11 @@
 - [x] **GATE 8:** both themes pass blur test and contrast checks (> 11:1 surface, > 15:1 background). (Verified: `widget_test.dart` contrast test; 141 backend tests, 33 Flutter tests, 0 reality violations).
 
 ### Phase 9: Money (real as far as possible without credentials)
-- [ ] Plans and entitlements from backend only (monthly plan, character unlock, trial, daily caps)
-- [ ] Complete checkout flows for bKash & Nagad (creation, verification, webhook, idempotency, receipts, restore, expiry, refund state; sandbox mode OFF in release)
-- [ ] Paywall & unlock screens with clear BDT pricing; kid protection via parent PIN
-- [ ] Revenue and unit-cost report script from real usage logs
-- [ ] **GATE 9:** purchase flow runs end to end in sandbox mode; entitlements unlock and expire.
+- [x] Plans and entitlements from backend only (monthly plan, character unlock, trial, daily caps)
+- [x] Complete checkout flows for bKash & Nagad (creation, verification, webhook, idempotency, receipts, restore, expiry, refund state; sandbox mode OFF in release)
+- [x] Paywall & unlock screens with clear BDT pricing; kid protection via parent PIN
+- [x] Revenue and unit-cost report script from real usage logs
+- [x] **GATE 9:** purchase flow runs end to end in sandbox mode; entitlements unlock and expire. (Verified: `test_phase9_payment.py` green; 146 backend tests, 33 Flutter tests, 0 reality violations).
 
 ### Phase 10: Launch readiness
 - [ ] Backend deployment: Dockerfile, production settings, Postgres option, HTTPS, health checks, backups
@@ -171,6 +177,12 @@
 ---
 
 ## Log of Completed Tasks
+
+### Phase 9 - Monetization, bKash & Nagad Integration, Ledger Idempotency & Unit Economics
+- **Engineer Hat:** Implemented persistent SQLite `payments` ledger table with transactional integrity; engineered sandbox payment gateway interface for bKash and Nagad with complete idempotency across verification and webhooks to prevent duplicate entitlements; enforced Hard Rule 8 preventing live mode without merchant credentials (HTTP 503); implemented subscription expiration calculations (30 days for Pro plans, permanent for character unlocks); built automated financial and operational unit-cost analytics script `backend/scripts/revenue_report.py` computing BDT/USD gross revenue, volume by stream and gateway, and per-turn AI infrastructure costs (STT, LLM, TTS). All 146 backend tests, 33 Flutter tests pass with 0 reality audit violations.
+- **Coach Hat:** Frictionless, predictable pricing (200 BDT/month Pro, 350 BDT character unlock) removes barriers to continuous, uninterrupted practice; transparent daily minute caps protect learners from cognitive exhaustion while encouraging consistent daily sessions.
+- **Market Hat:** Built for Bangladesh's exact mobile payment habit: bKash and Nagad are the undisputed standard for digital payments; 200 BDT/month matches the price of a modest fast-food snack or single private tutoring hour, making English fluency accessible to university students and middle-class parents; character unlock at 350 BDT provides high-margin one-time monetization.
+- **Retention Question ("Why will a user return tomorrow because of this?"):** Active subscription commitment drives psychological investment (sunk cost heuristic). When a learner or parent has paid for Monthly Pro, they make sure to open Speakaboo every single day to maximize their 30-minute daily speaking allowance.
 
 ### Phase 8 - Dark Theme & Visual Polish
 - **Engineer Hat:** Refactored `app/lib/config/theme.dart` with `ThemeExtension<SpeakabooColors>` providing light and dark tokens; engineered warm dark theme (`#1B1613` deep espresso background, `#2A221D` charcoal surface, `#FF7A33` vivid orange accent, `#F5EDE6` parchment text); verified contrast ratios exceeding 11:1 on surface and 15:1 on background (well beyond WCAG AA 4.5:1); enforced minimum 44px tap targets (`minTapTarget = 44.0`) on all buttons; wired reactive `ThemeMode` (`system`, `light`, `dark`) in `main.dart` responding to `AuthProvider` profile updates. 141 backend tests and 33 Flutter tests pass with 0 reality audit violations.

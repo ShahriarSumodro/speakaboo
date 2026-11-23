@@ -90,9 +90,25 @@ async def get_plans_and_pricing():
 
 
 @router.post("/checkout", response_model=CheckoutResponse)
-async def create_checkout(request: CheckoutRequest):
+async def create_checkout(
+    request: CheckoutRequest, repo: BaseRepository = Depends(get_repository)
+):
     """Initiate a payment checkout session with bKash or Nagad."""
     settings = load_settings()
+
+    # Enforce Hard Rule 8: If sandbox is disabled, require verified merchant credentials
+    if not settings.payment.sandbox_mode:
+        if request.gateway == "bkash" and not settings.payment.bkash_app_key:
+            raise HTTPException(
+                status_code=503,
+                detail="Live bKash merchant gateway not configured. Please use sandbox mode.",
+            )
+        if request.gateway == "nagad" and not settings.payment.nagad_merchant_id:
+            raise HTTPException(
+                status_code=503,
+                detail="Live Nagad merchant gateway not configured. Please use sandbox mode.",
+            )
+
     gateway = get_payment_gateway(request.gateway)
 
     if request.purpose == "monthly_plan":
@@ -113,6 +129,18 @@ async def create_checkout(request: CheckoutRequest):
         target_id=request.target_id,
     )
 
+    # Persist in SQLite ledger
+    await repo.record_payment(
+        payment_id=intent.payment_id,
+        user_id=request.user_id,
+        gateway=intent.gateway,
+        amount_bdt=intent.amount_bdt,
+        purpose=intent.purpose.value,
+        target_id=intent.target_id,
+        checkout_url=intent.checkout_url,
+        status="pending",
+    )
+
     return CheckoutResponse(
         payment_id=intent.payment_id,
         gateway=intent.gateway,
@@ -126,11 +154,26 @@ async def create_checkout(request: CheckoutRequest):
 async def verify_payment(
     request: VerifyRequest, repo: BaseRepository = Depends(get_repository)
 ):
-    """Verify payment and grant entitlement upon success."""
+    """Verify payment and grant entitlement upon success (Idempotent)."""
+    # 1. Check ledger for existing payment record
+    existing = await repo.get_payment(request.payment_id)
+    if existing and existing.get("status") == "completed":
+        # Idempotent response: payment was already verified and entitlement granted
+        return VerifyResponse(
+            payment_id=existing["id"],
+            success=True,
+            status="completed",
+            transaction_id=existing.get("transaction_id", ""),
+            message="Payment already verified.",
+            entitlement_granted=f"{existing['purpose']}:{existing['target_id']}",
+        )
+
     gateway = get_payment_gateway(request.gateway)
     res = await gateway.verify_payment(request.payment_id, request.verification_token)
 
     if not res.success:
+        if existing:
+            await repo.update_payment_status(request.payment_id, "failed")
         return VerifyResponse(
             payment_id=res.payment_id,
             success=False,
@@ -139,11 +182,15 @@ async def verify_payment(
             message=res.message,
         )
 
+    # Update ledger status to completed
+    await repo.update_payment_status(request.payment_id, "completed", res.transaction_id)
+
     # Grant entitlement
-    # Retrieve user from intent or request
-    # If monthly plan: expires in 30 days. If character: permanent (expires_at=None).
-    user_id = getattr(gateway, "_intents", {}).get(request.payment_id, None)
-    uid = user_id.user_id if user_id else "unknown_user"
+    uid = existing["user_id"] if existing else "unknown_user"
+    if uid == "unknown_user":
+        user_obj = getattr(gateway, "_intents", {}).get(request.payment_id, None)
+        if user_obj:
+            uid = user_obj.user_id
 
     expires_at = (time.time() + (30 * 86400)) if res.entitlement_type == "plan" else None
     ent = Entitlement(
@@ -170,16 +217,27 @@ async def payment_webhook(
     gateway_name: str = "bkash",
     repo: BaseRepository = Depends(get_repository),
 ):
-    """Webhook callback for asynchronous payment notifications."""
+    """Webhook callback for asynchronous payment notifications (Idempotent)."""
+    pid = payload.get("payment_id", "")
+    existing = await repo.get_payment(pid)
+    if existing and existing.get("status") == "completed":
+        return {"status": "already_processed", "success": True}
+
     gateway = get_payment_gateway(gateway_name)
     res = await gateway.process_webhook(payload)
     if res.success:
-        uid = getattr(gateway, "_intents", {}).get(res.payment_id)
+        await repo.update_payment_status(pid, "completed", res.transaction_id)
+        uid = existing["user_id"] if existing else None
+        if not uid:
+            user_intent = getattr(gateway, "_intents", {}).get(res.payment_id)
+            if user_intent:
+                uid = user_intent.user_id
+
         if uid:
             expires_at = (time.time() + (30 * 86400)) if res.entitlement_type == "plan" else None
             await repo.add_entitlement(
                 Entitlement(
-                    user_id=uid.user_id,
+                    user_id=uid,
                     type=res.entitlement_type,
                     value=res.entitlement_value,
                     expires_at=expires_at,

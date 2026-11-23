@@ -90,7 +90,10 @@ class DatabaseConfig:
 
 @dataclass(frozen=True)
 class PaymentConfig:
-    provider: str = "mock"
+    provider: str = "sandbox"
+    sandbox_mode: bool = True
+    bkash_app_key: str = ""
+    nagad_merchant_id: str = ""
     monthly_plan_price_bdt: int = 200
     character_unlock_price_bdt: int = 350
 
@@ -219,7 +222,10 @@ def load_settings() -> Settings:
             url=_env("DATABASE_URL", "sqlite:///./speakaboo.db"),
         ),
         payment=PaymentConfig(
-            provider=_env("PAYMENT_PROVIDER", "mock"),
+            provider=_env("PAYMENT_PROVIDER", "sandbox"),
+            sandbox_mode=_env_bool("PAYMENT_SANDBOX_MODE", True),
+            bkash_app_key=_env("BKASH_APP_KEY", ""),
+            nagad_merchant_id=_env("NAGAD_MERCHANT_ID", ""),
             monthly_plan_price_bdt=_env_int("MONTHLY_PLAN_PRICE_BDT", 200),
             character_unlock_price_bdt=_env_int("CHARACTER_UNLOCK_PRICE_BDT", 350),
         ),

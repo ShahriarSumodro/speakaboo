@@ -154,6 +154,16 @@ class BaseRepository(ABC):
     @abstractmethod
     async def get_parent_summary(self, user_id: str) -> Dict[str, Any]: ...
 
+    # --- Payments Ledger ---
+    @abstractmethod
+    async def record_payment(self, payment_id: str, user_id: str, gateway: str, amount_bdt: int, purpose: str, target_id: str = "", checkout_url: str = "", status: str = "pending") -> dict: ...
+    @abstractmethod
+    async def get_payment(self, payment_id: str) -> Optional[dict]: ...
+    @abstractmethod
+    async def update_payment_status(self, payment_id: str, status: str, transaction_id: str = "") -> bool: ...
+    @abstractmethod
+    async def get_payments_by_user(self, user_id: str) -> List[dict]: ...
+
 
 # Default Daily Missions pool
 DEFAULT_MISSIONS = [
@@ -170,6 +180,10 @@ class SqliteRepository(BaseRepository):
     def __init__(self, db_path: str = "speakaboo.db"):
         self._db_path = db_path
         self._conn: Optional[sqlite3.Connection] = None
+
+    @property
+    def db_path(self) -> str:
+        return self._db_path
 
     async def initialize(self) -> None:
         """Create tables and indexes if they don't exist."""
@@ -343,6 +357,22 @@ class SqliteRepository(BaseRepository):
                 FOREIGN KEY (referee_user_id) REFERENCES users(id)
             );
             
+            -- Phase 9: Payments & Transactions Ledger
+            CREATE TABLE IF NOT EXISTS payments (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                gateway TEXT NOT NULL,
+                amount_bdt INTEGER NOT NULL,
+                purpose TEXT NOT NULL,
+                target_id TEXT DEFAULT '',
+                status TEXT NOT NULL,
+                transaction_id TEXT DEFAULT '',
+                checkout_url TEXT DEFAULT '',
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+            
             CREATE INDEX IF NOT EXISTS idx_users_device ON users(device_id);
             CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id);
             CREATE INDEX IF NOT EXISTS idx_turns_conversation ON turns(conversation_id);
@@ -353,6 +383,7 @@ class SqliteRepository(BaseRepository):
             CREATE INDEX IF NOT EXISTS idx_vocab_user ON vocabulary_items(user_id, next_review_date);
             CREATE INDEX IF NOT EXISTS idx_safety_flags_user ON safety_flags(user_id);
             CREATE INDEX IF NOT EXISTS idx_user_profiles_user ON user_profiles(user_id);
+            CREATE INDEX IF NOT EXISTS idx_payments_user ON payments(user_id);
         """)
 
         # Migrations for existing user_progress table
@@ -1059,6 +1090,63 @@ class SqliteRepository(BaseRepository):
             "safety_flags_by_category": safety_counts,
         }
 
+    # ========================================================
+    # Phase 9: Payments Ledger
+    # ========================================================
+
+    async def record_payment(
+        self,
+        payment_id: str,
+        user_id: str,
+        gateway: str,
+        amount_bdt: int,
+        purpose: str,
+        target_id: str = "",
+        checkout_url: str = "",
+        status: str = "pending",
+    ) -> dict:
+        now = time.time()
+        self._conn.execute(
+            """INSERT INTO payments (id, user_id, gateway, amount_bdt, purpose, target_id, status, transaction_id, checkout_url, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?)""",
+            (payment_id, user_id, gateway, amount_bdt, purpose, target_id, status, checkout_url, now, now),
+        )
+        self._conn.commit()
+        return {
+            "id": payment_id,
+            "user_id": user_id,
+            "gateway": gateway,
+            "amount_bdt": amount_bdt,
+            "purpose": purpose,
+            "target_id": target_id,
+            "status": status,
+            "checkout_url": checkout_url,
+            "created_at": now,
+        }
+
+    async def get_payment(self, payment_id: str) -> Optional[dict]:
+        row = self._conn.execute("SELECT * FROM payments WHERE id = ?", (payment_id,)).fetchone()
+        if not row:
+            return None
+        return dict(row)
+
+    async def update_payment_status(
+        self, payment_id: str, status: str, transaction_id: str = ""
+    ) -> bool:
+        now = time.time()
+        cur = self._conn.execute(
+            "UPDATE payments SET status = ?, transaction_id = ?, updated_at = ? WHERE id = ?",
+            (status, transaction_id, now, payment_id),
+        )
+        self._conn.commit()
+        return cur.rowcount > 0
+
+    async def get_payments_by_user(self, user_id: str) -> List[dict]:
+        rows = self._conn.execute(
+            "SELECT * FROM payments WHERE user_id = ? ORDER BY created_at DESC", (user_id,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
     async def delete_user_data(self, user_id: str) -> bool:
         """Completely purge all records for a user across all tables."""
         cursor = self._conn.cursor()
@@ -1078,6 +1166,7 @@ class SqliteRepository(BaseRepository):
         cursor.execute("DELETE FROM character_trials WHERE user_id = ?", (user_id,))
         cursor.execute("DELETE FROM character_memories WHERE user_id = ?", (user_id,))
         cursor.execute("DELETE FROM referrals WHERE referrer_user_id = ? OR referee_user_id = ?", (user_id, user_id))
+        cursor.execute("DELETE FROM payments WHERE user_id = ?", (user_id,))
         cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
         self._conn.commit()
         return True
