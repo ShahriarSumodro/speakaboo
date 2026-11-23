@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speakaboo/config/theme.dart';
 import 'package:speakaboo/services/api_service.dart';
 import 'package:speakaboo/services/audio_service.dart';
@@ -16,15 +17,28 @@ import 'package:speakaboo/widgets/empty_state.dart';
 import 'package:speakaboo/widgets/unlock_sheet.dart';
 import 'package:speakaboo/widgets/daily_cap_sheet.dart';
 import 'package:speakaboo/widgets/correction_detail_sheet.dart';
+import 'package:speakaboo/models/character.dart';
 import 'package:speakaboo/screens/talk_screen.dart';
 import 'package:speakaboo/screens/characters_screen.dart';
+import 'package:speakaboo/screens/character_detail_screen.dart';
 import 'package:speakaboo/screens/missions_screen.dart';
 import 'package:speakaboo/screens/profile_screen.dart';
 import 'package:speakaboo/screens/onboarding_screen.dart';
 import 'package:speakaboo/screens/device_pairing_screen.dart';
 import 'package:speakaboo/screens/main_shell.dart';
+import 'package:speakaboo/screens/scenarios_screen.dart';
+import 'package:speakaboo/screens/topics_screen.dart';
+import 'package:speakaboo/screens/shadowing_screen.dart';
+import 'package:speakaboo/screens/vocabulary_screen.dart';
+import 'package:speakaboo/screens/settings_screen.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   testWidgets('CharacterFace renders properly', (WidgetTester tester) async {
     await tester.pumpWidget(
       const MaterialApp(
@@ -124,7 +138,56 @@ void main() {
 
   testWidgets('MainShell renders bottom navigation and navigates between tabs',
       (WidgetTester tester) async {
-    final api = ApiService(baseUrl: 'http://localhost:8000');
+    final mockClient = MockClient((request) async {
+      if (request.url.path.contains('/api/characters')) {
+        return http.Response(jsonEncode([]), 200);
+      }
+      if (request.url.path.contains('/api/learning/missions')) {
+        return http.Response(jsonEncode({'missions': [], 'streak': 0, 'freezes': 0}), 200);
+      }
+      if (request.url.path.contains('/api/learning/progress')) {
+        return http.Response(jsonEncode({
+          'user_id': 'u1',
+          'level': 'beginner',
+          'xp': 0,
+          'total_words_spoken': 0,
+          'streak_days': 0,
+          'weekly_minutes': 0.0,
+          'accuracy_score': 0.0,
+        }), 200);
+      }
+      if (request.url.path.contains('/api/usage')) {
+        return http.Response(jsonEncode({
+          'user_id': 'u1',
+          'daily_minutes_used': 0.0,
+          'daily_minutes_limit': 10.0,
+          'turns_today': 0,
+          'plan': 'free',
+          'is_capped': false,
+        }), 200);
+      }
+      if (request.url.path.contains('/api/learning/vocabulary')) {
+        return http.Response(jsonEncode({'cards': []}), 200);
+      }
+      if (request.url.path.contains('/api/auth/profile')) {
+        return http.Response(jsonEncode({
+          'user_id': 'u1',
+          'display_name': 'Learner',
+          'age_band': 'adult',
+          'goal': 'Practice',
+          'level': 'beginner',
+          'daily_goal_minutes': 10,
+          'reminder_time': '20:00',
+          'theme': 'system',
+          'has_parent_pin': false,
+          'created_at': '',
+          'updated_at': '',
+        }), 200);
+      }
+      return http.Response(jsonEncode({'status': 'ok'}), 200);
+    });
+
+    final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
     final auth = AuthProvider(api: api);
     final audio = AudioService();
     final conversation = ConversationProvider(api: api, audio: audio);
@@ -132,6 +195,7 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
+          Provider<ApiService>.value(value: api),
           ChangeNotifierProvider<AuthProvider>.value(value: auth),
           ChangeNotifierProvider<AudioService>.value(value: audio),
           ChangeNotifierProvider<ConversationProvider>.value(
@@ -156,32 +220,100 @@ void main() {
     // Switch to Characters tab
     await tester.tap(find.text('Characters'));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('Speaking Companions'), findsOneWidget);
 
     // Switch to Missions tab
     await tester.tap(find.text('Missions'));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
     expect(find.text("Today's Goals"), findsOneWidget);
 
     // Switch to Profile tab
     await tester.tap(find.text('Profile'));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('Learner Profile'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('CharactersScreen lists companions', (WidgetTester tester) async {
-    final api = ApiService();
+    final mockClient = MockClient((request) async {
+      if (request.url.path.endsWith('/api/characters/')) {
+        return http.Response(
+          jsonEncode([
+            {
+              'id': 'rule_farmer',
+              'name': 'Farmer Reggie',
+              'tagline': 'Rules & Farming Metaphors',
+              'voice_id': 'austin',
+              'personality_prompt': 'Patient farmer',
+              'speaking_style': 'Warm',
+              'vocabulary_focus': 'Agriculture',
+              'is_free': true,
+              'price_bdt': 0,
+              'avatar_url': '',
+              'personality_traits': ['Patient', 'Warm'],
+              'sample_lines': ['Welcome to the farm!'],
+              'best_for': 'Beginners',
+            },
+            {
+              'id': 'dhaka_detective',
+              'name': 'Detective Kabir',
+              'tagline': 'Mystery & Logic Practice',
+              'voice_id': 'daniel',
+              'personality_prompt': 'Clever detective',
+              'speaking_style': 'Sharp',
+              'vocabulary_focus': 'Logic',
+              'is_free': false,
+              'price_bdt': 350,
+              'avatar_url': '',
+              'personality_traits': ['Clever', 'Curious'],
+              'sample_lines': ['Let us examine the clues.'],
+              'best_for': 'Intermediate',
+            },
+            {
+              'id': 'professor_anika',
+              'name': 'Professor Anika',
+              'tagline': 'Nature & Science Conversations',
+              'voice_id': 'diana',
+              'personality_prompt': 'Scholarly researcher',
+              'speaking_style': 'Academic',
+              'vocabulary_focus': 'Science',
+              'is_free': false,
+              'price_bdt': 350,
+              'avatar_url': '',
+              'personality_traits': ['Analytical', 'Encouraging'],
+              'sample_lines': ['Every observation matters.'],
+              'best_for': 'Advanced',
+            },
+          ]),
+          200,
+        );
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
+    final auth = AuthProvider(api: api);
     final audio = AudioService();
     final conv = ConversationProvider(api: api, audio: audio);
 
     await tester.pumpWidget(
-      ChangeNotifierProvider<ConversationProvider>.value(
-        value: conv,
+      MultiProvider(
+        providers: [
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
+          ChangeNotifierProvider<ConversationProvider>.value(value: conv),
+        ],
         child: const MaterialApp(home: CharactersScreen()),
       ),
     );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('Farmer Reggie'), findsOneWidget);
     expect(find.text('Detective Kabir'), findsOneWidget);
@@ -190,9 +322,60 @@ void main() {
 
   testWidgets('MissionsScreen displays streak and missions',
       (WidgetTester tester) async {
+    final mockClient = MockClient((request) async {
+      if (request.url.path.contains('/api/learning/missions/')) {
+        return http.Response(
+          jsonEncode({
+            'date': '2026-11-24',
+            'streak': 3,
+            'freezes': 1,
+            'missions': [
+              {
+                'id': 'm_speak_3m',
+                'title': 'Daily Speaker',
+                'description': 'Speak for at least 3 minutes today',
+                'xp_reward': 50,
+                'target': 3,
+                'progress': 1,
+                'completed': false,
+                'claimed': false,
+                'category': 'speaking',
+              },
+              {
+                'id': 'm_new_words_3',
+                'title': 'Word Explorer',
+                'description': 'Learn or use 3 new vocabulary words',
+                'xp_reward': 40,
+                'target': 3,
+                'progress': 3,
+                'completed': true,
+                'claimed': false,
+                'category': 'vocabulary',
+              },
+            ],
+          }),
+          200,
+        );
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
+    final auth = AuthProvider(api: api);
+
     await tester.pumpWidget(
-      const MaterialApp(home: MissionsScreen()),
+      MultiProvider(
+        providers: [
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
+        ],
+        child: const MaterialApp(home: MissionsScreen()),
+      ),
     );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('3 Day Streak!'), findsOneWidget);
     expect(find.text('Daily Speaker'), findsOneWidget);
@@ -201,11 +384,75 @@ void main() {
 
   testWidgets('ProfileScreen displays stats and vocabulary notebook',
       (WidgetTester tester) async {
+    final mockClient = MockClient((request) async {
+      if (request.url.path.contains('/api/learning/progress/')) {
+        return http.Response(
+          jsonEncode({
+            'user_id': 'u1',
+            'level': 'intermediate',
+            'xp': 240,
+            'total_words_spoken': 450,
+            'streak_days': 3,
+            'weekly_minutes': 15.0,
+            'accuracy_score': 85.0,
+          }),
+          200,
+        );
+      }
+      if (request.url.path.contains('/api/usage/')) {
+        return http.Response(
+          jsonEncode({
+            'user_id': 'u1',
+            'daily_minutes_used': 3.5,
+            'daily_minutes_limit': 10.0,
+            'turns_today': 4,
+            'plan': 'free',
+            'is_capped': false,
+          }),
+          200,
+        );
+      }
+      if (request.url.path.contains('/api/learning/vocabulary/')) {
+        return http.Response(
+          jsonEncode({
+            'cards': [
+              {
+                'id': 'v1',
+                'word': 'harvest',
+                'definition': 'Gathering crops',
+                'example': 'We harvest in autumn.',
+                'box': 1,
+                'next_review': '',
+                'mastered': false,
+                'ease_factor': 2.5,
+                'repetitions': 0,
+              }
+            ]
+          }),
+          200,
+        );
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
+    final auth = AuthProvider(api: api);
+
     await tester.pumpWidget(
-      const MaterialApp(home: ProfileScreen()),
+      MultiProvider(
+        providers: [
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
+        ],
+        child: const MaterialApp(home: ProfileScreen()),
+      ),
     );
 
-    expect(find.text('Learner (Anonymous)'), findsOneWidget);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Learner'), findsOneWidget);
     expect(find.text('Vocabulary Notebook'), findsOneWidget);
     expect(find.text('Parent Dashboard'), findsOneWidget);
   });
@@ -424,5 +671,173 @@ void main() {
     analytics.recordError(Exception('Network timeout'), null, context: 'talk_turn');
     expect(analytics.errorLog.length, 1);
     expect(analytics.errorLog.first['context'], 'talk_turn');
+  });
+
+  testWidgets('ScenariosScreen renders scenarios list', (WidgetTester tester) async {
+    final mockClient = MockClient((request) async {
+      if (request.url.path.endsWith('/api/learning/scenarios')) {
+        return http.Response(
+          jsonEncode({
+            'scenarios': [
+              {
+                'id': 'sc_market',
+                'title': 'Vegetable Market',
+                'category': 'Daily Life',
+                'difficulty': 'beginner',
+                'description': 'Bargain and buy fresh produce',
+                'roles': ['Buyer', 'Seller'],
+                'goals': ['Ask price', 'Buy items'],
+              }
+            ]
+          }),
+          200,
+        );
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
+
+    await tester.pumpWidget(
+      Provider<ApiService>.value(
+        value: api,
+        child: const MaterialApp(home: ScenariosScreen()),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Vegetable Market'), findsOneWidget);
+    expect(find.text('Start Roleplay'), findsOneWidget);
+  });
+
+  testWidgets('TopicsScreen renders topics list', (WidgetTester tester) async {
+    final mockClient = MockClient((request) async {
+      if (request.url.path.endsWith('/api/learning/topics')) {
+        return http.Response(
+          jsonEncode({
+            'topics': [
+              {
+                'id': 'top_weather',
+                'title': 'Monsoon Weather',
+                'category': 'Environment',
+                'difficulty': 'beginner',
+                'starters': ['What is the weather like today?'],
+              }
+            ]
+          }),
+          200,
+        );
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
+
+    await tester.pumpWidget(
+      Provider<ApiService>.value(
+        value: api,
+        child: const MaterialApp(home: TopicsScreen()),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Monsoon Weather'), findsOneWidget);
+  });
+
+  testWidgets('VocabularyScreen renders search and empty state', (WidgetTester tester) async {
+    final mockClient = MockClient((request) async {
+      if (request.url.path.contains('/api/learning/vocabulary/')) {
+        return http.Response(
+          jsonEncode({'cards': []}),
+          200,
+        );
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
+    final auth = AuthProvider(api: api);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
+        ],
+        child: const MaterialApp(home: VocabularyScreen()),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Vocabulary Notebook'), findsOneWidget);
+    expect(find.byType(TextField), findsOneWidget);
+  });
+
+  testWidgets('CharacterDetailScreen renders character information and sample phrases', (WidgetTester tester) async {
+    final character = Character(
+      id: 'prof_anika',
+      name: 'Professor Anika',
+      tagline: 'Science & Nature Conversations',
+      voiceId: 'diana',
+      personalityPrompt: 'Curious researcher',
+      speakingStyle: 'Warm and scholarly',
+      vocabularyFocus: 'Science & Ecology',
+      isFree: true,
+      priceBdt: 0,
+      avatarUrl: '',
+      personalityTraits: ['Analytical', 'Encouraging'],
+      sampleLines: ['Every observation matters.'],
+      bestFor: 'Advanced learners',
+    );
+
+    final api = ApiService();
+    final auth = AuthProvider(api: api);
+    final audio = AudioService();
+    final conv = ConversationProvider(api: api, audio: audio);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
+          ChangeNotifierProvider<AudioService>.value(value: audio),
+          ChangeNotifierProvider<ConversationProvider>.value(value: conv),
+        ],
+        child: MaterialApp(home: CharacterDetailScreen(character: character)),
+      ),
+    );
+
+    expect(find.text('Professor Anika'), findsWidgets);
+    expect(find.text('Science & Nature Conversations'), findsOneWidget);
+    expect(find.text('Hear their voice'), findsOneWidget);
+    expect(find.text('"Every observation matters."'), findsOneWidget);
+  });
+
+  testWidgets('SettingsScreen renders settings items', (WidgetTester tester) async {
+    final api = ApiService();
+    final auth = AuthProvider(api: api);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
+        ],
+        child: const MaterialApp(home: SettingsScreen()),
+      ),
+    );
+
+    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('App Theme'), findsOneWidget);
+    expect(find.text('Server Connection (Dev)'), findsOneWidget);
+    expect(find.text('Delete My Data'), findsOneWidget);
   });
 }

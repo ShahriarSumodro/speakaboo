@@ -16,6 +16,9 @@ class AppConfig {
     defaultValue: 'http://localhost:8000',
   );
 
+  /// Emulator fallback URL
+  static const String emulatorBackendUrl = 'http://10.0.2.2:8000';
+
   static String _activeBackendUrl = defaultBackendUrl;
 
   /// Current backend URL (either runtime-configured or default)

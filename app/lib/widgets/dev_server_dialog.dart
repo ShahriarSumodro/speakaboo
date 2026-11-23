@@ -8,12 +8,13 @@ import '../config/app_config.dart';
 import '../config/theme.dart';
 
 class DevServerDialog extends StatefulWidget {
-  const DevServerDialog({super.key});
+  final VoidCallback? onSaved;
+  const DevServerDialog({super.key, this.onSaved});
 
-  static Future<void> show(BuildContext context) {
+  static Future<void> show(BuildContext context, {VoidCallback? onSaved}) {
     return showDialog<void>(
       context: context,
-      builder: (_) => const DevServerDialog(),
+      builder: (_) => DevServerDialog(onSaved: onSaved),
     );
   }
 
@@ -84,6 +85,7 @@ class _DevServerDialogState extends State<DevServerDialog> {
   Future<void> _save(String url) async {
     final cleanUrl = url.trim().replaceAll(RegExp(r'/+$'), '');
     await AppConfig.setBackendUrl(cleanUrl);
+    widget.onSaved?.call();
     if (!mounted) return;
     Navigator.of(context).pop();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -96,6 +98,7 @@ class _DevServerDialogState extends State<DevServerDialog> {
 
   Future<void> _reset() async {
     await AppConfig.resetBackendUrl();
+    widget.onSaved?.call();
     if (!mounted) return;
     Navigator.of(context).pop();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -149,11 +152,11 @@ class _DevServerDialogState extends State<DevServerDialog> {
               children: [
                 ActionChip(
                   label: const Text('localhost:8000 (USB)'),
-                  onPressed: () => _controller.text = 'http://localhost:8000',
+                  onPressed: () => _controller.text = AppConfig.defaultBackendUrl,
                 ),
                 ActionChip(
                   label: const Text('10.0.2.2:8000 (Emulator)'),
-                  onPressed: () => _controller.text = 'http://10.0.2.2:8000',
+                  onPressed: () => _controller.text = AppConfig.emulatorBackendUrl,
                 ),
               ],
             ),

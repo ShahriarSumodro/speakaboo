@@ -2,7 +2,9 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../config/theme.dart';
+import '../providers/auth_provider.dart';
 
 class OnboardingScreen extends StatefulWidget {
   final VoidCallback onFinish;
@@ -76,7 +78,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               _buildLevelSelector(),
               const SizedBox(height: SpeakabooTheme.spacingXl),
               FilledButton(
-                onPressed: widget.onFinish,
+                onPressed: () {
+                  try {
+                    context.read<AuthProvider>().updateProfile({'level': _selectedLevel});
+                  } catch (_) {}
+                  widget.onFinish();
+                },
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(double.infinity, SpeakabooTheme.minTapTarget),
                 ),

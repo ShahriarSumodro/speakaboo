@@ -1,8 +1,16 @@
-/// Missions screen - daily goals, streaks, and XP rewards.
+/// Missions screen - connected to real backend daily goals and XP claims.
 library;
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../config/theme.dart';
+import '../models/learning_models.dart';
+import '../providers/auth_provider.dart';
+import '../services/api_service.dart';
+import '../services/cache_service.dart';
+import 'scenarios_screen.dart';
+import 'shadowing_screen.dart';
+import 'vocabulary_screen.dart';
 
 class MissionsScreen extends StatefulWidget {
   const MissionsScreen({super.key});
@@ -12,52 +20,95 @@ class MissionsScreen extends StatefulWidget {
 }
 
 class _MissionsScreenState extends State<MissionsScreen> {
-  // Mock missions data for instant responsive UI
-  final List<Map<String, dynamic>> _missions = [
-    {
-      'id': 'm_speak_3m',
-      'title': 'Daily Speaker',
-      'description': 'Speak for at least 3 minutes today',
-      'target': 3.0,
-      'current': 1.8,
-      'reward': 50,
-      'completed': false,
-      'claimed': false,
-    },
-    {
-      'id': 'm_new_words_3',
-      'title': 'Word Explorer',
-      'description': 'Learn or use 3 new vocabulary words',
-      'target': 3.0,
-      'current': 3.0,
-      'reward': 40,
-      'completed': true,
-      'claimed': false,
-    },
-    {
-      'id': 'm_complete_scene',
-      'title': 'Scenario Master',
-      'description': 'Complete 1 real-life speaking scenario',
-      'target': 1.0,
-      'current': 0.0,
-      'reward': 60,
-      'completed': false,
-      'claimed': false,
-    },
-    {
-      'id': 'm_shadowing_1',
-      'title': 'Echo Speaker',
-      'description': 'Complete 1 shadowing practice session',
-      'target': 1.0,
-      'current': 1.0,
-      'reward': 50,
-      'completed': true,
-      'claimed': true,
-    },
-  ];
+  MissionsResponse? _missionsData;
+  bool _isLoading = true;
 
-  final int _streakDays = 3;
-  final int _streakFreezes = 1;
+  @override
+  void initState() {
+    super.initState();
+    _loadMissions();
+  }
+
+  Future<void> _loadMissions() async {
+    final auth = context.read<AuthProvider>();
+    final api = context.read<ApiService>();
+
+    // Instant cached state
+    final cached = await CacheService.get('missions_${auth.userId}');
+    if (cached is Map<String, dynamic>) {
+      setState(() {
+        _missionsData = MissionsResponse.fromJson(cached);
+        _isLoading = false;
+      });
+    }
+
+    try {
+      final remote = await api.getMissions(auth.userId);
+      setState(() {
+        _missionsData = remote;
+        _isLoading = false;
+      });
+      await CacheService.set('missions_${auth.userId}', {
+        'date': remote.date,
+        'streak': remote.streak,
+        'freezes': remote.freezes,
+        'missions': remote.missions.map((m) => {
+          'id': m.id,
+          'title': m.title,
+          'description': m.description,
+          'xp_reward': m.xpReward,
+          'target': m.target,
+          'progress': m.progress,
+          'completed': m.completed,
+          'claimed': m.claimed,
+          'category': m.category,
+        }).toList(),
+      });
+    } catch (_) {
+      if (_missionsData == null) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _claimMission(Mission m) async {
+    final auth = context.read<AuthProvider>();
+    final api = context.read<ApiService>();
+
+    try {
+      final res = await api.claimMission(userId: auth.userId, missionId: m.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Claimed +${res['xp_awarded'] ?? m.xpReward} XP!'),
+            backgroundColor: SpeakabooTheme.success,
+          ),
+        );
+      }
+      _loadMissions();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not claim reward: $e')),
+        );
+      }
+    }
+  }
+
+  void _startActivity(Mission m) {
+    if (m.category == 'scenario') {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const ScenariosScreen()));
+    } else if (m.category == 'shadowing') {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const ShadowingScreen()));
+    } else if (m.category == 'vocabulary') {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const VocabularyScreen()));
+    } else {
+      // General speaking practice - switch to talk tab (or notify user)
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Go to the Talk tab to start practicing!')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -74,28 +125,41 @@ class _MissionsScreenState extends State<MissionsScreen> {
           ),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
-        children: [
-          // Streak Card
-          _buildStreakCard(),
-          const SizedBox(height: SpeakabooTheme.spacingLg),
-          const Text(
-            "Today's Goals",
-            style: TextStyle(
-              fontSize: SpeakabooTheme.headingSize - 4,
-              fontWeight: FontWeight.bold,
-              color: SpeakabooTheme.textPrimary,
-            ),
-          ),
-          const SizedBox(height: SpeakabooTheme.spacingSm),
-          ..._missions.map(_buildMissionCard),
-        ],
-      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _missionsData == null
+              ? const Center(child: Text('Could not load missions. Check connection.'))
+              : RefreshIndicator(
+                  onRefresh: _loadMissions,
+                  child: ListView(
+                    padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
+                    children: [
+                      // Streak Card
+                      _buildStreakCard(_missionsData!.streak, _missionsData!.freezes),
+                      const SizedBox(height: SpeakabooTheme.spacingLg),
+                      const Text(
+                        "Today's Goals",
+                        style: TextStyle(
+                          fontSize: SpeakabooTheme.headingSize - 4,
+                          fontWeight: FontWeight.bold,
+                          color: SpeakabooTheme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: SpeakabooTheme.spacingSm),
+                      if (_missionsData!.missions.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: Center(child: Text('All missions completed for today!')),
+                        )
+                      else
+                        ..._missionsData!.missions.map(_buildMissionCard),
+                    ],
+                  ),
+                ),
     );
   }
 
-  Widget _buildStreakCard() {
+  Widget _buildStreakCard(int streakDays, int streakFreezes) {
     return Container(
       padding: const EdgeInsets.all(SpeakabooTheme.spacingLg),
       decoration: BoxDecoration(
@@ -123,7 +187,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '$_streakDays Day Streak!',
+                  '$streakDays Day Streak!',
                   style: const TextStyle(
                     fontSize: SpeakabooTheme.headingSize - 4,
                     fontWeight: FontWeight.bold,
@@ -131,9 +195,9 @@ class _MissionsScreenState extends State<MissionsScreen> {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text(
+                const Text(
                   'Practice today to keep it going (Asia/Dhaka)',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: SpeakabooTheme.captionSize,
                     color: SpeakabooTheme.textSecondary,
                   ),
@@ -146,7 +210,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
               const Icon(Icons.ac_unit, color: Colors.blueAccent, size: 22),
               const SizedBox(height: 2),
               Text(
-                '$_streakFreezes freeze',
+                '$streakFreezes freeze',
                 style: const TextStyle(
                   fontSize: SpeakabooTheme.smallSize,
                   color: SpeakabooTheme.textSecondary,
@@ -159,10 +223,8 @@ class _MissionsScreenState extends State<MissionsScreen> {
     );
   }
 
-  Widget _buildMissionCard(Map<String, dynamic> m) {
-    final double progress = ((m['current'] as double) / (m['target'] as double)).clamp(0.0, 1.0);
-    final bool completed = m['completed'] as bool;
-    final bool claimed = m['claimed'] as bool;
+  Widget _buildMissionCard(Mission m) {
+    final double progress = (m.progress / (m.target > 0 ? m.target : 1)).clamp(0.0, 1.0);
 
     return Container(
       margin: const EdgeInsets.only(bottom: SpeakabooTheme.spacingMd),
@@ -178,7 +240,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
             children: [
               Expanded(
                 child: Text(
-                  m['title'],
+                  m.title,
                   style: const TextStyle(
                     fontSize: SpeakabooTheme.baseFontSize,
                     fontWeight: FontWeight.bold,
@@ -193,7 +255,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
                   borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm),
                 ),
                 child: Text(
-                  '+${m['reward']} XP',
+                  '+${m.xpReward} XP',
                   style: const TextStyle(
                     fontSize: SpeakabooTheme.captionSize,
                     fontWeight: FontWeight.bold,
@@ -205,7 +267,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            m['description'],
+            m.description,
             style: const TextStyle(
               fontSize: SpeakabooTheme.captionSize,
               color: SpeakabooTheme.textSecondary,
@@ -226,13 +288,13 @@ class _MissionsScreenState extends State<MissionsScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '${m['current']} / ${m['target']}',
+                '${m.progress} / ${m.target}',
                 style: const TextStyle(
                   fontSize: SpeakabooTheme.smallSize,
                   color: SpeakabooTheme.textSecondary,
                 ),
               ),
-              if (claimed)
+              if (m.claimed)
                 const Text(
                   'Claimed ✓',
                   style: TextStyle(
@@ -241,23 +303,28 @@ class _MissionsScreenState extends State<MissionsScreen> {
                     color: SpeakabooTheme.success,
                   ),
                 )
-              else if (completed)
+              else if (m.completed)
                 SizedBox(
                   height: 36,
                   child: FilledButton(
-                    onPressed: () {
-                      setState(() {
-                        m['claimed'] = true;
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Claimed +${m['reward']} XP!')),
-                      );
-                    },
+                    onPressed: () => _claimMission(m),
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       minimumSize: const Size(80, 36),
                     ),
                     child: const Text('Claim Reward'),
+                  ),
+                )
+              else
+                SizedBox(
+                  height: 36,
+                  child: OutlinedButton(
+                    onPressed: () => _startActivity(m),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      minimumSize: const Size(80, 36),
+                    ),
+                    child: const Text('Start'),
                   ),
                 ),
             ],

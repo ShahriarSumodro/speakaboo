@@ -1,53 +1,62 @@
-/// Characters screen - browsing and switching speaking companions.
+/// Characters screen - browsing and selecting speaking companions from the backend.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../config/theme.dart';
+import '../models/character.dart';
 import '../providers/conversation_provider.dart';
-import '../widgets/character_sheet.dart';
-import '../widgets/unlock_sheet.dart';
+import '../services/api_service.dart';
+import '../services/cache_service.dart';
+import 'character_detail_screen.dart';
 
-class CharactersScreen extends StatelessWidget {
+class CharactersScreen extends StatefulWidget {
   const CharactersScreen({super.key});
 
-  static const List<Map<String, dynamic>> _characters = [
-    {
-      'id': 'rule_farmer',
-      'name': 'Farmer Reggie',
-      'tagline': 'Rules & Farming Metaphors',
-      'description': 'An intense, rule-obsessed farmer who takes spoken English very seriously! Pulls mistakes like weeds.',
-      'greeting': 'Welcome to my farm! Every word you plant here will grow strong.',
-      'locked': false,
-      'price_bdt': 0,
-      'voice_id': 'austin',
-    },
-    {
-      'id': 'dhaka_detective',
-      'name': 'Detective Kabir',
-      'tagline': 'Mystery & Logic Practice',
-      'description': 'A sharp and witty private investigator in Old Dhaka who helps you solve English sentence clues.',
-      'greeting': 'Aha! Let us examine the evidence of your spoken English together.',
-      'locked': true,
-      'price_bdt': 350,
-      'voice_id': 'daniel',
-    },
-    {
-      'id': 'professor_anika',
-      'name': 'Professor Anika',
-      'tagline': 'Nature & Science Conversations',
-      'description': 'A warm and thoughtful researcher who loves discussing geography, wildlife, and technology.',
-      'greeting': 'Hello learner! Every journey of discovery starts with a single spoken sentence.',
-      'locked': true,
-      'price_bdt': 350,
-      'voice_id': 'diana',
-    },
-  ];
+  @override
+  State<CharactersScreen> createState() => _CharactersScreenState();
+}
+
+class _CharactersScreenState extends State<CharactersScreen> {
+  List<Character> _characters = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCharacters();
+  }
+
+  Future<void> _loadCharacters() async {
+    final api = context.read<ApiService>();
+
+    // Rapid cached rendering
+    final cached = await CacheService.get('characters_list');
+    if (cached is List) {
+      setState(() {
+        _characters = cached.map((c) => Character.fromJson(c as Map<String, dynamic>)).toList();
+        _isLoading = false;
+      });
+    }
+
+    try {
+      final remote = await api.getCharacters();
+      setState(() {
+        _characters = remote;
+        _isLoading = false;
+      });
+      await CacheService.set('characters_list', remote.map((c) => c.toJson()).toList());
+    } catch (_) {
+      if (_characters.isEmpty) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final conv = context.watch<ConversationProvider>();
-    final currentId = conv.conversationId != null ? 'rule_farmer' : '';
+    final currentId = conv.currentCharacterId ?? (conv.conversationId != null ? 'rule_farmer' : '');
 
     return Scaffold(
       appBar: AppBar(
@@ -62,137 +71,103 @@ class CharactersScreen extends StatelessWidget {
           ),
         ),
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
-        itemCount: _characters.length,
-        itemBuilder: (context, index) {
-          final c = _characters[index];
-          final isCurrent = c['id'] == currentId;
-          final isLocked = c['locked'] as bool;
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _characters.isEmpty
+              ? const Center(child: Text('No companions found. Connect to backend.'))
+              : RefreshIndicator(
+                  onRefresh: _loadCharacters,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
+                    itemCount: _characters.length,
+                    itemBuilder: (context, index) {
+                      final c = _characters[index];
+                      final isCurrent = c.id == currentId;
+                      final isLocked = !c.isFree;
 
-          return Container(
-            margin: const EdgeInsets.only(bottom: SpeakabooTheme.spacingMd),
-            decoration: BoxDecoration(
-              color: SpeakabooTheme.surface,
-              borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
-              border: isCurrent
-                  ? Border.all(color: SpeakabooTheme.accent, width: 2)
-                  : null,
-            ),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
-              onTap: () {
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
-                  builder: (ctx) => CharacterSheet(
-                    id: c['id'],
-                    name: c['name'],
-                    description: c['description'],
-                    greeting: c['greeting'],
-                    isLocked: isLocked,
-                    priceBdt: c['price_bdt'],
-                    isCurrent: isCurrent,
-                    onSelect: () {
-                      Navigator.pop(ctx);
-                      conv.startConversation(
-                        userId: 'device-user',
-                        characterId: c['id'],
-                      );
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Switched to ${c['name']}')),
-                      );
-                    },
-                    onUnlock: () {
-                      Navigator.pop(ctx);
-                      showModalBottomSheet(
-                        context: context,
-                        backgroundColor: Colors.transparent,
-                        builder: (_) => UnlockSheet(
-                          title: c['name'],
-                          priceText: '${c['price_bdt']} BDT',
-                          onPayWithBkash: () {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Mock bKash payment initiated')),
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: SpeakabooTheme.spacingMd),
+                        decoration: BoxDecoration(
+                          color: SpeakabooTheme.surface,
+                          borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
+                          border: isCurrent
+                              ? Border.all(color: SpeakabooTheme.accent, width: 2)
+                              : null,
+                        ),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => CharacterDetailScreen(character: c),
+                              ),
                             );
                           },
-                          onPayWithNagad: () {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Mock Nagad payment initiated')),
-                            );
-                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 56,
+                                  height: 56,
+                                  decoration: BoxDecoration(
+                                    color: SpeakabooTheme.background,
+                                    borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
+                                  ),
+                                  child: Icon(
+                                    isLocked ? Icons.lock_outline : Icons.face,
+                                    color: isLocked ? SpeakabooTheme.textSecondary : SpeakabooTheme.accent,
+                                    size: 32,
+                                  ),
+                                ),
+                                const SizedBox(width: SpeakabooTheme.spacingMd),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        c.name,
+                                        style: const TextStyle(
+                                          fontSize: SpeakabooTheme.baseFontSize,
+                                          fontWeight: FontWeight.bold,
+                                          color: SpeakabooTheme.textPrimary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        c.tagline,
+                                        style: const TextStyle(
+                                          fontSize: SpeakabooTheme.captionSize,
+                                          color: SpeakabooTheme.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (isCurrent)
+                                  const Chip(
+                                    label: Text('Active', style: TextStyle(color: Colors.white, fontSize: 11)),
+                                    backgroundColor: SpeakabooTheme.accent,
+                                    visualDensity: VisualDensity.compact,
+                                  )
+                                else if (isLocked)
+                                  Text(
+                                    '${c.priceBdt} BDT',
+                                    style: const TextStyle(
+                                      fontSize: SpeakabooTheme.captionSize,
+                                      fontWeight: FontWeight.bold,
+                                      color: SpeakabooTheme.accent,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
                         ),
                       );
                     },
                   ),
-                );
-              },
-              child: Padding(
-                padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: SpeakabooTheme.background,
-                        borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
-                      ),
-                      child: Icon(
-                        isLocked ? Icons.lock_outline : Icons.face,
-                        color: isLocked ? SpeakabooTheme.textSecondary : SpeakabooTheme.accent,
-                        size: 32,
-                      ),
-                    ),
-                    const SizedBox(width: SpeakabooTheme.spacingMd),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            c['name'],
-                            style: const TextStyle(
-                              fontSize: SpeakabooTheme.baseFontSize,
-                              fontWeight: FontWeight.bold,
-                              color: SpeakabooTheme.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            c['tagline'],
-                            style: const TextStyle(
-                              fontSize: SpeakabooTheme.captionSize,
-                              color: SpeakabooTheme.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (isCurrent)
-                      const Chip(
-                        label: Text('Active', style: TextStyle(color: Colors.white, fontSize: 11)),
-                        backgroundColor: SpeakabooTheme.accent,
-                        visualDensity: VisualDensity.compact,
-                      )
-                    else if (isLocked)
-                      Text(
-                        '${c['price_bdt']} BDT',
-                        style: const TextStyle(
-                          fontSize: SpeakabooTheme.captionSize,
-                          fontWeight: FontWeight.bold,
-                          color: SpeakabooTheme.accent,
-                        ),
-                      ),
-                  ],
                 ),
-              ),
-            ),
-          );
-        },
-      ),
     );
   }
 }
