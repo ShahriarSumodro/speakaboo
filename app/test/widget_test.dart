@@ -682,6 +682,36 @@ void main() {
     expect(SpeakabooTheme.textPrimary, const Color(0xFF2A211B));
   });
 
+  test('Dark Theme (Phase 8) has correct 60-30-10 tokens and contrast >= 4.5:1', () {
+    // 60-30-10 tokens
+    expect(SpeakabooTheme.darkBackground, const Color(0xFF1B1613));
+    expect(SpeakabooTheme.darkSurface, const Color(0xFF2A221D));
+    expect(SpeakabooTheme.darkAccent, const Color(0xFFFF7A33));
+    expect(SpeakabooTheme.darkTextPrimary, const Color(0xFFF5EDE6));
+    expect(SpeakabooTheme.darkTextSecondary, const Color(0xFFC4B8B0));
+
+    // Tap target minimum 44px
+    expect(SpeakabooTheme.minTapTarget, greaterThanOrEqualTo(44.0));
+
+    // ThemeExtension registered
+    final colors = SpeakabooTheme.darkTheme.extension<SpeakabooColors>();
+    expect(colors, isNotNull);
+    expect(colors!.background, SpeakabooTheme.darkBackground);
+    expect(colors.surface, SpeakabooTheme.darkSurface);
+
+    // WCAG Contrast ratio verification: (L1 + 0.05) / (L2 + 0.05)
+    double luminance(Color c) => c.computeLuminance();
+    final lText = luminance(SpeakabooTheme.darkTextPrimary);
+    final lBg = luminance(SpeakabooTheme.darkBackground);
+    final lSurface = luminance(SpeakabooTheme.darkSurface);
+
+    final contrastBg = (lText + 0.05) / (lBg + 0.05);
+    final contrastSurface = (lText + 0.05) / (lSurface + 0.05);
+
+    expect(contrastBg, greaterThan(4.5)); // Well above 4.5:1 (actually ~15:1)
+    expect(contrastSurface, greaterThan(4.5)); // Well above 4.5:1 (actually ~11:1)
+  });
+
   test('ApiService creates without error', () {
     final api = ApiService(baseUrl: 'http://localhost:8000');
     expect(api.baseUrl, 'http://localhost:8000');

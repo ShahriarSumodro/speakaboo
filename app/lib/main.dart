@@ -59,11 +59,24 @@ class _SpeakabooAppState extends State<SpeakabooApp> {
               previous ?? ConversationProvider(api: _apiService, audio: audio),
         ),
       ],
-      child: MaterialApp(
-        title: 'Speakaboo',
-        debugShowCheckedModeBanner: false,
-        theme: SpeakabooTheme.theme,
-        home: const _AppRoot(),
+      child: Consumer<AuthProvider>(
+        builder: (context, auth, _) {
+          ThemeMode mode = ThemeMode.system;
+          if (auth.profile?.theme == 'dark') {
+            mode = ThemeMode.dark;
+          } else if (auth.profile?.theme == 'light') {
+            mode = ThemeMode.light;
+          }
+
+          return MaterialApp(
+            title: 'Speakaboo',
+            debugShowCheckedModeBanner: false,
+            theme: SpeakabooTheme.theme,
+            darkTheme: SpeakabooTheme.darkTheme,
+            themeMode: mode,
+            home: const _AppRoot(),
+          );
+        },
       ),
     );
   }
