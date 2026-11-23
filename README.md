@@ -137,6 +137,35 @@ Pop-Location
 >   `flutter run --dart-define=BACKEND_URL=http://192.168.1.15:8000`
 > - **In-App Runtime Setting:** In `TalkScreen`, tap the Server Settings icon (`settings_ethernet`) in the header or long-press the Speakaboo title to open the Developer Server Dialog, test the connection, and change the server URL on the fly without recompiling.
 
+### 5. Docker Deployment (Containerized Production)
+
+Run the containerized backend with Docker Compose:
+
+```bash
+# Build and start container in the background
+docker compose up -d --build
+
+# View container logs
+docker compose logs -f
+
+# Check health probe
+curl http://localhost:8000/api/health
+```
+
+### 6. Build Android Release APK / App Bundle
+
+To build production-ready artifacts for testing or publishing to Google Play:
+
+```powershell
+Push-Location app
+# 1. Build universal release APK pointing to production backend
+flutter build apk --release --dart-define=BACKEND_URL=https://api.speakaboo.app
+
+# 2. Build Google Play Store App Bundle (.aab)
+flutter build appbundle --release --dart-define=BACKEND_URL=https://api.speakaboo.app
+Pop-Location
+```
+
 ---
 
 ## 🧪 Testing & Verification
@@ -169,10 +198,12 @@ python -m backend.cli_chat --audio sample.wav
 python -m backend.scripts.load_test --turns 50 --concurrency 10
 ```
 
-### Generate Unit Economics & Cost Report
-```bash
-python -m backend.scripts.cost_report
-```
+### Operational & Analytics Scripts
+- **Automated Reality Audit:** `python tools/reality_audit.py`
+- **Provider Verification:** `python backend/scripts/verify_providers.py`
+- **Retention & Daily Habits Report:** `python backend/scripts/retention_report.py`
+- **Revenue & Unit-Cost Analytics:** `python backend/scripts/revenue_report.py`
+- **Automated Database Backup:** `python backend/scripts/backup_db.py`
 
 ---
 

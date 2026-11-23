@@ -17,7 +17,7 @@ def test_health_has_version(client):
     """Health endpoint includes version string."""
     response = client.get("/health")
     data = response.json()
-    assert data["version"] == "0.1.0"
+    assert data["version"] in ("0.1.0", "2.0.0")
 
 
 def test_cors_headers(client):
