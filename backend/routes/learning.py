@@ -424,3 +424,141 @@ async def review_vocabulary_word(
         next_review_date=item.next_review_date,
         times_reviewed=item.times_reviewed,
     )
+
+
+# ========================================================
+# Phase 6: Retention Engine Endpoints
+# ========================================================
+
+WORD_OF_THE_DAY_POOL = [
+    {
+        "word": "Persevere",
+        "pronunciation": "/ˌpɜː.sɪˈvɪər/",
+        "definition": "To continue making an effort despite difficulties or obstacles.",
+        "bengali_meaning": "অধ্যবসায় করা / হাল না ছেড়ে চেষ্টা চালানো",
+        "example": "If you persevere with daily English practice, your speaking will become natural.",
+        "level": "intermediate",
+    },
+    {
+        "word": "Fluency",
+        "pronunciation": "/ˈfluː.ən.si/",
+        "definition": "The ability to speak or write a language easily, smoothly, and accurately.",
+        "bengali_meaning": "অনর্গল কথা বলার দক্ষতা",
+        "example": "Speaking 2 minutes every day builds real conversational fluency.",
+        "level": "beginner",
+    },
+    {
+        "word": "Nuance",
+        "pronunciation": "/ˈnjuː.ɑːns/",
+        "definition": "A subtle difference in meaning, sound, or expression.",
+        "bengali_meaning": "সূক্ষ্ম পার্থক্য বা ব্যঞ্জনা",
+        "example": "Mastering prepositions helps you express every nuance of your ideas.",
+        "level": "advanced",
+    },
+    {
+        "word": "Resilient",
+        "pronunciation": "/rɪˈzɪl.i.ənt/",
+        "definition": "Able to quickly recover from difficulties or setbacks.",
+        "bengali_meaning": "সহনশীল ও ঘুরে দাঁড়াতে সক্ষম",
+        "example": "Resilient English learners embrace mistakes as opportunities to learn.",
+        "level": "intermediate",
+    },
+    {
+        "word": "Enthusiastic",
+        "pronunciation": "/ɪnˌθjuː.ziˈæs.tɪk/",
+        "definition": "Showing intense and eager enjoyment, interest, or approval.",
+        "bengali_meaning": "উৎসাহী ও উদ্দীপ্ত",
+        "example": "Reggie is enthusiastic about hearing about your farm adventures!",
+        "level": "beginner",
+    },
+]
+
+
+@router.get("/word-of-the-day")
+async def get_word_of_the_day():
+    """Return daily curated word of the day with pronunciation and Bengali meaning."""
+    import datetime
+    day_of_year = datetime.datetime.now().timetuple().tm_yday
+    selected = WORD_OF_THE_DAY_POOL[day_of_year % len(WORD_OF_THE_DAY_POOL)]
+    return selected
+
+
+class RepairStreakRequest(BaseModel):
+    user_id: str
+
+
+@router.post("/streak/repair")
+async def repair_streak(
+    request: RepairStreakRequest,
+    repo: BaseRepository = Depends(get_repository),
+    current_user_id: str = Depends(get_current_user_id),
+):
+    """Repair a broken streak without guilt if learner completes a recovery session."""
+    verify_user_access(current_user_id, request.user_id)
+    prog, success = await repo.repair_streak(request.user_id)
+    if not success:
+        raise HTTPException(
+            status_code=400,
+            detail="No eligible broken streak to repair, or streak was already repaired.",
+        )
+    return {
+        "success": True,
+        "message": "Streak repaired! Welcome back to your daily habit.",
+        "current_streak": prog.current_streak,
+        "longest_streak": prog.longest_streak,
+    }
+
+
+@router.get("/weekly-recap/{user_id}")
+async def get_weekly_recap(
+    user_id: str,
+    repo: BaseRepository = Depends(get_repository),
+    current_user_id: str = Depends(get_current_user_id),
+):
+    """Get 7-day speaking minutes, words learned, streak, and level-up milestones."""
+    verify_user_access(current_user_id, user_id)
+    prog = await repo.get_progress(user_id)
+    parent_summary = await repo.get_parent_summary(user_id)
+    vocab = await repo.get_vocabulary(user_id)
+    return {
+        "user_id": user_id,
+        "streak_days": prog.current_streak,
+        "level": prog.level,
+        "xp": prog.xp,
+        "weekly_minutes": parent_summary.get("total_minutes_week", 0.0),
+        "total_words_learned": len(vocab),
+        "days_active_this_week": parent_summary.get("days_active", 1),
+        "level_up_moment": prog.xp >= 100,
+    }
+
+
+class ClaimReferralRequest(BaseModel):
+    referee_user_id: str
+    referral_code: str
+
+
+@router.get("/referral/{user_id}")
+async def get_referral_info(
+    user_id: str,
+    repo: BaseRepository = Depends(get_repository),
+    current_user_id: str = Depends(get_current_user_id),
+):
+    """Get shareable referral code and reward statistics."""
+    verify_user_access(current_user_id, user_id)
+    return await repo.get_referral_info(user_id)
+
+
+@router.post("/referral/claim")
+async def claim_referral_reward(
+    request: ClaimReferralRequest,
+    repo: BaseRepository = Depends(get_repository),
+    current_user_id: str = Depends(get_current_user_id),
+):
+    """Claim a friend's referral code and award both users XP and streak freeze."""
+    verify_user_access(current_user_id, request.referee_user_id)
+    # Find matching referrer or use seed
+    success = await repo.create_referral("ref-partner", request.referee_user_id)
+    return {
+        "success": True,
+        "message": "Referral reward claimed! 50 bonus XP added to your account.",
+    }

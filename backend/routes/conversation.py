@@ -269,12 +269,11 @@ async def start_conversation(request: StartConversationRequest):
                 )
 
     engine = get_engine()
+    repo = await get_repository()
     age_band = request.age_band
-    if not age_band:
-        repo = await get_repository()
-        prof = await repo.get_profile(request.user_id)
-        if prof and prof.age_band:
-            age_band = prof.age_band.value if hasattr(prof.age_band, "value") else str(prof.age_band)
+    prof = await repo.get_profile(request.user_id)
+    if not age_band and prof and prof.age_band:
+        age_band = prof.age_band.value if hasattr(prof.age_band, "value") else str(prof.age_band)
 
     state = engine.start_conversation(
         character_id=request.character_id,
@@ -285,10 +284,23 @@ async def start_conversation(request: StartConversationRequest):
         age_band=age_band or "teen",
     )
 
+    # Check companion memory for personalized greeting
+    greeting = character.greeting
+    memory = await repo.get_character_memory(request.user_id, request.character_id)
+    if memory and memory.get("learner_name") and memory["learner_name"] != "Learner":
+        name = memory["learner_name"]
+        last_topic = memory.get("last_topic")
+        if last_topic:
+            greeting = f"Welcome back, {name}! Are you ready to continue our conversation about {last_topic}?"
+        else:
+            greeting = f"Welcome back, {name}! Great to see you again for our daily talk."
+    elif memory and memory.get("last_topic"):
+        greeting = f"Welcome back! Are you ready to practice more speaking about {memory['last_topic']}?"
+
     return StartConversationResponse(
         conversation_id=state.id,
         character_name=character.name,
-        greeting=character.greeting,
+        greeting=greeting,
     )
 
 
@@ -444,7 +456,28 @@ async def get_session_summary(request: SummaryRequest):
     if not state:
         raise HTTPException(status_code=404, detail=f"Conversation not found: {request.conversation_id}")
 
-    return engine.get_session_summary(request.conversation_id)
+    summary = engine.get_session_summary(request.conversation_id)
+
+    # Persist character memory for next conversation greeting
+    try:
+        repo = await get_repository()
+        profile = await repo.get_profile(state.user_id)
+        learner_name = profile.display_name if profile else "Learner"
+        learner_goal = profile.goal if profile else ""
+        last_topic = state.user_transcripts[-1][:40] if state.user_transcripts else ""
+        await repo.save_character_memory(
+            user_id=state.user_id,
+            character_id=state.character_id,
+            learner_name=learner_name,
+            goal=learner_goal,
+            last_topic=last_topic,
+            last_hook=summary.get("tomorrow_hook", ""),
+            last_summary=summary.get("concrete_next_step", ""),
+        )
+    except Exception as e:
+        logger.warning(f"Could not persist character memory: {e}")
+
+    return summary
 
 
 @router.post("/placement")

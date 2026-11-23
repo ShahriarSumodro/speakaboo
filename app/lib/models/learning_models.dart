@@ -392,3 +392,90 @@ class MistakeLogItem {
     );
   }
 }
+
+class WordOfTheDay {
+  final String word;
+  final String pronunciation;
+  final String definition;
+  final String bengaliMeaning;
+  final String example;
+  final String level;
+
+  WordOfTheDay({
+    required this.word,
+    required this.pronunciation,
+    required this.definition,
+    required this.bengaliMeaning,
+    required this.example,
+    required this.level,
+  });
+
+  factory WordOfTheDay.fromJson(Map<String, dynamic> json) {
+    return WordOfTheDay(
+      word: json['word'] ?? '',
+      pronunciation: json['pronunciation'] ?? '',
+      definition: json['definition'] ?? '',
+      bengaliMeaning: json['bengali_meaning'] ?? '',
+      example: json['example'] ?? '',
+      level: json['level'] ?? 'intermediate',
+    );
+  }
+}
+
+class WeeklyRecap {
+  final String userId;
+  final int streakDays;
+  final int level;
+  final int xp;
+  final double weeklyMinutes;
+  final int totalWordsLearned;
+  final int daysActiveThisWeek;
+  final bool levelUpMoment;
+
+  WeeklyRecap({
+    required this.userId,
+    required this.streakDays,
+    required this.level,
+    required this.xp,
+    required this.weeklyMinutes,
+    required this.totalWordsLearned,
+    required this.daysActiveThisWeek,
+    required this.levelUpMoment,
+  });
+
+  factory WeeklyRecap.fromJson(Map<String, dynamic> json) {
+    return WeeklyRecap(
+      userId: json['user_id'] ?? '',
+      streakDays: json['streak_days'] ?? 0,
+      level: json['level'] ?? 1,
+      xp: json['xp'] ?? 0,
+      weeklyMinutes: (json['weekly_minutes'] ?? 0).toDouble(),
+      totalWordsLearned: json['total_words_learned'] ?? 0,
+      daysActiveThisWeek: json['days_active_this_week'] ?? 1,
+      levelUpMoment: json['level_up_moment'] ?? false,
+    );
+  }
+}
+
+class ReferralInfo {
+  final String referralCode;
+  final int referralCount;
+  final int xpEarned;
+  final int freezesEarned;
+
+  ReferralInfo({
+    required this.referralCode,
+    required this.referralCount,
+    required this.xpEarned,
+    required this.freezesEarned,
+  });
+
+  factory ReferralInfo.fromJson(Map<String, dynamic> json) {
+    return ReferralInfo(
+      referralCode: json['referral_code'] ?? '',
+      referralCount: json['referral_count'] ?? 0,
+      xpEarned: json['xp_earned'] ?? 0,
+      freezesEarned: json['freezes_earned'] ?? 0,
+    );
+  }
+}

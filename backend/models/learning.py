@@ -18,6 +18,8 @@ class UserProgress:
     longest_streak: int = 0
     last_active_date: str = ""  # YYYY-MM-DD in Asia/Dhaka
     streak_freeze_count: int = 0
+    previous_streak: int = 0
+    streak_repaired: bool = False
     updated_at: float = field(default_factory=time.time)
 
 

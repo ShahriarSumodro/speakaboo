@@ -9,6 +9,7 @@ import '../models/usage_info.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
+import '../widgets/share_progress_card.dart';
 import 'parent_dashboard_screen.dart';
 import 'scenarios_screen.dart';
 import 'settings_screen.dart';
@@ -26,6 +27,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   LearningProgress? _progress;
   UsageInfo? _usage;
+  ReferralInfo? _referral;
   int _vocabCount = 0;
   bool _isLoading = true;
 
@@ -52,10 +54,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final prog = await api.getProgress(auth.userId);
       final usage = await api.getUsage(auth.userId);
       final cards = await api.getVocabulary(auth.userId);
+      ReferralInfo? ref;
+      try {
+        ref = await api.getReferralInfo(auth.userId);
+      } catch (_) {}
 
       setState(() {
         _progress = prog;
         _usage = usage;
+        _referral = ref;
         _vocabCount = cards.length;
         _isLoading = false;
       });
@@ -74,6 +81,74 @@ class _ProfileScreenState extends State<ProfileScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  void _showClaimReferralDialog() {
+    final auth = context.read<AuthProvider>();
+    final api = context.read<ApiService>();
+    final codeController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Enter Referral Code'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enter a friend\'s Speakaboo referral code to claim 50 bonus XP and a streak freeze!',
+              style: TextStyle(fontSize: SpeakabooTheme.captionSize),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: codeController,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                labelText: 'Referral Code',
+                hintText: 'e.g. SPK-ABC123',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () async {
+              final code = codeController.text.trim();
+              if (code.isEmpty) return;
+              Navigator.pop(ctx);
+              try {
+                final res = await api.claimReferral(
+                  refereeUserId: auth.userId,
+                  referralCode: code,
+                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(res['message'] ?? 'Referral reward claimed!'),
+                      backgroundColor: SpeakabooTheme.success,
+                    ),
+                  );
+                }
+                _loadStats();
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to claim: $e'),
+                      backgroundColor: SpeakabooTheme.error,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Claim Reward'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showEditProfileDialog() {
@@ -376,6 +451,142 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Icon(Icons.chevron_right, color: SpeakabooTheme.textSecondary),
                   ],
                 ),
+              ),
+            ),
+            const SizedBox(height: SpeakabooTheme.spacingMd),
+
+            // Share Progress Social Card
+            InkWell(
+              borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
+              onTap: () {
+                ShareProgressCard.show(
+                  context,
+                  streakDays: _progress?.streakDays ?? 0,
+                  level: _progress?.level ?? 'beginner',
+                  xp: _progress?.xp ?? 0,
+                  weeklyMinutes: _progress?.weeklyMinutes ?? 0.0,
+                  referralCode: _referral?.referralCode ?? 'SPEAKABOO',
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF2A221D), Color(0xFF1B1613)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
+                  border: Border.all(color: SpeakabooTheme.accent.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.share, color: SpeakabooTheme.accent, size: 28),
+                    const SizedBox(width: SpeakabooTheme.spacingMd),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'Share My Progress Card',
+                            style: TextStyle(
+                              fontSize: SpeakabooTheme.baseFontSize,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            'Show friends on WhatsApp & Facebook your speaking streak!',
+                            style: TextStyle(
+                              fontSize: SpeakabooTheme.captionSize,
+                              color: Color(0xFFC4B8B0),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward, color: SpeakabooTheme.accent),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: SpeakabooTheme.spacingMd),
+
+            // Referral & Rewards Tile
+            Container(
+              padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
+              decoration: BoxDecoration(
+                color: SpeakabooTheme.surface,
+                borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.card_giftcard, color: SpeakabooTheme.accent, size: 24),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Refer Friends (+100 XP)',
+                        style: TextStyle(
+                          fontSize: SpeakabooTheme.baseFontSize,
+                          fontWeight: FontWeight.bold,
+                          color: SpeakabooTheme.textPrimary,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        'Code: ${_referral?.referralCode ?? "..."}',
+                        style: const TextStyle(
+                          fontSize: SpeakabooTheme.captionSize,
+                          fontWeight: FontWeight.bold,
+                          color: SpeakabooTheme.accent,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${_referral?.referralCount ?? 0} friends joined. ${_referral?.xpEarned ?? 0} XP earned.',
+                    style: const TextStyle(
+                      fontSize: SpeakabooTheme.captionSize,
+                      color: SpeakabooTheme.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _showClaimReferralDialog,
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                          child: const Text('Enter Code'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () {
+                            ShareProgressCard.show(
+                              context,
+                              streakDays: _progress?.streakDays ?? 0,
+                              level: _progress?.level ?? 'beginner',
+                              xp: _progress?.xp ?? 0,
+                              weeklyMinutes: _progress?.weeklyMinutes ?? 0.0,
+                              referralCode: _referral?.referralCode ?? 'SPEAKABOO',
+                            );
+                          },
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                          child: const Text('Invite Friends'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ],

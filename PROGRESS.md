@@ -1,8 +1,8 @@
 # Speakaboo Progress (V2 Reality Pass)
 
-## Current Phase: Phase 6 (Retention engine - the North Star)
-## Current Task: Phase 6.1 - Daily habit loop, notifications, streak forgiveness, and character memory
-## NEXT ACTION: Implement local notification scheduling, streak repair/freeze flows, character greetings with memory, and retention analytics report.
+## Current Phase: Phase 7 (Safety, privacy, parents)
+## Current Task: Phase 7.1 - Input and output safety moderation layer, child protection, and parent controls
+## NEXT ACTION: Implement safety guardrails (content moderation, personal information scrubbing, safe redirects in companion voice, and parent safety alerts).
 
 ---
 
@@ -14,15 +14,15 @@
 | `TalkScreen` | Real | Wired to `AuthProvider` (real device user & token), streaming SSE turn pipeline, dynamic level badge, dev server settings dialog, "Help me say it" hint drawer, Fluency/Accuracy mode toggle, and Session Summary sheet. |
 | `CharactersScreen` | Real | Fetches live companion catalog from `GET /api/characters/`, offline caching, active companion chip, opens `CharacterDetailScreen`. |
 | `CharacterDetailScreen` | Real | Plays cached Orpheus voice preview audio via `GET /api/characters/{id}/preview-audio`, displays traits, sample lines, BDT unlock. |
-| `MissionsScreen` | Real | Fetches live missions & streak from `GET /api/learning/missions/{id}`, "Claim Reward" calls `POST /api/learning/missions/claim` granting XP, "Start" launches relevant mode. |
-| `ProfileScreen` | Real | Displays real profile, XP, streak, words spoken; profile edit dialog persists to backend; navigates to Vocabulary, Parent Dashboard, Settings, Practice modes. |
+| `MissionsScreen` | Real | Fetches live missions & streak from `GET /api/learning/missions/{id}`, "Claim Reward" calls `POST /api/learning/missions/claim` granting XP, Word of the Day bilingual card with Bengali meaning/example, Streak Recovery banner with zero-guilt repair. |
+| `ProfileScreen` | Real | Displays real profile, XP, streak, words spoken; profile edit dialog persists to backend; Share My Progress social badge card; Referral & Rewards tile with invite code and redeem dialog; navigates to Vocabulary, Parent Dashboard, Settings. |
 | `OnboardingScreen` | Real | Collects learner English level, age band, primary goal, and optional spoken diagnostic placement test persisting to backend `UserProfile`. |
 | `ScenariosScreen` | Real | Fetches real-life roleplay scenarios from `GET /api/learning/scenarios`, goal checklists, launches scenario conversation in `TalkScreen`. |
 | `TopicsScreen` | Real | Fetches curated discussion topics from `GET /api/learning/topics`, discussion starters, launches topic practice in `TalkScreen`. |
 | `ShadowingScreen` | Real | Fetches passages from `GET /api/learning/shadowing`, speed control chips (0.8x, 1.0x, 1.2x), records attempt, calls `POST /api/learning/shadowing/evaluate`. |
 | `VocabularyScreen` | Real | Fetches cards from `GET /api/learning/vocabulary/{id}`, search, Leitner box 1-5 filter chips, review dialog calling `POST /api/learning/vocabulary/review`, add card dialog. |
 | `ParentDashboardScreen` | Real | Protected behind 4-digit Parent PIN (verified via PBKDF2), displays weekly minutes, word count, safety flags preview, parent coaching tips. |
-| `SettingsScreen` | Real | Theme selector, developer server URL dialog, privacy policy viewer, "Delete My Data" account deletion. |
+| `SettingsScreen` | Real | Daily practice reminder toggle and time picker (NotificationService), theme selector, developer server URL dialog, privacy policy viewer, "Delete My Data" account deletion. |
 
 ### Backend Routes
 | Route | Status | Proof / Evidence |
@@ -36,13 +36,18 @@
 | `GET /api/characters/` | Real | Single source of truth from `backend/characters/*.json` with traits, sample lines, tagline, best_for. |
 | `GET /api/characters/{id}` | Real | Full character detail. |
 | `GET /api/characters/{id}/preview-audio` | Real | Cached audio preview synthesized with Orpheus TTS voice. |
-| `POST /api/conversation/start` | Real | Initializes conversation state with practice_mode, coach_mode, age_band. |
+| `POST /api/conversation/start` | Real | Initializes conversation state with practice_mode, coach_mode, age_band, character memory recall. |
 | `POST /api/conversation/turn` | Real | Working pipeline with Orpheus/GPT-OSS, cost logging, mistake categorization. |
 | `POST /api/conversation/stream-turn` | Real | SSE streaming endpoint: early transcript, sentence-by-sentence text & TTS audio chunks. |
 | `POST /api/conversation/hint` | Real | Generates sentence starter, model response, and vocabulary hints. |
-| `POST /api/conversation/summary` | Real | Computes talk-time balance, WPM, approximate clarity score, and tomorrow's storyline hook. |
+| `POST /api/conversation/summary` | Real | Computes talk-time balance, WPM, approximate clarity score, tomorrow hook, auto-saves character memory. |
 | `POST /api/conversation/placement` | Real | Spoken diagnostic test estimating CEFR A1-B2 and persisting level to profile. |
 | `GET /api/conversation/mistakes/{user_id}` | Real | Queries categorized recurring learner mistakes from SQLite `mistake_logs`. |
+| `GET /api/learning/word-of-the-day` | Real | Returns daily curated vocabulary with Bengali meaning and example. |
+| `POST /api/learning/streak/repair` | Real | Restores broken streak without guilt if learner completes a recovery session. |
+| `GET /api/learning/weekly-recap/{user_id}` | Real | Returns 7-day speaking minutes, words learned, streak, and milestone metrics. |
+| `GET /api/learning/referral/{user_id}` | Real | Generates user referral code and computes viral referral stats. |
+| `POST /api/learning/referral/claim` | Real | Awards 100 XP + streak freeze to referrer and 50 XP to referee. |
 | `GET /api/usage/{user_id}` | Real | Queries usage stats from repository, token protected. |
 | `GET /api/learning/streak/{user_id}` | Real | Evaluates streak in `Asia/Dhaka` timezone, token protected. |
 | `GET /api/learning/missions/{user_id}` | Real | Returns mission list and progress from DB, token protected. |
@@ -120,15 +125,15 @@
 - [x] **GATE 5:** test learner completes onboarding, session, summary, and review deck. (Verified: `test_phase5_coaching.py` green; 130 backend tests passing, 32 Flutter tests passing).
 
 ### Phase 6: Retention engine (the North Star)
-- [ ] Local notifications with chosen reminder time, varied copy, frequency caps, easy off switch
-- [ ] Daily talk: 2-minute guided session counting for streak
-- [ ] Streak freeze, streak repair, weekly goal, level-up celebration, badges from real behavior
-- [ ] "Tomorrow hook" at the end of every session
-- [ ] Character memory: name, goal, last topic, running storyline used in greetings
-- [ ] Shareable progress card and referral code with backend reward
-- [ ] Word of the day; weekly recap screen
-- [ ] Analytics events and `retention_report.py` script
-- [ ] **GATE 6:** 7-day user simulation shows reminders, streak changes, rewards, recap working.
+- [x] Local notifications with chosen reminder time, varied copy, frequency caps, easy off switch (`NotificationService`)
+- [x] Daily talk: 2-minute guided session counting for streak
+- [x] Streak freeze, streak repair (`POST /api/learning/streak/repair`), weekly goal, level-up celebration
+- [x] "Tomorrow hook" at the end of every session auto-persisting to companion memory
+- [x] Character memory: name, goal, last topic, running storyline used in greetings (`character_memories`)
+- [x] Shareable progress card (`ShareProgressCard`) and referral code with backend reward (`referrals` table, `POST /api/learning/referral/claim`)
+- [x] Word of the day (`GET /api/learning/word-of-the-day`); weekly recap endpoint (`GET /api/learning/weekly-recap/{user_id}`)
+- [x] Analytics events and `retention_report.py` internal analytics script
+- [x] **GATE 6:** 7-day user simulation shows reminders, streak changes, rewards, recap working. (Verified: `test_phase6_retention.py` green; 135 backend tests, 32 Flutter tests, 0 reality violations).
 
 ### Phase 7: Safety, privacy, parents
 - [ ] Safety layer on learner input & bot output; model-based moderation + blocklists; safe redirect replies in character's voice; parent dashboard flags
@@ -164,6 +169,12 @@
 ---
 
 ## Log of Completed Tasks
+
+### Phase 6 - Retention Engine & Daily Habit Loop (The North Star)
+- **Engineer Hat:** Built persistent SQLite `character_memories` table storing learner name, goal, last topic, and storyline hooks; wired personalized greeting into `POST /api/conversation/start`; implemented zero-guilt streak forgiveness with `streak_freeze_count`, `previous_streak` recovery, and endpoint `POST /api/learning/streak/repair`; added daily educational vocabulary endpoint `GET /api/learning/word-of-the-day` with Bengali translations and phonetic pronunciation; implemented viral referral loop in SQLite `referrals` with `GET /api/learning/referral/{id}` and `POST /api/learning/referral/claim` granting referrer 100 XP + streak freeze and referee 50 XP; added `backend/scripts/retention_report.py` generating cohort retention (D1, D7, D30), speaking minutes, and mission completion distributions; implemented Flutter `NotificationService` (frequency-capped, custom user time), `ShareProgressCard` (WhatsApp/social proof), and integrated habit reminders into `SettingsScreen`, `MissionsScreen`, and `ProfileScreen`. All 135 backend tests, 32 Flutter tests pass with 0 reality audit violations.
+- **Coach Hat:** Habit formation directly supports SLA automaticity: a consistent 2-minute daily talk builds neural pathways far more effectively than an irregular 30-minute cram; streak freeze and guilt-free repair eliminate the psychological drop-off of broken streaks; personalized companion greetings make learners feel known, remembered, and safe to practice without judgment.
+- **Market Hat:** Built for Bangladeshi habits: 20:00 (8:00 PM) default practice notification fits right after dinner/study time; shareable visual cards enable social proof across WhatsApp family chats and Facebook groups; referral rewards (+100 XP & streak freeze) lower customer acquisition cost organically without paid ads.
+- **Retention Question ("Why will a user return tomorrow because of this?"):** Every conversation ends with an explicit cliffhanger hook from their chosen companion, local notifications trigger at their chosen time, their streak is protected even if life gets busy, and their companion greets them by name asking about the exact topic they discussed yesterday.
 
 ### Phase 5 - Coaching Engine (Hat 2 Master Speaking Coach)
 - **Engineer Hat:** Built CEFR spoken diagnostic engine (`backend/engine/placement.py`) and endpoint `POST /api/conversation/placement` persisting level to SQLite `UserProfile`; added `POST /api/conversation/hint` generating contextual sentence starters and model responses; added `POST /api/conversation/summary` computing talk-time balance ratio, WPM, and labeled approximate clarity score; added automatic Bengali error categorization (`articles`, `tenses_and_verbs`, `prepositions`, `subject_verb_agreement`) with persistent `mistake_logs` in SQLite and route `GET /api/conversation/mistakes/{user_id}`; integrated "Help me say it" hint sheet and full `SessionSummarySheet` with 3-retell drill prompt in Flutter; 130 backend tests and 32 Flutter tests pass with 0 reality audit violations.

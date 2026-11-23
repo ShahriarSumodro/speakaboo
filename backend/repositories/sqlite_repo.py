@@ -316,6 +316,32 @@ class SqliteRepository(BaseRepository):
                 PRIMARY KEY (user_id, character_id),
                 FOREIGN KEY (user_id) REFERENCES users(id)
             );
+
+            -- Phase 6: Character Memory (remembers learner name, goal, and last topic)
+            CREATE TABLE IF NOT EXISTS character_memories (
+                user_id TEXT NOT NULL,
+                character_id TEXT NOT NULL,
+                learner_name TEXT DEFAULT '',
+                goal TEXT DEFAULT '',
+                last_topic TEXT DEFAULT '',
+                last_hook TEXT DEFAULT '',
+                last_summary TEXT DEFAULT '',
+                updated_at REAL,
+                PRIMARY KEY (user_id, character_id),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+
+            -- Phase 6: Referrals & Viral Growth Loop
+            CREATE TABLE IF NOT EXISTS referrals (
+                id TEXT PRIMARY KEY,
+                referrer_user_id TEXT NOT NULL,
+                referee_user_id TEXT NOT NULL,
+                reward_claimed INTEGER DEFAULT 0,
+                created_at REAL,
+                UNIQUE(referrer_user_id, referee_user_id),
+                FOREIGN KEY (referrer_user_id) REFERENCES users(id),
+                FOREIGN KEY (referee_user_id) REFERENCES users(id)
+            );
             
             CREATE INDEX IF NOT EXISTS idx_users_device ON users(device_id);
             CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id);
@@ -328,6 +354,14 @@ class SqliteRepository(BaseRepository):
             CREATE INDEX IF NOT EXISTS idx_safety_flags_user ON safety_flags(user_id);
             CREATE INDEX IF NOT EXISTS idx_user_profiles_user ON user_profiles(user_id);
         """)
+
+        # Migrations for existing user_progress table
+        for col, col_type in [("previous_streak", "INTEGER DEFAULT 0"), ("streak_repaired", "INTEGER DEFAULT 0")]:
+            try:
+                self._conn.execute(f"ALTER TABLE user_progress ADD COLUMN {col} {col_type}")
+            except sqlite3.OperationalError:
+                pass
+
         self._conn.commit()
 
     async def close(self) -> None:
@@ -608,6 +642,8 @@ class SqliteRepository(BaseRepository):
             longest_streak=row["longest_streak"],
             last_active_date=row["last_active_date"],
             streak_freeze_count=row["streak_freeze_count"],
+            previous_streak=row["previous_streak"] if "previous_streak" in row.keys() else 0,
+            streak_repaired=bool(row["streak_repaired"]) if "streak_repaired" in row.keys() else False,
             updated_at=row["updated_at"],
         )
 
@@ -646,7 +682,9 @@ class SqliteRepository(BaseRepository):
                 prog.last_active_date = today
                 logger.info(f"Streak freeze used for user {user_id}. Remaining: {prog.streak_freeze_count}")
             else:
-                # Missed more than allowed without freeze: streak resets
+                # Missed more than allowed without freeze: save previous streak for repair opportunity
+                prog.previous_streak = prog.current_streak
+                prog.streak_repaired = False
                 prog.current_streak = 1
                 prog.longest_streak = max(prog.longest_streak, 1)
                 prog.last_active_date = today
@@ -655,12 +693,33 @@ class SqliteRepository(BaseRepository):
 
         self._conn.execute(
             """UPDATE user_progress SET xp = ?, level = ?, current_streak = ?, longest_streak = ?,
-               last_active_date = ?, streak_freeze_count = ?, updated_at = ? WHERE user_id = ?""",
+               last_active_date = ?, streak_freeze_count = ?, previous_streak = ?, streak_repaired = ?,
+               updated_at = ? WHERE user_id = ?""",
             (prog.xp, prog.level, prog.current_streak, prog.longest_streak,
-             prog.last_active_date, prog.streak_freeze_count, prog.updated_at, user_id),
+             prog.last_active_date, prog.streak_freeze_count, prog.previous_streak,
+             1 if prog.streak_repaired else 0, prog.updated_at, user_id),
         )
         self._conn.commit()
         return prog
+
+    async def repair_streak(self, user_id: str) -> tuple[UserProgress, bool]:
+        """Restore lost streak without guilt if learner completes a recovery session."""
+        prog = await self.get_progress(user_id)
+        if prog.previous_streak > 1 and not prog.streak_repaired:
+            prog.current_streak = prog.previous_streak + 1
+            prog.longest_streak = max(prog.longest_streak, prog.current_streak)
+            prog.previous_streak = 0
+            prog.streak_repaired = True
+            prog.updated_at = time.time()
+            self._conn.execute(
+                """UPDATE user_progress SET current_streak = ?, longest_streak = ?, previous_streak = ?,
+                   streak_repaired = ?, updated_at = ? WHERE user_id = ?""",
+                (prog.current_streak, prog.longest_streak, prog.previous_streak,
+                 1 if prog.streak_repaired else 0, prog.updated_at, user_id),
+            )
+            self._conn.commit()
+            return prog, True
+        return prog, False
 
     async def add_streak_freeze(self, user_id: str, count: int = 1) -> UserProgress:
         prog = await self.get_progress(user_id)
@@ -672,6 +731,90 @@ class SqliteRepository(BaseRepository):
         )
         self._conn.commit()
         return prog
+
+    # ========================================================
+    # Phase 6: Character Memory & Social Proof
+    # ========================================================
+
+    async def save_character_memory(
+        self,
+        user_id: str,
+        character_id: str,
+        learner_name: str = "",
+        goal: str = "",
+        last_topic: str = "",
+        last_hook: str = "",
+        last_summary: str = "",
+    ) -> None:
+        """Store companion memory of learner details and previous conversation topics."""
+        now = time.time()
+        self._conn.execute(
+            """INSERT INTO character_memories (user_id, character_id, learner_name, goal, last_topic, last_hook, last_summary, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(user_id, character_id) DO UPDATE SET
+               learner_name = CASE WHEN excluded.learner_name != '' THEN excluded.learner_name ELSE character_memories.learner_name END,
+               goal = CASE WHEN excluded.goal != '' THEN excluded.goal ELSE character_memories.goal END,
+               last_topic = CASE WHEN excluded.last_topic != '' THEN excluded.last_topic ELSE character_memories.last_topic END,
+               last_hook = CASE WHEN excluded.last_hook != '' THEN excluded.last_hook ELSE character_memories.last_hook END,
+               last_summary = CASE WHEN excluded.last_summary != '' THEN excluded.last_summary ELSE character_memories.last_summary END,
+               updated_at = excluded.updated_at""",
+            (user_id, character_id, learner_name, goal, last_topic, last_hook, last_summary, now),
+        )
+        self._conn.commit()
+
+    async def get_character_memory(self, user_id: str, character_id: str) -> Optional[dict]:
+        """Retrieve stored companion memory for personalized greetings."""
+        row = self._conn.execute(
+            "SELECT * FROM character_memories WHERE user_id = ? AND character_id = ?",
+            (user_id, character_id),
+        ).fetchone()
+        if not row:
+            return None
+        return {
+            "user_id": row["user_id"],
+            "character_id": row["character_id"],
+            "learner_name": row["learner_name"],
+            "goal": row["goal"],
+            "last_topic": row["last_topic"],
+            "last_hook": row["last_hook"],
+            "last_summary": row["last_summary"],
+            "updated_at": row["updated_at"],
+        }
+
+    async def create_referral(self, referrer_id: str, referee_id: str) -> bool:
+        """Record referral and reward both learners with XP and streak freeze."""
+        if referrer_id == referee_id:
+            return False
+        import uuid as _uuid
+        try:
+            self._conn.execute(
+                """INSERT INTO referrals (id, referrer_user_id, referee_user_id, reward_claimed, created_at)
+                   VALUES (?, ?, ?, 0, ?)""",
+                (str(_uuid.uuid4()), referrer_id, referee_id, time.time()),
+            )
+            # Award referrer 100 XP + 1 streak freeze
+            await self.record_activity(referrer_id, xp_earned=100)
+            await self.add_streak_freeze(referrer_id, count=1)
+            # Award referee 50 XP
+            await self.record_activity(referee_id, xp_earned=50)
+            self._conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            return False
+
+    async def get_referral_info(self, user_id: str) -> dict:
+        """Get user referral code and statistics."""
+        import hashlib
+        short_code = "SPK-" + hashlib.md5(user_id.encode()).hexdigest()[:6].upper()
+        rows = self._conn.execute(
+            "SELECT * FROM referrals WHERE referrer_user_id = ?", (user_id,)
+        ).fetchall()
+        return {
+            "referral_code": short_code,
+            "referral_count": len(rows),
+            "xp_earned": len(rows) * 100,
+            "freezes_earned": len(rows),
+        }
 
     # ========================================================
     # Phase 3: Daily Missions Engine

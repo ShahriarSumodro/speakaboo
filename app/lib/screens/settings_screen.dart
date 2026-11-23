@@ -7,6 +7,7 @@ import '../config/app_config.dart';
 import '../config/theme.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../services/notification_service.dart';
 import '../widgets/dev_server_dialog.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -18,6 +19,8 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   String _themeSelection = 'system';
+  bool _remindersEnabled = true;
+  String _reminderTime = '20:00';
 
   @override
   void initState() {
@@ -25,6 +28,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final auth = context.read<AuthProvider>();
     if (auth.profile != null) {
       _themeSelection = auth.profile!.theme;
+    }
+    _loadNotificationSettings();
+  }
+
+  Future<void> _loadNotificationSettings() async {
+    final enabled = await NotificationService.isEnabled();
+    final time = await NotificationService.getReminderTime();
+    if (mounted) {
+      setState(() {
+        _remindersEnabled = enabled;
+        _reminderTime = time;
+      });
+    }
+  }
+
+  Future<void> _selectReminderTime() async {
+    final parts = _reminderTime.split(':');
+    final initialHour = int.tryParse(parts.first) ?? 20;
+    final initialMinute = int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0;
+
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: initialHour, minute: initialMinute),
+    );
+
+    if (picked != null) {
+      final formatted = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+      await NotificationService.setReminderTime(formatted);
+      if (mounted) {
+        setState(() => _reminderTime = formatted);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Daily practice reminder set to $formatted')),
+        );
+      }
     }
   }
 
@@ -136,6 +173,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
               });
             },
           ),
+          const SizedBox(height: 8),
+
+          // Daily Practice Reminders
+          SwitchListTile(
+            tileColor: SpeakabooTheme.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm)),
+            secondary: const Icon(Icons.notifications_active_outlined, color: SpeakabooTheme.accent),
+            title: const Text('Daily Practice Reminder'),
+            subtitle: Text(_remindersEnabled ? 'Scheduled for $_reminderTime' : 'Disabled'),
+            value: _remindersEnabled,
+            onChanged: (val) async {
+              await NotificationService.setEnabled(val);
+              setState(() => _remindersEnabled = val);
+            },
+          ),
+          if (_remindersEnabled) ...[
+            const SizedBox(height: 8),
+            ListTile(
+              tileColor: SpeakabooTheme.surface,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm)),
+              leading: const Icon(Icons.access_time, color: SpeakabooTheme.accent),
+              title: const Text('Reminder Time'),
+              subtitle: Text('Current time: $_reminderTime (Asia/Dhaka)'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: _selectReminderTime,
+            ),
+          ],
           const SizedBox(height: 8),
 
           // Privacy Policy

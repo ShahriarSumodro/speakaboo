@@ -527,6 +527,80 @@ class ApiService {
     return jsonDecode(response.body);
   }
 
+  /// Repair broken streak after a recovery activity.
+  Future<Map<String, dynamic>> repairStreak(String userId) async {
+    final response = await _client
+        .post(
+          Uri.parse('$baseUrl/api/learning/streak/repair'),
+          headers: _headers(),
+          body: jsonEncode({'user_id': userId}),
+        )
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to repair streak', response.statusCode);
+    }
+    return jsonDecode(response.body);
+  }
+
+  /// Get daily word of the day with pronunciation and Bengali meaning.
+  Future<WordOfTheDay> getWordOfTheDay() async {
+    final response = await _client
+        .get(Uri.parse('$baseUrl/api/learning/word-of-the-day'), headers: _headers())
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to load word of the day', response.statusCode);
+    }
+    return WordOfTheDay.fromJson(jsonDecode(response.body));
+  }
+
+  /// Get 7-day speaking minutes, words learned, streak, and milestones.
+  Future<WeeklyRecap> getWeeklyRecap(String userId) async {
+    final response = await _client
+        .get(Uri.parse('$baseUrl/api/learning/weekly-recap/$userId'), headers: _headers())
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to load weekly recap', response.statusCode);
+    }
+    return WeeklyRecap.fromJson(jsonDecode(response.body));
+  }
+
+  /// Get user referral code and reward stats.
+  Future<ReferralInfo> getReferralInfo(String userId) async {
+    final response = await _client
+        .get(Uri.parse('$baseUrl/api/learning/referral/$userId'), headers: _headers())
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to load referral info', response.statusCode);
+    }
+    return ReferralInfo.fromJson(jsonDecode(response.body));
+  }
+
+  /// Claim a friend's referral code.
+  Future<Map<String, dynamic>> claimReferral({
+    required String refereeUserId,
+    required String referralCode,
+  }) async {
+    final response = await _client
+        .post(
+          Uri.parse('$baseUrl/api/learning/referral/claim'),
+          headers: _headers(),
+          body: jsonEncode({
+            'referee_user_id': refereeUserId,
+            'referral_code': referralCode,
+          }),
+        )
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to claim referral', response.statusCode);
+    }
+    return jsonDecode(response.body);
+  }
+
   /// Get daily missions.
   Future<MissionsResponse> getMissions(String userId) async {
     final response = await _client

@@ -21,7 +21,9 @@ class MissionsScreen extends StatefulWidget {
 
 class _MissionsScreenState extends State<MissionsScreen> {
   MissionsResponse? _missionsData;
+  WordOfTheDay? _wordOfTheDay;
   bool _isLoading = true;
+  bool _isRepairing = false;
 
   @override
   void initState() {
@@ -44,8 +46,14 @@ class _MissionsScreenState extends State<MissionsScreen> {
 
     try {
       final remote = await api.getMissions(auth.userId);
+      WordOfTheDay? wotd;
+      try {
+        wotd = await api.getWordOfTheDay();
+      } catch (_) {}
+
       setState(() {
         _missionsData = remote;
+        _wordOfTheDay = wotd;
         _isLoading = false;
       });
       await CacheService.set('missions_${auth.userId}', {
@@ -68,6 +76,36 @@ class _MissionsScreenState extends State<MissionsScreen> {
       if (_missionsData == null) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  Future<void> _repairStreak() async {
+    final auth = context.read<AuthProvider>();
+    final api = context.read<ApiService>();
+
+    setState(() => _isRepairing = true);
+    try {
+      final res = await api.repairStreak(auth.userId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res['message'] ?? 'Streak repaired! Welcome back!'),
+            backgroundColor: SpeakabooTheme.success,
+          ),
+        );
+      }
+      await _loadMissions();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Streak repair: $e'),
+            backgroundColor: SpeakabooTheme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isRepairing = false);
     }
   }
 
@@ -136,6 +174,14 @@ class _MissionsScreenState extends State<MissionsScreen> {
                     children: [
                       // Streak Card
                       _buildStreakCard(_missionsData!.streak, _missionsData!.freezes),
+                      if (_missionsData!.streak == 0) ...[
+                        const SizedBox(height: SpeakabooTheme.spacingMd),
+                        _buildStreakRecoveryBanner(),
+                      ],
+                      if (_wordOfTheDay != null) ...[
+                        const SizedBox(height: SpeakabooTheme.spacingMd),
+                        _buildWordOfTheDayCard(_wordOfTheDay!),
+                      ],
                       const SizedBox(height: SpeakabooTheme.spacingLg),
                       const Text(
                         "Today's Goals",
@@ -328,6 +374,158 @@ class _MissionsScreenState extends State<MissionsScreen> {
                   ),
                 ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStreakRecoveryBanner() {
+    return Container(
+      padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
+      decoration: BoxDecoration(
+        color: SpeakabooTheme.accent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
+        border: Border.all(color: SpeakabooTheme.accent.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.healing, color: SpeakabooTheme.accent, size: 28),
+          const SizedBox(width: SpeakabooTheme.spacingMd),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'Restore Your Streak',
+                  style: TextStyle(
+                    fontSize: SpeakabooTheme.baseFontSize,
+                    fontWeight: FontWeight.bold,
+                    color: SpeakabooTheme.textPrimary,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Missed a day? No guilt! Tap below to repair your habit streak.',
+                  style: TextStyle(
+                    fontSize: SpeakabooTheme.captionSize,
+                    color: SpeakabooTheme.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          FilledButton.tonal(
+            onPressed: _isRepairing ? null : _repairStreak,
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            ),
+            child: _isRepairing
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Text('Repair'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWordOfTheDayCard(WordOfTheDay wotd) {
+    return Container(
+      padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
+      decoration: BoxDecoration(
+        color: SpeakabooTheme.surface,
+        borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.lightbulb_outline, color: SpeakabooTheme.accent, size: 20),
+              const SizedBox(width: 6),
+              const Text(
+                'Word of the Day',
+                style: TextStyle(
+                  fontSize: SpeakabooTheme.captionSize,
+                  fontWeight: FontWeight.bold,
+                  color: SpeakabooTheme.accent,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                wotd.level.toUpperCase(),
+                style: const TextStyle(
+                  fontSize: SpeakabooTheme.smallSize,
+                  fontStyle: FontStyle.italic,
+                  color: SpeakabooTheme.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                wotd.word,
+                style: const TextStyle(
+                  fontSize: SpeakabooTheme.headingSize - 2,
+                  fontWeight: FontWeight.bold,
+                  color: SpeakabooTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                wotd.pronunciation,
+                style: const TextStyle(
+                  fontSize: SpeakabooTheme.captionSize,
+                  color: SpeakabooTheme.textSecondary,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                wotd.bengaliMeaning,
+                style: const TextStyle(
+                  fontSize: SpeakabooTheme.baseFontSize,
+                  fontWeight: FontWeight.w600,
+                  color: SpeakabooTheme.accent,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            wotd.definition,
+            style: const TextStyle(
+              fontSize: SpeakabooTheme.captionSize,
+              color: SpeakabooTheme.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: SpeakabooTheme.background,
+              borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.format_quote, size: 16, color: SpeakabooTheme.textSecondary),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    wotd.example,
+                    style: const TextStyle(
+                      fontSize: SpeakabooTheme.smallSize,
+                      fontStyle: FontStyle.italic,
+                      color: SpeakabooTheme.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
