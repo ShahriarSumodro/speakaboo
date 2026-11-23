@@ -1076,6 +1076,8 @@ class SqliteRepository(BaseRepository):
         cursor.execute("DELETE FROM safety_flags WHERE user_id = ?", (user_id,))
         cursor.execute("DELETE FROM user_profiles WHERE user_id = ?", (user_id,))
         cursor.execute("DELETE FROM character_trials WHERE user_id = ?", (user_id,))
+        cursor.execute("DELETE FROM character_memories WHERE user_id = ?", (user_id,))
+        cursor.execute("DELETE FROM referrals WHERE referrer_user_id = ? OR referee_user_id = ?", (user_id, user_id))
         cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
         self._conn.commit()
         return True

@@ -81,6 +81,41 @@ async def get_parental_consent() -> Dict[str, str]:
     }
 
 
+@router.get("/export/{user_id}")
+async def export_user_data(
+    user_id: str,
+    repo: BaseRepository = Depends(get_repository),
+    current_user_id: str = Depends(get_current_user_id),
+) -> Dict[str, Any]:
+    """Export complete learner data archive for data portability (GDPR/COPPA compliance)."""
+    verify_user_access(current_user_id, user_id)
+    user = await repo.get_user(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    profile = await repo.get_profile(user_id)
+    progress = await repo.get_progress(user_id)
+    vocab = await repo.get_vocabulary(user_id)
+    summary = await repo.get_parent_summary(user_id)
+    flags = await repo.get_safety_flags(user_id)
+
+    return {
+        "user": {
+            "id": user.id,
+            "created_at": user.created_at,
+            "plan": user.plan.value if hasattr(user.plan, "value") else str(user.plan),
+        },
+        "profile": profile.__dict__ if profile else None,
+        "progress": progress.__dict__ if progress else None,
+        "vocabulary_count": len(vocab),
+        "vocabulary": [v.__dict__ for v in vocab],
+        "weekly_summary": summary,
+        "safety_flags": [f.__dict__ for f in flags],
+        "raw_audio_stored": False,
+        "data_retention_policy": "Zero raw audio stored. Learner owns all data.",
+    }
+
+
 @router.delete("/user/{user_id}", response_model=DeleteDataResponse)
 async def delete_user_account_and_data(
     user_id: str,

@@ -154,9 +154,9 @@ class ConversationEngine:
         logger.info(f"STT: {user_text[:80]}... ({stt_result.duration_seconds:.1f}s audio)")
 
         # --- Step 2: Safety check on user message ---
-        blocked_category = check_content_safety(user_text, is_user_message=True)
+        blocked_category = check_content_safety(user_text, is_user_message=True, age_band=state.age_band)
         if blocked_category:
-            redirect = get_redirect_message(blocked_category)
+            redirect = get_redirect_message(blocked_category, character_id=character.id)
             redirect_audio = await self._synthesize_chunks(redirect, character.voice_id)
             return TurnResult(
                 conversation_id=conversation_id,
@@ -318,9 +318,9 @@ class ConversationEngine:
             return
 
         # 2. Safety Check
-        blocked_category = check_content_safety(user_text, is_user_message=True)
+        blocked_category = check_content_safety(user_text, is_user_message=True, age_band=state.age_band)
         if blocked_category:
-            redirect = get_redirect_message(blocked_category)
+            redirect = get_redirect_message(blocked_category, character_id=character.id)
             yield {
                 "event": "safety",
                 "data": {

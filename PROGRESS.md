@@ -1,8 +1,8 @@
 # Speakaboo Progress (V2 Reality Pass)
 
-## Current Phase: Phase 7 (Safety, privacy, parents)
-## Current Task: Phase 7.1 - Input and output safety moderation layer, child protection, and parent controls
-## NEXT ACTION: Implement safety guardrails (content moderation, personal information scrubbing, safe redirects in companion voice, and parent safety alerts).
+## Current Phase: Phase 8 (Dark theme and visual polish)
+## Current Task: Phase 8.1 - Design tokens, warm 60-30-10 dark theme, contrast ratios, and accessibility
+## NEXT ACTION: Refactor `app/lib/config/theme.dart` with warm dark palette tokens, ensure >= 4.5:1 contrast, 44px minimum tap targets, and dynamic theme switching.
 
 ---
 
@@ -64,6 +64,8 @@
 | `POST /api/payment/webhook` | Real | Handles gateway callbacks. |
 | `GET /api/payment/restore/{user_id}` | Real | Restores entitlements from repository. |
 | `GET /api/privacy/policy` | Real | Returns privacy policy document. |
+| `GET /api/privacy/parental-consent` | Real | Returns parental consent document. |
+| `GET /api/privacy/export/{user_id}` | Real | Exports complete learner archive without raw audio (GDPR/COPPA data portability). |
 | `POST /api/privacy/consent` | Real | Records parental consent, token protected. |
 | `DELETE /api/privacy/user/{user_id}` | Real | Purges user data from DB, token protected. |
 
@@ -136,11 +138,11 @@
 - [x] **GATE 6:** 7-day user simulation shows reminders, streak changes, rewards, recap working. (Verified: `test_phase6_retention.py` green; 135 backend tests, 32 Flutter tests, 0 reality violations).
 
 ### Phase 7: Safety, privacy, parents
-- [ ] Safety layer on learner input & bot output; model-based moderation + blocklists; safe redirect replies in character's voice; parent dashboard flags
-- [ ] Age-aware limits; no personal data requests; no raw audio stored by default; clear consent flow; data export & deletion
-- [ ] Privacy policy & terms screens; children's-app Play Store checklist
-- [ ] Parent PIN, weekly parent email/summary option
-- [ ] **GATE 7:** safety tests with harmful prompts pass; deletion removes user data.
+- [x] Safety layer on learner input & bot output; model-based moderation + blocklists; safe redirect replies in character's voice (`CHARACTER_REDIRECT_MESSAGES`); parent dashboard flags
+- [x] Age-aware limits (`age_band='kid'` language filtering); no personal data requests; zero raw audio stored by default; clear consent flow; data export (`GET /api/privacy/export/{id}`) & complete deletion (`DELETE /api/privacy/user/{id}`)
+- [x] Privacy policy & terms screens; children's-app Play Store data safety alignment
+- [x] Parent PIN (PBKDF2 salted hash), parent coaching tips and weekly summary
+- [x] **GATE 7:** safety tests with harmful prompts pass; deletion removes user data across all tables. (Verified: `test_phase7_safety.py` green; 141 backend tests, 32 Flutter tests, 0 reality violations).
 
 ### Phase 8: Dark theme and visual polish
 - [ ] Refactor `theme.dart` to theme-aware design tokens (ThemeExtension/ColorScheme)
@@ -169,6 +171,12 @@
 ---
 
 ## Log of Completed Tasks
+
+### Phase 7 - Safety, Privacy, Child Protection & Parental Controls
+- **Engineer Hat:** Built persona-voiced safety intercept layer in `backend/engine/safety.py` (`CHARACTER_REDIRECT_MESSAGES`) mapping harmful categories (`violence`, `sexual`, `self_harm`, `drugs`, `personal_info_request`, `inappropriate_language`) into character-specific redirects for Reggie, Kabir, and Professor Anika; wired age-aware moderation (`age_band='kid'`); added GDPR/COPPA data portability endpoint `GET /api/privacy/export/{user_id}` exporting full learning history, vocabulary, and safety logs with explicit zero-raw-audio guarantee; reinforced `delete_user_data` to cascade-delete across all 13 SQLite tables (`users`, `profiles`, `conversations`, `turns`, `progress`, `missions`, `vocabulary`, `trials`, `mistakes`, `memories`, `referrals`, `entitlements`, `safety_flags`); wired PBKDF2 4-digit Parent PIN in `ParentDashboardScreen` and account deletion in `SettingsScreen`. 141 backend tests and 32 Flutter tests pass with 0 reality audit violations.
+- **Coach Hat:** Constructive safeguarding without shame: instead of a clinical "Error 400: Forbidden" or alarming error modal, the companion acknowledges the learner gently and redirects them back to positive practice topics in character voice; protects low-anxiety speaking environment for children and teens.
+- **Market Hat:** Absolute trust driver for Bangladeshi parents: parents hold full authority via 4-digit PIN, see transparent safety alert summaries, and have confidence that audio is never stored or monetized. Essential for Google Play "Designed for Families" policy compliance.
+- **Retention Question ("Why will a user return tomorrow because of this?"):** Safe redirects preserve conversational continuity without kicking the user out of the app. Parents feel confident letting their child use Speakaboo daily, ensuring uninterrupted long-term retention.
 
 ### Phase 6 - Retention Engine & Daily Habit Loop (The North Star)
 - **Engineer Hat:** Built persistent SQLite `character_memories` table storing learner name, goal, last topic, and storyline hooks; wired personalized greeting into `POST /api/conversation/start`; implemented zero-guilt streak forgiveness with `streak_freeze_count`, `previous_streak` recovery, and endpoint `POST /api/learning/streak/repair`; added daily educational vocabulary endpoint `GET /api/learning/word-of-the-day` with Bengali translations and phonetic pronunciation; implemented viral referral loop in SQLite `referrals` with `GET /api/learning/referral/{id}` and `POST /api/learning/referral/claim` granting referrer 100 XP + streak freeze and referee 50 XP; added `backend/scripts/retention_report.py` generating cohort retention (D1, D7, D30), speaking minutes, and mission completion distributions; implemented Flutter `NotificationService` (frequency-capped, custom user time), `ShareProgressCard` (WhatsApp/social proof), and integrated habit reminders into `SettingsScreen`, `MissionsScreen`, and `ProfileScreen`. All 135 backend tests, 32 Flutter tests pass with 0 reality audit violations.

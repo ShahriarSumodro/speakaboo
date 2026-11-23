@@ -880,6 +880,18 @@ class ApiService {
     return data['success'] == true;
   }
 
+  /// Export full user learning and privacy archive (GDPR/COPPA data portability).
+  Future<Map<String, dynamic>> exportUserData(String userId) async {
+    final response = await _client
+        .get(Uri.parse('$baseUrl/api/privacy/export/$userId'), headers: _headers())
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to export user data', response.statusCode);
+    }
+    return jsonDecode(response.body);
+  }
+
   // ================= PAYMENT =================
 
   /// Get subscription and character unlock pricing plans.
