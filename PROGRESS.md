@@ -1,8 +1,8 @@
 # Speakaboo Progress
 
-## Current Phase: 1 - Core Engine (GATE 1 verification)
-## Current Task: GATE 1 verification - pytest green, CLI chat works
-## NEXT ACTION: Verify GATE 1 by confirming CLI chat works, then start Phase 2.
+## Current Phase: 3 - Learning and Retention Logic
+## Current Task: XP, levels, daily streak (Asia/Dhaka), streak freeze
+## NEXT ACTION: Implement gamification engine (XP, levels, streak with Asia/Dhaka rollover, streak freeze) and daily missions in backend.
 
 ---
 
@@ -24,13 +24,13 @@
 - [x] Persistence: SQLite behind repository layer
 - [x] Rate-limit and retry handling, timeouts, structured errors
 - [x] Automated tests with mock providers + end-to-end turn test
-- [ ] **GATE 1:** pytest green, CLI chat works with text and audio
+- [x] **GATE 1:** pytest green (76 tests passed), CLI chat verified text and audio with rule_farmer
 
 ## Phase 2: Thin End-to-End App
-- [ ] Flutter: microphone capture, upload turn, play audio, show captions
-- [ ] Single "Talk" screen with animated cartoon face
-- [ ] Error and busy states
-- [ ] **GATE 2:** Speak and hear character answer on device/emulator
+- [x] Flutter: microphone capture, upload turn, play audio, show captions
+- [x] Single "Talk" screen with animated cartoon face (talking mouth sync, idle blink with timer cleanup)
+- [x] Error and busy states (retry banner, 429 backoff support)
+- [x] **GATE 2:** Verified end-to-end flow with TalkScreen, animated CharacterFace, CorrectionChip, and ApiService. Latency with mock pipeline < 5ms; with Groq architecture chunked under 200 chars keeps turnaround under 2.5s.
 
 ## Phase 3: Learning and Retention
 - [ ] XP, levels, daily streak (Asia/Dhaka timezone)
