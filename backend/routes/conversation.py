@@ -135,6 +135,43 @@ async def process_turn(
     # Encode audio chunks as base64 for JSON response
     audio_b64 = [base64.b64encode(chunk).decode() for chunk in result.audio_chunks]
 
+    # Asynchronously record learning progress & safety flags if repo is available
+    try:
+        from backend.repositories import get_repository
+        from backend.models.learning import SafetyFlag
+        from backend.engine.missions import MissionsEngine
+        from backend.engine.vocabulary import VocabularyEngine
+
+        repo = await get_repository()
+        if result.safety_blocked:
+            await repo.log_safety_flag(
+                SafetyFlag(
+                    user_id=state.user_id,
+                    category=result.response.reply,
+                    snippet=result.user_transcript[:100],
+                )
+            )
+        else:
+            minutes = max(0.01, result.stt_seconds / 60.0)
+            await repo.increment_usage(state.user_id, minutes)
+            await repo.record_activity(state.user_id, xp_earned=10 + int(minutes * 20))
+            
+            missions = MissionsEngine(repo)
+            await missions.track_speaking_time(state.user_id, minutes)
+            if result.response.new_words:
+                await missions.track_new_words(state.user_id, len(result.response.new_words))
+
+            vocab = VocabularyEngine(repo)
+            corr_dict = result.response.correction.__dict__ if result.response.correction else None
+            await vocab.add_from_turn(
+                user_id=state.user_id,
+                new_words=result.response.new_words,
+                correction=corr_dict,
+                context_sentence=result.user_transcript,
+            )
+    except Exception as e:
+        logger.warning(f"Could not record turn metrics: {e}")
+
     return TurnResponseModel(
         conversation_id=result.conversation_id,
         turn_id=result.turn_id,

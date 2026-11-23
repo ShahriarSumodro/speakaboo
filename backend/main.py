@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from backend.config import load_settings
-from backend.routes import health, auth, characters, conversation, usage
+from backend.routes import health, auth, characters, conversation, usage, learning, parent
 
 # Load settings
 settings = load_settings()
@@ -87,3 +87,5 @@ app.include_router(auth.router)
 app.include_router(characters.router)
 app.include_router(conversation.router)
 app.include_router(usage.router)
+app.include_router(learning.router)
+app.include_router(parent.router)

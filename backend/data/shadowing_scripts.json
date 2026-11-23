@@ -1,0 +1,23 @@
+[
+  {
+    "id": "script_morning_market",
+    "title": "A Fresh Morning",
+    "target_text": "Early every morning, the town bazaar fills with the aroma of fresh tea and fruits. Farmers bring their harvest to market before the sun rises high.",
+    "target_wpm": 110,
+    "difficulty": "beginner"
+  },
+  {
+    "id": "script_study_habits",
+    "title": "Consistency in Learning",
+    "target_text": "Speaking a new language requires patience and daily practice. When you speak aloud every day, your confidence grows naturally.",
+    "target_wpm": 125,
+    "difficulty": "intermediate"
+  },
+  {
+    "id": "script_sylhet_gardens",
+    "title": "The Green Hills of Sylhet",
+    "target_text": "The rolling hills are draped in endless layers of emerald tea bushes. Gentle morning mist blankets the valleys, creating a tranquil landscape.",
+    "target_wpm": 120,
+    "difficulty": "advanced"
+  }
+]

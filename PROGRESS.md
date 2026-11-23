@@ -1,8 +1,8 @@
 # Speakaboo Progress
 
-## Current Phase: 3 - Learning and Retention Logic
-## Current Task: XP, levels, daily streak (Asia/Dhaka), streak freeze
-## NEXT ACTION: Implement gamification engine (XP, levels, streak with Asia/Dhaka rollover, streak freeze) and daily missions in backend.
+## Current Phase: 4 - Full App UI to DESIGN.md
+## Current Task: Design tokens, bottom navigation, screens (Talk, Characters, Missions, Profile)
+## NEXT ACTION: Implement complete Flutter multi-tab UI conforming strictly to DESIGN.md (60-30-10 color rule, bottom navigation, sheets, accessibility).
 
 ---
 
@@ -33,14 +33,14 @@
 - [x] **GATE 2:** Verified end-to-end flow with TalkScreen, animated CharacterFace, CorrectionChip, and ApiService. Latency with mock pipeline < 5ms; with Groq architecture chunked under 200 chars keeps turnaround under 2.5s.
 
 ## Phase 3: Learning and Retention
-- [ ] XP, levels, daily streak (Asia/Dhaka timezone)
-- [ ] Daily missions engine
-- [ ] Real-life scenario packs
-- [ ] Topic mode
-- [ ] Shadowing mode
-- [ ] Vocabulary notebook with spaced review
-- [ ] Parent dashboard data
-- [ ] **GATE 3:** Tests green, metrics endpoints correct
+- [x] XP, levels, daily streak (Asia/Dhaka timezone-safe day rollover), streak freeze
+- [x] Daily missions engine (data-driven: speak time, new words, scenario, shadowing)
+- [x] Real-life scenario packs as data (job interview, IELTS part 2, ordering food, welcoming guest, presentation)
+- [x] Topic mode (monsoon weather, climate/delta, technology in education) with neutral, safe framing
+- [x] Shadowing mode with original practice scripts, WPM pace calculation & word accuracy scoring
+- [x] Vocabulary notebook with spaced repetition (5-box Leitner system, due review tracking)
+- [x] Parent dashboard data: weekly minutes spoken, streak, words learned, categorized safety flags
+- [x] **GATE 3:** 99 backend tests passed; parent summary & learning routes return verified numbers on seeded data
 
 ## Phase 4: Full App UI
 - [ ] Design tokens in theme file

@@ -2,6 +2,7 @@
 Repository layer for Speakaboo.
 
 Abstract base repository that works with SQLite (dev) and can be swapped to Postgres.
+Includes Phase 3 Learning, Gamification, Vocabulary, and Parent Dashboard support.
 """
 
 import json
@@ -10,11 +11,14 @@ import sqlite3
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, timedelta
 
 from backend.models.user import (
     User, Conversation, Turn, DailyUsage, Entitlement, MistakeLog, Plan,
+)
+from backend.models.learning import (
+    UserProgress, Mission, UserMissionProgress, VocabularyItem, SafetyFlag,
 )
 
 logger = logging.getLogger("speakaboo.repositories")
@@ -30,68 +34,136 @@ def dhaka_today() -> str:
     return dhaka_time.strftime("%Y-%m-%d")
 
 
+def dhaka_date_add(days: int, from_date: Optional[str] = None) -> str:
+    """Add days to a given YYYY-MM-DD date (or today in Asia/Dhaka)."""
+    if from_date:
+        base = datetime.strptime(from_date, "%Y-%m-%d")
+    else:
+        now_utc = datetime.now(timezone.utc)
+        base = now_utc + DHAKA_OFFSET
+    result = base + timedelta(days=days)
+    return result.strftime("%Y-%m-%d")
+
+
+def dhaka_date_diff(earlier_date: str, later_date: str) -> int:
+    """Return later_date - earlier_date in whole days."""
+    d1 = datetime.strptime(earlier_date, "%Y-%m-%d")
+    d2 = datetime.strptime(later_date, "%Y-%m-%d")
+    return (d2 - d1).days
+
+
+def calculate_level(xp: int) -> int:
+    """Calculate level from XP (e.g. Lvl 1: 0-100, Lvl 2: 101-250, Lvl 3: 251-450...)."""
+    if xp <= 0:
+        return 1
+    # Simple progressive curve: 100 * level^1.2
+    lvl = 1
+    req = 100
+    total = 0
+    while total + req <= xp:
+        total += req
+        lvl += 1
+        req = int(100 * (lvl ** 1.2))
+    return lvl
+
+
 class BaseRepository(ABC):
     """Abstract repository for all data operations."""
 
     # --- Users ---
     @abstractmethod
     async def create_user(self, user: User) -> User: ...
-
     @abstractmethod
     async def get_user(self, user_id: str) -> Optional[User]: ...
-
     @abstractmethod
     async def get_user_by_device(self, device_id: str) -> Optional[User]: ...
-
     @abstractmethod
     async def update_user(self, user: User) -> User: ...
 
     # --- Conversations ---
     @abstractmethod
     async def create_conversation(self, conv: Conversation) -> Conversation: ...
-
     @abstractmethod
     async def get_conversation(self, conv_id: str) -> Optional[Conversation]: ...
 
     # --- Turns ---
     @abstractmethod
     async def create_turn(self, turn: Turn) -> Turn: ...
-
     @abstractmethod
     async def get_turns(self, conversation_id: str, limit: int = 50) -> list[Turn]: ...
 
     # --- Usage ---
     @abstractmethod
     async def get_daily_usage(self, user_id: str, date: Optional[str] = None) -> Optional[DailyUsage]: ...
-
     @abstractmethod
     async def increment_usage(self, user_id: str, minutes: float, date: Optional[str] = None) -> DailyUsage: ...
 
     # --- Entitlements ---
     @abstractmethod
     async def get_entitlements(self, user_id: str) -> list[Entitlement]: ...
-
     @abstractmethod
     async def add_entitlement(self, entitlement: Entitlement) -> Entitlement: ...
 
-    # --- Mistake logs (Phase 8 prep) ---
+    # --- Mistake logs ---
     @abstractmethod
     async def log_mistake(self, mistake: MistakeLog) -> MistakeLog: ...
-
     @abstractmethod
     async def get_mistakes(self, user_id: str, limit: int = 50) -> list[MistakeLog]: ...
 
+    # --- Phase 3: Gamification & Streaks ---
+    @abstractmethod
+    async def get_progress(self, user_id: str) -> UserProgress: ...
+    @abstractmethod
+    async def record_activity(self, user_id: str, xp_earned: int = 0, date: Optional[str] = None) -> UserProgress: ...
+    @abstractmethod
+    async def add_streak_freeze(self, user_id: str, count: int = 1) -> UserProgress: ...
+
+    # --- Phase 3: Missions ---
+    @abstractmethod
+    async def get_daily_missions(self, user_id: str, date: Optional[str] = None) -> List[UserMissionProgress]: ...
+    @abstractmethod
+    async def update_mission_progress(self, user_id: str, mission_type: str, increment: float, date: Optional[str] = None) -> List[UserMissionProgress]: ...
+    @abstractmethod
+    async def claim_mission_reward(self, user_id: str, mission_id: str, date: Optional[str] = None) -> Optional[int]: ...
+
+    # --- Phase 3: Vocabulary Notebook ---
+    @abstractmethod
+    async def add_vocabulary(self, item: VocabularyItem) -> VocabularyItem: ...
+    @abstractmethod
+    async def get_vocabulary(self, user_id: str, limit: int = 100) -> List[VocabularyItem]: ...
+    @abstractmethod
+    async def get_due_vocabulary(self, user_id: str, date: Optional[str] = None) -> List[VocabularyItem]: ...
+    @abstractmethod
+    async def review_vocabulary(self, item_id: str, remembered: bool) -> Optional[VocabularyItem]: ...
+
+    # --- Phase 3: Safety Flags & Parent Dashboard ---
+    @abstractmethod
+    async def log_safety_flag(self, flag: SafetyFlag) -> SafetyFlag: ...
+    @abstractmethod
+    async def get_safety_flags(self, user_id: str, limit: int = 50) -> List[SafetyFlag]: ...
+    @abstractmethod
+    async def get_parent_summary(self, user_id: str) -> Dict[str, Any]: ...
+
+
+# Default Daily Missions pool
+DEFAULT_MISSIONS = [
+    Mission(id="m_speak_3m", title="Daily Speaker", description="Speak for at least 3 minutes today", type="speak_time", target=3.0, xp_reward=50),
+    Mission(id="m_new_words_3", title="Word Explorer", description="Learn or use 3 new words", type="new_words", target=3.0, xp_reward=40),
+    Mission(id="m_complete_scene", title="Scenario Master", description="Complete 1 real-life speaking scenario", type="complete_scene", target=1.0, xp_reward=60),
+    Mission(id="m_shadowing_1", title="Echo Speaker", description="Complete 1 shadowing practice session", type="shadowing", target=1.0, xp_reward=50),
+]
+
 
 class SqliteRepository(BaseRepository):
-    """SQLite implementation of the repository."""
+    """SQLite implementation of the repository with full Phase 3 capabilities."""
 
     def __init__(self, db_path: str = "speakaboo.db"):
         self._db_path = db_path
         self._conn: Optional[sqlite3.Connection] = None
 
     async def initialize(self) -> None:
-        """Create tables if they don't exist."""
-        self._conn = sqlite3.connect(self._db_path)
+        """Create tables and indexes if they don't exist."""
+        self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
 
@@ -158,6 +230,56 @@ class SqliteRepository(BaseRepository):
                 last_seen_at REAL,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             );
+
+            -- Phase 3: Gamification & Streaks
+            CREATE TABLE IF NOT EXISTS user_progress (
+                user_id TEXT PRIMARY KEY,
+                xp INTEGER DEFAULT 0,
+                level INTEGER DEFAULT 1,
+                current_streak INTEGER DEFAULT 0,
+                longest_streak INTEGER DEFAULT 0,
+                last_active_date TEXT DEFAULT '',
+                streak_freeze_count INTEGER DEFAULT 0,
+                updated_at REAL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+
+            -- Phase 3: Daily Missions Progress
+            CREATE TABLE IF NOT EXISTS user_missions (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                date TEXT NOT NULL,
+                mission_id TEXT NOT NULL,
+                current_value REAL DEFAULT 0.0,
+                completed INTEGER DEFAULT 0,
+                reward_claimed INTEGER DEFAULT 0,
+                UNIQUE(user_id, date, mission_id),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+
+            -- Phase 3: Vocabulary Notebook (Leitner Box)
+            CREATE TABLE IF NOT EXISTS vocabulary_items (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                word_or_phrase TEXT NOT NULL,
+                context_sentence TEXT DEFAULT '',
+                correction_notes TEXT DEFAULT '',
+                box INTEGER DEFAULT 1,
+                next_review_date TEXT NOT NULL,
+                times_reviewed INTEGER DEFAULT 0,
+                created_at REAL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+
+            -- Phase 3: Safety Flags (for Parent Dashboard)
+            CREATE TABLE IF NOT EXISTS safety_flags (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                category TEXT NOT NULL,
+                snippet TEXT NOT NULL,
+                created_at REAL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
             
             CREATE INDEX IF NOT EXISTS idx_users_device ON users(device_id);
             CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id);
@@ -165,6 +287,9 @@ class SqliteRepository(BaseRepository):
             CREATE INDEX IF NOT EXISTS idx_daily_usage_user_date ON daily_usage(user_id, date);
             CREATE INDEX IF NOT EXISTS idx_entitlements_user ON entitlements(user_id);
             CREATE INDEX IF NOT EXISTS idx_mistakes_user ON mistake_logs(user_id);
+            CREATE INDEX IF NOT EXISTS idx_user_missions ON user_missions(user_id, date);
+            CREATE INDEX IF NOT EXISTS idx_vocab_user ON vocabulary_items(user_id, next_review_date);
+            CREATE INDEX IF NOT EXISTS idx_safety_flags_user ON safety_flags(user_id);
         """)
         self._conn.commit()
 
@@ -296,7 +421,6 @@ class SqliteRepository(BaseRepository):
 
     # --- Mistake logs ---
     async def log_mistake(self, mistake: MistakeLog) -> MistakeLog:
-        # Check if similar mistake already exists
         existing = self._conn.execute(
             "SELECT * FROM mistake_logs WHERE user_id = ? AND original = ? AND better = ?",
             (mistake.user_id, mistake.original, mistake.better),
@@ -334,6 +458,345 @@ class SqliteRepository(BaseRepository):
             for r in rows
         ]
 
+    # ========================================================
+    # Phase 3: Gamification & Daily Streaks (Asia/Dhaka safe)
+    # ========================================================
+
+    async def get_progress(self, user_id: str) -> UserProgress:
+        row = self._conn.execute(
+            "SELECT * FROM user_progress WHERE user_id = ?", (user_id,)
+        ).fetchone()
+
+        if not row:
+            # Initialize progress for user
+            prog = UserProgress(user_id=user_id)
+            self._conn.execute(
+                """INSERT INTO user_progress (user_id, xp, level, current_streak, longest_streak,
+                   last_active_date, streak_freeze_count, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (prog.user_id, prog.xp, prog.level, prog.current_streak, prog.longest_streak,
+                 prog.last_active_date, prog.streak_freeze_count, prog.updated_at),
+            )
+            self._conn.commit()
+            return prog
+
+        return UserProgress(
+            user_id=row["user_id"],
+            xp=row["xp"],
+            level=row["level"],
+            current_streak=row["current_streak"],
+            longest_streak=row["longest_streak"],
+            last_active_date=row["last_active_date"],
+            streak_freeze_count=row["streak_freeze_count"],
+            updated_at=row["updated_at"],
+        )
+
+    async def record_activity(
+        self, user_id: str, xp_earned: int = 0, date: Optional[str] = None
+    ) -> UserProgress:
+        """Record user activity today, updating streak (Asia/Dhaka safe) and XP."""
+        today = date or dhaka_today()
+        prog = await self.get_progress(user_id)
+
+        # 1. Update XP & Level
+        prog.xp += xp_earned
+        prog.level = calculate_level(prog.xp)
+
+        # 2. Streak calculation
+        if not prog.last_active_date:
+            # First day ever active
+            prog.current_streak = 1
+            prog.longest_streak = max(prog.longest_streak, 1)
+            prog.last_active_date = today
+        elif prog.last_active_date == today:
+            # Already active today, streak doesn't increment further today
+            pass
+        else:
+            diff = dhaka_date_diff(prog.last_active_date, today)
+            if diff == 1:
+                # Consecutive day!
+                prog.current_streak += 1
+                prog.longest_streak = max(prog.longest_streak, prog.current_streak)
+                prog.last_active_date = today
+            elif diff == 2 and prog.streak_freeze_count > 0:
+                # Missed 1 day, but saved by streak freeze!
+                prog.streak_freeze_count -= 1
+                prog.current_streak += 1
+                prog.longest_streak = max(prog.longest_streak, prog.current_streak)
+                prog.last_active_date = today
+                logger.info(f"Streak freeze used for user {user_id}. Remaining: {prog.streak_freeze_count}")
+            else:
+                # Missed more than allowed without freeze: streak resets
+                prog.current_streak = 1
+                prog.longest_streak = max(prog.longest_streak, 1)
+                prog.last_active_date = today
+
+        prog.updated_at = time.time()
+
+        self._conn.execute(
+            """UPDATE user_progress SET xp = ?, level = ?, current_streak = ?, longest_streak = ?,
+               last_active_date = ?, streak_freeze_count = ?, updated_at = ? WHERE user_id = ?""",
+            (prog.xp, prog.level, prog.current_streak, prog.longest_streak,
+             prog.last_active_date, prog.streak_freeze_count, prog.updated_at, user_id),
+        )
+        self._conn.commit()
+        return prog
+
+    async def add_streak_freeze(self, user_id: str, count: int = 1) -> UserProgress:
+        prog = await self.get_progress(user_id)
+        prog.streak_freeze_count += count
+        prog.updated_at = time.time()
+        self._conn.execute(
+            "UPDATE user_progress SET streak_freeze_count = ?, updated_at = ? WHERE user_id = ?",
+            (prog.streak_freeze_count, prog.updated_at, user_id),
+        )
+        self._conn.commit()
+        return prog
+
+    # ========================================================
+    # Phase 3: Daily Missions Engine
+    # ========================================================
+
+    async def get_daily_missions(
+        self, user_id: str, date: Optional[str] = None
+    ) -> List[UserMissionProgress]:
+        today = date or dhaka_today()
+
+        # Check existing missions for today
+        rows = self._conn.execute(
+            "SELECT * FROM user_missions WHERE user_id = ? AND date = ?",
+            (user_id, today),
+        ).fetchall()
+
+        if not rows:
+            # Seed default missions for today
+            seeded = []
+            for m in DEFAULT_MISSIONS:
+                ump = UserMissionProgress(user_id=user_id, date=today, mission_id=m.id)
+                self._conn.execute(
+                    """INSERT INTO user_missions (id, user_id, date, mission_id, current_value, completed, reward_claimed)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (ump.id, ump.user_id, ump.date, ump.mission_id, ump.current_value,
+                     1 if ump.completed else 0, 1 if ump.reward_claimed else 0),
+                )
+                seeded.append(ump)
+            self._conn.commit()
+            return seeded
+
+        return [
+            UserMissionProgress(
+                id=r["id"],
+                user_id=r["user_id"],
+                date=r["date"],
+                mission_id=r["mission_id"],
+                current_value=r["current_value"],
+                completed=bool(r["completed"]),
+                reward_claimed=bool(r["reward_claimed"]),
+            )
+            for r in rows
+        ]
+
+    async def update_mission_progress(
+        self, user_id: str, mission_type: str, increment: float, date: Optional[str] = None
+    ) -> List[UserMissionProgress]:
+        missions = await self.get_daily_missions(user_id, date)
+        type_to_mission = {m.type: m for m in DEFAULT_MISSIONS}
+
+        updated = []
+        for ump in missions:
+            m_def = next((m for m in DEFAULT_MISSIONS if m.id == ump.mission_id), None)
+            if m_def and m_def.type == mission_type and not ump.completed:
+                ump.current_value += increment
+                if ump.current_value >= m_def.target:
+                    ump.completed = True
+
+                self._conn.execute(
+                    "UPDATE user_missions SET current_value = ?, completed = ? WHERE id = ?",
+                    (ump.current_value, 1 if ump.completed else 0, ump.id),
+                )
+                updated.append(ump)
+
+        if updated:
+            self._conn.commit()
+
+        return missions
+
+    async def claim_mission_reward(
+        self, user_id: str, mission_id: str, date: Optional[str] = None
+    ) -> Optional[int]:
+        today = date or dhaka_today()
+        row = self._conn.execute(
+            "SELECT * FROM user_missions WHERE user_id = ? AND date = ? AND mission_id = ?",
+            (user_id, today, mission_id),
+        ).fetchone()
+
+        if not row or not row["completed"] or row["reward_claimed"]:
+            return None
+
+        m_def = next((m for m in DEFAULT_MISSIONS if m.id == mission_id), None)
+        xp_reward = m_def.xp_reward if m_def else 50
+
+        self._conn.execute(
+            "UPDATE user_missions SET reward_claimed = 1 WHERE id = ?", (row["id"],)
+        )
+        self._conn.commit()
+
+        # Award XP to user progress
+        await self.record_activity(user_id, xp_earned=xp_reward, date=today)
+        return xp_reward
+
+    # ========================================================
+    # Phase 3: Vocabulary Notebook (Spaced Repetition / Leitner)
+    # ========================================================
+
+    async def add_vocabulary(self, item: VocabularyItem) -> VocabularyItem:
+        if not item.next_review_date:
+            item.next_review_date = dhaka_date_add(1)  # Default: review tomorrow
+
+        self._conn.execute(
+            """INSERT INTO vocabulary_items (id, user_id, word_or_phrase, context_sentence,
+               correction_notes, box, next_review_date, times_reviewed, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (item.id, item.user_id, item.word_or_phrase, item.context_sentence,
+             item.correction_notes, item.box, item.next_review_date, item.times_reviewed, item.created_at),
+        )
+        self._conn.commit()
+        return item
+
+    async def get_vocabulary(self, user_id: str, limit: int = 100) -> List[VocabularyItem]:
+        rows = self._conn.execute(
+            "SELECT * FROM vocabulary_items WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+            (user_id, limit),
+        ).fetchall()
+        return [self._row_to_vocab(r) for r in rows]
+
+    async def get_due_vocabulary(
+        self, user_id: str, date: Optional[str] = None
+    ) -> List[VocabularyItem]:
+        today = date or dhaka_today()
+        rows = self._conn.execute(
+            "SELECT * FROM vocabulary_items WHERE user_id = ? AND next_review_date <= ? ORDER BY next_review_date ASC",
+            (user_id, today),
+        ).fetchall()
+        return [self._row_to_vocab(r) for r in rows]
+
+    async def review_vocabulary(self, item_id: str, remembered: bool) -> Optional[VocabularyItem]:
+        row = self._conn.execute(
+            "SELECT * FROM vocabulary_items WHERE id = ?", (item_id,)
+        ).fetchone()
+        if not row:
+            return None
+
+        current_box = row["box"]
+        times_reviewed = row["times_reviewed"] + 1
+
+        # Leitner box interval: Box 1=1d, Box 2=3d, Box 3=7d, Box 4=14d, Box 5=30d
+        box_intervals = {1: 1, 2: 3, 3: 7, 4: 14, 5: 30}
+
+        if remembered:
+            new_box = min(5, current_box + 1)
+        else:
+            new_box = 1  # Reset to box 1 on lapse
+
+        days_ahead = box_intervals.get(new_box, 1)
+        next_date = dhaka_date_add(days_ahead)
+
+        self._conn.execute(
+            """UPDATE vocabulary_items SET box = ?, next_review_date = ?, times_reviewed = ?
+               WHERE id = ?""",
+            (new_box, next_date, times_reviewed, item_id),
+        )
+        self._conn.commit()
+
+        return VocabularyItem(
+            id=row["id"],
+            user_id=row["user_id"],
+            word_or_phrase=row["word_or_phrase"],
+            context_sentence=row["context_sentence"],
+            correction_notes=row["correction_notes"],
+            box=new_box,
+            next_review_date=next_date,
+            times_reviewed=times_reviewed,
+            created_at=row["created_at"],
+        )
+
+    # ========================================================
+    # Phase 3: Safety Flags & Parent Dashboard
+    # ========================================================
+
+    async def log_safety_flag(self, flag: SafetyFlag) -> SafetyFlag:
+        self._conn.execute(
+            "INSERT INTO safety_flags (id, user_id, category, snippet, created_at) VALUES (?, ?, ?, ?, ?)",
+            (flag.id, flag.user_id, flag.category, flag.snippet, flag.created_at),
+        )
+        self._conn.commit()
+        return flag
+
+    async def get_safety_flags(self, user_id: str, limit: int = 50) -> List[SafetyFlag]:
+        rows = self._conn.execute(
+            "SELECT * FROM safety_flags WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+            (user_id, limit),
+        ).fetchall()
+        return [
+            SafetyFlag(
+                id=r["id"],
+                user_id=r["user_id"],
+                category=r["category"],
+                snippet=r["snippet"],
+                created_at=r["created_at"],
+            )
+            for r in rows
+        ]
+
+    async def get_parent_summary(self, user_id: str) -> Dict[str, Any]:
+        """Aggregate data for parent dashboard: weekly minutes, streak, words, safety flags."""
+        today = dhaka_today()
+        # 7 days window
+        seven_days_ago = dhaka_date_add(-7, from_date=today)
+
+        # Weekly minutes & turns
+        usage_rows = self._conn.execute(
+            """SELECT SUM(minutes_spoken) as total_min, SUM(turns_count) as total_turns
+               FROM daily_usage WHERE user_id = ? AND date >= ?""",
+            (user_id, seven_days_ago),
+        ).fetchone()
+
+        weekly_minutes = usage_rows["total_min"] or 0.0
+        weekly_turns = usage_rows["total_turns"] or 0
+
+        # Progress
+        progress = await self.get_progress(user_id)
+
+        # Total vocabulary learned
+        vocab_count = self._conn.execute(
+            "SELECT COUNT(*) as cnt FROM vocabulary_items WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()["cnt"]
+
+        # Safety flags count in last 30 days
+        thirty_days_ago = time.time() - (30 * 86400)
+        safety_rows = self._conn.execute(
+            "SELECT category, COUNT(*) as cnt FROM safety_flags WHERE user_id = ? AND created_at >= ? GROUP BY category",
+            (user_id, thirty_days_ago),
+        ).fetchall()
+
+        safety_counts = {r["category"]: r["cnt"] for r in safety_rows}
+        total_safety_flags = sum(safety_counts.values())
+
+        return {
+            "user_id": user_id,
+            "weekly_minutes_spoken": round(weekly_minutes, 1),
+            "weekly_turns_count": weekly_turns,
+            "current_streak": progress.current_streak,
+            "longest_streak": progress.longest_streak,
+            "xp": progress.xp,
+            "level": progress.level,
+            "total_words_learned": vocab_count,
+            "safety_flags_count": total_safety_flags,
+            "safety_flags_by_category": safety_counts,
+        }
+
+    # --- Helpers ---
     @staticmethod
     def _row_to_user(row) -> User:
         return User(
@@ -358,5 +821,19 @@ class SqliteRepository(BaseRepository):
             tts_chars=row["tts_chars"],
             llm_tokens_in=row["llm_tokens_in"],
             llm_tokens_out=row["llm_tokens_out"],
+            created_at=row["created_at"],
+        )
+
+    @staticmethod
+    def _row_to_vocab(row) -> VocabularyItem:
+        return VocabularyItem(
+            id=row["id"],
+            user_id=row["user_id"],
+            word_or_phrase=row["word_or_phrase"],
+            context_sentence=row["context_sentence"],
+            correction_notes=row["correction_notes"],
+            box=row["box"],
+            next_review_date=row["next_review_date"],
+            times_reviewed=row["times_reviewed"],
             created_at=row["created_at"],
         )

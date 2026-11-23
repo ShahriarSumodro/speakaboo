@@ -1,0 +1,23 @@
+[
+  {
+    "id": "weather_monsoon",
+    "title": "Monsoon Rains & Seasons",
+    "category": "Nature",
+    "description": "Discuss seasonal changes, monsoon showers in Bangladesh, and how daily life adapts.",
+    "prompt_context": "TOPIC MODE: Weather and Monsoon. Engage the learner in discussing the rainy season, rainfall, staying safe during storms, and what they enjoy doing on rainy days. Maintain a safe, gentle, and conversational tone."
+  },
+  {
+    "id": "global_warming",
+    "title": "Climate & Environment",
+    "category": "Science",
+    "description": "Discuss rising temperatures, sea-level changes in delta regions, and green solutions.",
+    "prompt_context": "TOPIC MODE: Climate Change and the Environment. Discuss global warming objectively with educational focus on tree planting, clean energy, and river conservation. Keep tone balanced, scientific, and strictly neutral without partisan politics."
+  },
+  {
+    "id": "future_technology",
+    "title": "Smartphones & Learning",
+    "category": "Technology",
+    "description": "Explore how modern technology and educational apps assist school and university students.",
+    "prompt_context": "TOPIC MODE: Technology in Education. Discuss how digital tools and language apps make learning accessible. Encourage the student to voice their own opinions about screen time balance and online study."
+  }
+]

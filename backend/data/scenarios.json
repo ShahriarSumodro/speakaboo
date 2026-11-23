@@ -1,0 +1,52 @@
+[
+  {
+    "id": "job_interview",
+    "title": "First Job Interview",
+    "category": "Career",
+    "description": "Practice answering common questions for an entry-level office or tech role.",
+    "prompt_context": "SCENARIO: Job Interview. You are the hiring manager interviewing the learner for an entry-level position. Ask questions about their strengths, why they want the role, and how they solve problems. Stay professional yet encouraging.",
+    "target_turns": 5,
+    "suggested_vocabulary": ["experience", "strengths", "collaboration", "deadlines", "initiative"],
+    "difficulty": "intermediate"
+  },
+  {
+    "id": "ielts_speaking_part_2",
+    "title": "IELTS Speaking Part 2",
+    "category": "Exams",
+    "description": "Practice giving a structured 1-2 minute talk about a memorable journey in Bangladesh.",
+    "prompt_context": "SCENARIO: IELTS Speaking Exam Part 2. Topic: 'Describe a memorable journey you took.' Prompt the learner to mention where they went, who they traveled with, and why it was unforgettable. Provide structured feedback on fluency and coherence.",
+    "target_turns": 4,
+    "suggested_vocabulary": ["scenic", "destination", "unforgettable", "commute", "perspective"],
+    "difficulty": "advanced"
+  },
+  {
+    "id": "ordering_food",
+    "title": "Ordering at a Cafe",
+    "category": "Daily Life",
+    "description": "Practice greeting a barista, asking for recommendations, and ordering snacks.",
+    "prompt_context": "SCENARIO: Ordering at a Cafe. You are a friendly barista taking an order. Ask the learner what they would like, offer suggestions, clarify sizes or preferences, and state the total politely.",
+    "target_turns": 4,
+    "suggested_vocabulary": ["recommendation", "beverage", "pastry", "receipt", "takeaway"],
+    "difficulty": "beginner"
+  },
+  {
+    "id": "talking_to_foreigner",
+    "title": "Welcoming a Guest",
+    "category": "Social",
+    "description": "Explain Bangladeshi hospitality, traditional foods, and must-visit landmarks.",
+    "prompt_context": "SCENARIO: Talking to an International Visitor. You are a foreign visitor arriving in Bangladesh for the first time. Ask the learner about local customs, traditional food like biryani or pitha, and places to see in Dhaka or Cox's Bazar.",
+    "target_turns": 5,
+    "suggested_vocabulary": ["hospitality", "tradition", "heritage", "monument", "cuisine"],
+    "difficulty": "intermediate"
+  },
+  {
+    "id": "school_presentation",
+    "title": "School Science Presentation",
+    "category": "Academic",
+    "description": "Present a short topic to classmates and answer their questions confidently.",
+    "prompt_context": "SCENARIO: Classroom Presentation. You are a curious teacher or classmate listening to the learner present on renewable solar energy. Ask one or two thoughtful follow-up questions to test their speaking clarity.",
+    "target_turns": 4,
+    "suggested_vocabulary": ["renewable", "solar energy", "conservation", "sustainable", "conclusion"],
+    "difficulty": "intermediate"
+  }
+]
