@@ -11,7 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from backend.config import load_settings
-from backend.routes import health, auth, characters, conversation, usage, learning, parent, payment
+from backend.routes import health, auth, characters, conversation, usage, learning, parent, payment, privacy
+from backend.engine.telemetry import telemetry
 
 # Load settings
 settings = load_settings()
@@ -71,7 +72,15 @@ async def log_requests(request: Request, call_next):
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Catch-all exception handler. Never leak internal errors to client."""
-    logger.error(f"Unhandled error on {request.method} {request.url.path}: {exc}", exc_info=True)
+    import traceback
+    tb = traceback.format_exc()
+    logger.error(f"Unhandled error on {request.method} {request.url.path}: {exc}\n{tb}")
+    telemetry.record_crash(
+        error_type=type(exc).__name__,
+        message=str(exc),
+        stack_trace=tb,
+        endpoint=f"{request.method} {request.url.path}",
+    )
     return JSONResponse(
         status_code=500,
         content={
@@ -90,3 +99,4 @@ app.include_router(usage.router)
 app.include_router(learning.router)
 app.include_router(parent.router)
 app.include_router(payment.router)
+app.include_router(privacy.router)

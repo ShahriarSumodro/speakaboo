@@ -79,6 +79,8 @@ class BaseRepository(ABC):
     async def get_user_by_device(self, device_id: str) -> Optional[User]: ...
     @abstractmethod
     async def update_user(self, user: User) -> User: ...
+    @abstractmethod
+    async def delete_user_data(self, user_id: str) -> bool: ...
 
     # --- Conversations ---
     @abstractmethod
@@ -795,6 +797,25 @@ class SqliteRepository(BaseRepository):
             "safety_flags_count": total_safety_flags,
             "safety_flags_by_category": safety_counts,
         }
+
+    async def delete_user_data(self, user_id: str) -> bool:
+        """Completely purge all records for a user across all tables."""
+        cursor = self._conn.cursor()
+        cursor.execute("SELECT id FROM conversations WHERE user_id = ?", (user_id,))
+        conv_ids = [r["id"] for r in cursor.fetchall()]
+        for cid in conv_ids:
+            cursor.execute("DELETE FROM turns WHERE conversation_id = ?", (cid,))
+        cursor.execute("DELETE FROM conversations WHERE user_id = ?", (user_id,))
+        cursor.execute("DELETE FROM daily_usage WHERE user_id = ?", (user_id,))
+        cursor.execute("DELETE FROM entitlements WHERE user_id = ?", (user_id,))
+        cursor.execute("DELETE FROM mistake_logs WHERE user_id = ?", (user_id,))
+        cursor.execute("DELETE FROM user_progress WHERE user_id = ?", (user_id,))
+        cursor.execute("DELETE FROM user_missions WHERE user_id = ?", (user_id,))
+        cursor.execute("DELETE FROM vocabulary_items WHERE user_id = ?", (user_id,))
+        cursor.execute("DELETE FROM safety_flags WHERE user_id = ?", (user_id,))
+        cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        self._conn.commit()
+        return True
 
     # --- Helpers ---
     @staticmethod

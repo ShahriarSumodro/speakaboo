@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:speakaboo/config/theme.dart';
 import 'package:speakaboo/services/api_service.dart';
 import 'package:speakaboo/services/audio_service.dart';
+import 'package:speakaboo/services/analytics_service.dart';
 import 'package:speakaboo/providers/conversation_provider.dart';
 import 'package:speakaboo/widgets/character_face.dart';
 import 'package:speakaboo/widgets/correction_chip.dart';
@@ -406,5 +407,17 @@ void main() {
     await tester.pump();
     expect(find.text('Connected to Toy'), findsOneWidget);
     expect(find.text('Disconnect'), findsOneWidget);
+  });
+
+  test('AnalyticsService records events and errors', () {
+    final analytics = AnalyticsService();
+    analytics.clear();
+    analytics.track('app_opened', {'source': 'push'});
+    expect(analytics.events.length, 1);
+    expect(analytics.events.first.name, 'app_opened');
+
+    analytics.recordError(Exception('Network timeout'), null, context: 'talk_turn');
+    expect(analytics.errorLog.length, 1);
+    expect(analytics.errorLog.first['context'], 'talk_turn');
   });
 }
