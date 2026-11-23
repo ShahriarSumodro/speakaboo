@@ -8,6 +8,7 @@ import 'package:speakaboo/config/theme.dart';
 import 'package:speakaboo/services/api_service.dart';
 import 'package:speakaboo/services/audio_service.dart';
 import 'package:speakaboo/services/analytics_service.dart';
+import 'package:speakaboo/providers/auth_provider.dart';
 import 'package:speakaboo/providers/conversation_provider.dart';
 import 'package:speakaboo/widgets/character_face.dart';
 import 'package:speakaboo/widgets/correction_chip.dart';
@@ -91,12 +92,14 @@ void main() {
     });
 
     final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
+    final auth = AuthProvider(api: api);
     final audio = AudioService();
     final conversation = ConversationProvider(api: api, audio: audio);
 
     await tester.pumpWidget(
       MultiProvider(
         providers: [
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
           ChangeNotifierProvider<AudioService>.value(value: audio),
           ChangeNotifierProvider<ConversationProvider>.value(
               value: conversation),
@@ -122,12 +125,14 @@ void main() {
   testWidgets('MainShell renders bottom navigation and navigates between tabs',
       (WidgetTester tester) async {
     final api = ApiService(baseUrl: 'http://localhost:8000');
+    final auth = AuthProvider(api: api);
     final audio = AudioService();
     final conversation = ConversationProvider(api: api, audio: audio);
 
     await tester.pumpWidget(
       MultiProvider(
         providers: [
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
           ChangeNotifierProvider<AudioService>.value(value: audio),
           ChangeNotifierProvider<ConversationProvider>.value(
               value: conversation),

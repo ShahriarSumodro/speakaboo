@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../config/theme.dart';
+import '../providers/auth_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../widgets/character_face.dart';
 import '../widgets/correction_chip.dart';
@@ -38,9 +39,10 @@ class _TalkScreenState extends State<TalkScreen> {
   }
 
   Future<void> _startConversation() async {
+    final auth = context.read<AuthProvider>();
     await _conversation.startConversation(
-      userId: 'device-user', // Will be replaced with real device ID
-      characterId: 'rule_farmer',
+      userId: auth.userId,
+      characterId: _conversation.currentCharacterId ?? 'rule_farmer',
     );
   }
 

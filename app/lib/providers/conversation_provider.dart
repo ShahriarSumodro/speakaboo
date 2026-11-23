@@ -1,6 +1,9 @@
-/// Conversation provider - manages conversation state.
+/// Conversation provider - manages conversation state with streaming audio support.
 library;
 
+import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import '../services/api_service.dart';
 import '../services/audio_service.dart';
@@ -41,10 +44,14 @@ class ConversationProvider extends ChangeNotifier {
   ConversationStatus _status = ConversationStatus.idle;
   String? _conversationId;
   String? _characterName;
+  String? _currentCharacterId;
   String _level = 'beginner';
   String? _errorMessage;
   final List<ChatMessage> _messages = [];
   double _lastLatencyMs = 0;
+  String? _scenarioId;
+  String? _topicId;
+  bool _useStreaming = true;
 
   ConversationProvider({
     required this.api,
@@ -54,6 +61,7 @@ class ConversationProvider extends ChangeNotifier {
   ConversationStatus get status => _status;
   String? get conversationId => _conversationId;
   String? get characterName => _characterName;
+  String? get currentCharacterId => _currentCharacterId;
   String get level => _level;
   String? get errorMessage => _errorMessage;
   List<ChatMessage> get messages => List.unmodifiable(_messages);
@@ -61,20 +69,33 @@ class ConversationProvider extends ChangeNotifier {
   bool get isRecording => _status == ConversationStatus.recording;
   bool get isProcessing => _status == ConversationStatus.processing;
   bool get isPlaying => _status == ConversationStatus.playing;
+  String? get scenarioId => _scenarioId;
+  String? get topicId => _topicId;
+
+  void setStreamingEnabled(bool enabled) {
+    _useStreaming = enabled;
+  }
 
   /// Start a new conversation with a character.
   Future<void> startConversation({
     required String userId,
     required String characterId,
+    String? scenarioId,
+    String? topicId,
   }) async {
     try {
       _status = ConversationStatus.processing;
       _errorMessage = null;
+      _currentCharacterId = characterId;
+      _scenarioId = scenarioId;
+      _topicId = topicId;
       notifyListeners();
 
       final result = await api.startConversation(
         userId: userId,
         characterId: characterId,
+        scenarioId: scenarioId,
+        topicId: topicId,
       );
 
       _conversationId = result.conversationId;
@@ -120,18 +141,113 @@ class ConversationProvider extends ChangeNotifier {
       return;
     }
 
-    await _processAudio(audioBytes);
+    if (_useStreaming) {
+      await _processAudioStreaming(audioBytes);
+    } else {
+      await _processAudioBlocking(audioBytes);
+    }
   }
 
-  /// Process audio through the full pipeline.
-  Future<void> _processAudio(Uint8List audio) async {
+  /// Streaming turn: receives early transcript, streaming reply text, and sentence audio chunks.
+  Future<void> _processAudioStreaming(Uint8List audioBytes) async {
+    try {
+      _status = ConversationStatus.processing;
+      notifyListeners();
+
+      String transcript = '';
+      String replyText = '';
+      CorrectionData? correction;
+      List<String> newWords = [];
+      final List<Uint8List> audioChunks = [];
+      bool gotTranscript = false;
+
+      final stream = api.streamTurn(
+        conversationId: _conversationId!,
+        audio: audioBytes,
+      );
+
+      await for (final event in stream) {
+        final type = event['type'] as String?;
+
+        if (type == 'transcript') {
+          transcript = event['text'] ?? '';
+          if (transcript.isNotEmpty && !gotTranscript) {
+            gotTranscript = true;
+            _messages.add(ChatMessage(text: transcript, isUser: true));
+            notifyListeners();
+          }
+        } else if (type == 'reply_chunk') {
+          replyText += event['text'] ?? '';
+        } else if (type == 'audio_chunk') {
+          final b64 = event['audio_base64'] as String?;
+          if (b64 != null && b64.isNotEmpty) {
+            audioChunks.add(base64Decode(b64));
+          }
+        } else if (type == 'turn_complete') {
+          final turn = event['turn'] as Map<String, dynamic>? ?? {};
+          if (turn['reply'] != null) {
+            replyText = turn['reply'];
+          }
+          if (turn['correction'] != null) {
+            correction = CorrectionData.fromJson(turn['correction']);
+          }
+          if (turn['new_words'] != null) {
+            newWords = List<String>.from(turn['new_words']);
+          }
+          if (turn['level'] != null) {
+            _level = turn['level'];
+          }
+          if (turn['latency_ms'] != null) {
+            _lastLatencyMs = (turn['latency_ms'] as num).toDouble();
+          }
+        }
+      }
+
+      // If transcript was not yielded early
+      if (!gotTranscript && transcript.isNotEmpty) {
+        _messages.add(ChatMessage(text: transcript, isUser: true));
+      }
+
+      // Add completed AI response
+      if (replyText.isNotEmpty) {
+        _messages.add(ChatMessage(
+          text: replyText,
+          isUser: false,
+          correction: correction,
+          newWords: newWords,
+        ));
+      }
+
+      notifyListeners();
+
+      // Play audio response chunks
+      if (audioChunks.isNotEmpty) {
+        _status = ConversationStatus.playing;
+        notifyListeners();
+
+        await audio.playChunks(audioChunks);
+
+        _status = ConversationStatus.ready;
+        notifyListeners();
+      } else {
+        _status = ConversationStatus.ready;
+        notifyListeners();
+      }
+    } catch (_) {
+      // Fallback to blocking endpoint on any streaming failure
+      await _processAudioBlocking(audioBytes);
+    }
+  }
+
+  /// Process audio through blocking endpoint (fallback).
+  Future<void> _processAudioBlocking(Uint8List audioBytes) async {
     try {
       _status = ConversationStatus.processing;
       notifyListeners();
 
       final result = await api.sendTurn(
         conversationId: _conversationId!,
-        audio: audio,
+        audio: audioBytes,
       );
 
       _lastLatencyMs = result.latencyMs;
@@ -160,9 +276,8 @@ class ConversationProvider extends ChangeNotifier {
         _status = ConversationStatus.playing;
         notifyListeners();
 
-        await this.audio.playChunks(result.audioChunks);
+        await audio.playChunks(result.audioChunks);
 
-        // After playback completes
         _status = ConversationStatus.ready;
         notifyListeners();
       } else {
@@ -201,6 +316,9 @@ class ConversationProvider extends ChangeNotifier {
   void endConversation() {
     _conversationId = null;
     _characterName = null;
+    _currentCharacterId = null;
+    _scenarioId = null;
+    _topicId = null;
     _messages.clear();
     _status = ConversationStatus.idle;
     _errorMessage = null;

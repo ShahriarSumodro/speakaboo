@@ -1,10 +1,17 @@
-/// API service for communicating with the Speakaboo backend.
+/// Complete typed API service for Speakaboo backend communication.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
+import '../models/user_profile.dart';
+import '../models/character.dart';
+import '../models/learning_models.dart';
+import '../models/parent_summary.dart';
+import '../models/usage_info.dart';
+import '../models/payment_models.dart';
 
 /// Result of a conversation turn from the backend.
 class TurnResult {
@@ -72,6 +79,14 @@ class CorrectionData {
       reasonShort: json['reason_short'] ?? '',
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'original': original,
+      'better': better,
+      'reason_short': reasonShort,
+    };
+  }
 }
 
 /// Start conversation response.
@@ -95,16 +110,40 @@ class StartConversationResult {
   }
 }
 
-/// API client for the Speakaboo backend.
+/// Complete API client for the Speakaboo backend.
 class ApiService {
   final String? _customBaseUrl;
   final http.Client _client;
+  String? _authToken;
 
-  ApiService({String? baseUrl, http.Client? client})
+  ApiService({String? baseUrl, http.Client? client, String? authToken})
       : _customBaseUrl = baseUrl,
-        _client = client ?? http.Client();
+        _client = client ?? http.Client(),
+        _authToken = authToken;
 
   String get baseUrl => _customBaseUrl ?? AppConfig.backendUrl;
+
+  void setAuthToken(String? token) {
+    _authToken = token;
+  }
+
+  String? get authToken => _authToken;
+
+  Map<String, String> _headers([Map<String, String>? extra]) {
+    final map = <String, String>{
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    if (_authToken != null && _authToken!.isNotEmpty) {
+      map['Authorization'] = 'Bearer $_authToken';
+    }
+    if (extra != null) {
+      map.addAll(extra);
+    }
+    return map;
+  }
+
+  // ================= HEALTH =================
 
   /// Check backend health.
   Future<Map<String, dynamic>> healthCheck() async {
@@ -118,18 +157,159 @@ class ApiService {
     return jsonDecode(response.body);
   }
 
+  // ================= AUTH & PROFILE =================
+
+  /// Authenticate device and obtain signed JWT/HMAC token.
+  Future<Map<String, dynamic>> deviceAuth({
+    required String deviceId,
+    String? displayName,
+  }) async {
+    final response = await _client
+        .post(
+          Uri.parse('$baseUrl/api/auth/device'),
+          headers: _headers(),
+          body: jsonEncode({
+            'device_id': deviceId,
+            if (displayName != null) 'display_name': displayName,
+          }),
+        )
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Device authentication failed', response.statusCode);
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    if (data['auth_token'] != null) {
+      setAuthToken(data['auth_token']);
+    }
+    return data;
+  }
+
+  /// Get current user profile.
+  Future<UserProfile> getProfile() async {
+    final response = await _client
+        .get(
+          Uri.parse('$baseUrl/api/auth/profile'),
+          headers: _headers(),
+        )
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to load profile', response.statusCode);
+    }
+    return UserProfile.fromJson(jsonDecode(response.body));
+  }
+
+  /// Update current user profile.
+  Future<UserProfile> updateProfile(Map<String, dynamic> updates) async {
+    final response = await _client
+        .put(
+          Uri.parse('$baseUrl/api/auth/profile'),
+          headers: _headers(),
+          body: jsonEncode(updates),
+        )
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to update profile', response.statusCode);
+    }
+    return UserProfile.fromJson(jsonDecode(response.body));
+  }
+
+  /// Set 4-digit parent PIN.
+  Future<bool> setParentPin(String pin) async {
+    final response = await _client
+        .post(
+          Uri.parse('$baseUrl/api/auth/set-parent-pin'),
+          headers: _headers(),
+          body: jsonEncode({'pin': pin}),
+        )
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to set parent PIN', response.statusCode);
+    }
+    final data = jsonDecode(response.body);
+    return data['success'] == true;
+  }
+
+  /// Verify 4-digit parent PIN.
+  Future<bool> verifyParentPin(String pin) async {
+    final response = await _client
+        .post(
+          Uri.parse('$baseUrl/api/auth/verify-parent-pin'),
+          headers: _headers(),
+          body: jsonEncode({'pin': pin}),
+        )
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to verify parent PIN', response.statusCode);
+    }
+    final data = jsonDecode(response.body);
+    return data['valid'] == true;
+  }
+
+  // ================= CHARACTERS =================
+
+  /// Get all speaking characters.
+  Future<List<Character>> getCharacters() async {
+    final response = await _client
+        .get(Uri.parse('$baseUrl/api/characters/'), headers: _headers())
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to load characters', response.statusCode);
+    }
+    final list = jsonDecode(response.body) as List<dynamic>;
+    return list.map((item) => Character.fromJson(item as Map<String, dynamic>)).toList();
+  }
+
+  /// Get single character details.
+  Future<Character> getCharacter(String id) async {
+    final response = await _client
+        .get(Uri.parse('$baseUrl/api/characters/$id'), headers: _headers())
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Character not found', response.statusCode);
+    }
+    return Character.fromJson(jsonDecode(response.body));
+  }
+
+  /// Get cached voice preview audio.
+  Future<Uint8List> getPreviewAudio(String characterId) async {
+    final response = await _client
+        .get(
+          Uri.parse('$baseUrl/api/characters/$characterId/preview-audio'),
+          headers: _headers({'Accept': 'audio/wav'}),
+        )
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Preview audio not available', response.statusCode);
+    }
+    return response.bodyBytes;
+  }
+
+  // ================= CONVERSATION =================
+
   /// Start a conversation with a character.
   Future<StartConversationResult> startConversation({
     required String userId,
     required String characterId,
+    String? scenarioId,
+    String? topicId,
   }) async {
     final response = await _client
         .post(
           Uri.parse('$baseUrl/api/conversation/start'),
-          headers: {'Content-Type': 'application/json'},
+          headers: _headers(),
           body: jsonEncode({
             'user_id': userId,
             'character_id': characterId,
+            if (scenarioId != null) 'scenario_id': scenarioId,
+            if (topicId != null) 'topic_id': topicId,
           }),
         )
         .timeout(AppConfig.requestTimeout);
@@ -140,7 +320,7 @@ class ApiService {
     return StartConversationResult.fromJson(jsonDecode(response.body));
   }
 
-  /// Send an audio turn and get the AI response.
+  /// Send an audio turn and get the AI response (blocking fallback).
   Future<TurnResult> sendTurn({
     required String conversationId,
     required Uint8List audio,
@@ -150,6 +330,10 @@ class ApiService {
       'POST',
       Uri.parse('$baseUrl/api/conversation/turn'),
     );
+
+    if (_authToken != null) {
+      request.headers['Authorization'] = 'Bearer $_authToken';
+    }
 
     request.fields['conversation_id'] = conversationId;
     request.fields['audio_format'] = audioFormat;
@@ -188,10 +372,368 @@ class ApiService {
     return TurnResult.fromJson(jsonDecode(response.body));
   }
 
-  /// Get subscription and character unlock pricing.
+  /// Stream a conversation turn with early transcript and sentence-by-sentence audio (SSE).
+  Stream<Map<String, dynamic>> streamTurn({
+    required String conversationId,
+    required Uint8List audio,
+    String audioFormat = 'wav',
+  }) async* {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$baseUrl/api/conversation/stream-turn'),
+    );
+
+    if (_authToken != null) {
+      request.headers['Authorization'] = 'Bearer $_authToken';
+    }
+
+    request.fields['conversation_id'] = conversationId;
+    request.fields['audio_format'] = audioFormat;
+    request.files.add(http.MultipartFile.fromBytes(
+      'audio',
+      audio,
+      filename: 'recording.$audioFormat',
+    ));
+
+    final streamedResponse =
+        await _client.send(request).timeout(AppConfig.requestTimeout);
+
+    if (streamedResponse.statusCode != 200) {
+      final res = await http.Response.fromStream(streamedResponse);
+      throw ApiException('Stream turn failed: ${res.body}', streamedResponse.statusCode);
+    }
+
+    // Parse SSE lines
+    final lineStream = streamedResponse.stream
+        .transform(utf8.decoder)
+        .transform(const LineSplitter());
+
+    await for (final line in lineStream) {
+      if (line.startsWith('data: ')) {
+        final jsonStr = line.substring(6).trim();
+        if (jsonStr.isNotEmpty) {
+          try {
+            final data = jsonDecode(jsonStr);
+            if (data is Map<String, dynamic>) {
+              yield data;
+            }
+          } catch (_) {}
+        }
+      }
+    }
+  }
+
+  // ================= LEARNING & GAMIFICATION =================
+
+  /// Get streak status.
+  Future<Map<String, dynamic>> getStreak(String userId) async {
+    final response = await _client
+        .get(Uri.parse('$baseUrl/api/learning/streak/$userId'), headers: _headers())
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to load streak', response.statusCode);
+    }
+    return jsonDecode(response.body);
+  }
+
+  /// Use streak freeze.
+  Future<Map<String, dynamic>> freezeStreak() async {
+    final response = await _client
+        .post(Uri.parse('$baseUrl/api/learning/streak/freeze'), headers: _headers())
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to freeze streak', response.statusCode);
+    }
+    return jsonDecode(response.body);
+  }
+
+  /// Get daily missions.
+  Future<MissionsResponse> getMissions(String userId) async {
+    final response = await _client
+        .get(Uri.parse('$baseUrl/api/learning/missions/$userId'), headers: _headers())
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to load missions', response.statusCode);
+    }
+    return MissionsResponse.fromJson(jsonDecode(response.body));
+  }
+
+  /// Claim a completed mission reward.
+  Future<Map<String, dynamic>> claimMission({
+    required String userId,
+    required String missionId,
+  }) async {
+    final response = await _client
+        .post(
+          Uri.parse('$baseUrl/api/learning/missions/claim'),
+          headers: _headers(),
+          body: jsonEncode({
+            'user_id': userId,
+            'mission_id': missionId,
+          }),
+        )
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to claim mission', response.statusCode);
+    }
+    return jsonDecode(response.body);
+  }
+
+  /// Get overall progress stats.
+  Future<LearningProgress> getProgress(String userId) async {
+    final response = await _client
+        .get(Uri.parse('$baseUrl/api/learning/progress/$userId'), headers: _headers())
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to load progress', response.statusCode);
+    }
+    return LearningProgress.fromJson(jsonDecode(response.body));
+  }
+
+  /// Get roleplay scenarios.
+  Future<List<ScenarioItem>> getScenarios() async {
+    final response = await _client
+        .get(Uri.parse('$baseUrl/api/learning/scenarios'), headers: _headers())
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to load scenarios', response.statusCode);
+    }
+    final data = jsonDecode(response.body);
+    final list = data['scenarios'] as List<dynamic>? ?? [];
+    return list.map((item) => ScenarioItem.fromJson(item as Map<String, dynamic>)).toList();
+  }
+
+  /// Get conversation topics.
+  Future<List<TopicItem>> getTopics() async {
+    final response = await _client
+        .get(Uri.parse('$baseUrl/api/learning/topics'), headers: _headers())
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to load topics', response.statusCode);
+    }
+    final data = jsonDecode(response.body);
+    final list = data['topics'] as List<dynamic>? ?? [];
+    return list.map((item) => TopicItem.fromJson(item as Map<String, dynamic>)).toList();
+  }
+
+  /// Get shadowing scripts.
+  Future<List<ShadowingItem>> getShadowing() async {
+    final response = await _client
+        .get(Uri.parse('$baseUrl/api/learning/shadowing'), headers: _headers())
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to load shadowing items', response.statusCode);
+    }
+    final data = jsonDecode(response.body);
+    final list = data['items'] as List<dynamic>? ?? [];
+    return list.map((item) => ShadowingItem.fromJson(item as Map<String, dynamic>)).toList();
+  }
+
+  /// Evaluate a learner's shadowing attempt.
+  Future<Map<String, dynamic>> evaluateShadowing({
+    required String itemId,
+    required String transcript,
+    required double durationSec,
+  }) async {
+    final response = await _client
+        .post(
+          Uri.parse('$baseUrl/api/learning/shadowing/evaluate'),
+          headers: _headers(),
+          body: jsonEncode({
+            'item_id': itemId,
+            'transcript': transcript,
+            'duration_sec': durationSec,
+          }),
+        )
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to evaluate shadowing', response.statusCode);
+    }
+    return jsonDecode(response.body);
+  }
+
+  /// Get vocabulary notebook cards.
+  Future<List<VocabCard>> getVocabulary(String userId) async {
+    final response = await _client
+        .get(Uri.parse('$baseUrl/api/learning/vocabulary/$userId'), headers: _headers())
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to load vocabulary', response.statusCode);
+    }
+    final data = jsonDecode(response.body);
+    final list = data['cards'] as List<dynamic>? ?? [];
+    return list.map((c) => VocabCard.fromJson(c as Map<String, dynamic>)).toList();
+  }
+
+  /// Get due vocabulary cards for review.
+  Future<List<VocabCard>> getDueVocabulary(String userId) async {
+    final response = await _client
+        .get(Uri.parse('$baseUrl/api/learning/vocabulary/$userId/due'), headers: _headers())
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to load due vocabulary', response.statusCode);
+    }
+    final data = jsonDecode(response.body);
+    final list = data['cards'] as List<dynamic>? ?? [];
+    return list.map((c) => VocabCard.fromJson(c as Map<String, dynamic>)).toList();
+  }
+
+  /// Add a word to vocabulary notebook.
+  Future<Map<String, dynamic>> addVocabulary({
+    required String userId,
+    required String word,
+    required String definition,
+    String example = '',
+  }) async {
+    final response = await _client
+        .post(
+          Uri.parse('$baseUrl/api/learning/vocabulary/add'),
+          headers: _headers(),
+          body: jsonEncode({
+            'user_id': userId,
+            'word': word,
+            'definition': definition,
+            'example': example,
+          }),
+        )
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to add word', response.statusCode);
+    }
+    return jsonDecode(response.body);
+  }
+
+  /// Submit review rating for a vocabulary card (again, hard, good, easy).
+  Future<Map<String, dynamic>> reviewVocabulary({
+    required String cardId,
+    required String rating,
+  }) async {
+    final response = await _client
+        .post(
+          Uri.parse('$baseUrl/api/learning/vocabulary/review'),
+          headers: _headers(),
+          body: jsonEncode({
+            'card_id': cardId,
+            'rating': rating,
+          }),
+        )
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to submit review', response.statusCode);
+    }
+    return jsonDecode(response.body);
+  }
+
+  // ================= PARENT & SAFETY =================
+
+  /// Get parent dashboard summary.
+  Future<ParentSummary> getParentSummary(String userId) async {
+    final response = await _client
+        .get(Uri.parse('$baseUrl/api/parent/summary/$userId'), headers: _headers())
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to load parent summary', response.statusCode);
+    }
+    return ParentSummary.fromJson(jsonDecode(response.body));
+  }
+
+  /// Get safety flags for parent review.
+  Future<List<SafetyFlag>> getSafetyFlags(String userId) async {
+    final response = await _client
+        .get(Uri.parse('$baseUrl/api/parent/safety-flags/$userId'), headers: _headers())
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to load safety flags', response.statusCode);
+    }
+    final data = jsonDecode(response.body);
+    final list = data['flags'] as List<dynamic>? ?? [];
+    return list.map((f) => SafetyFlag.fromJson(f as Map<String, dynamic>)).toList();
+  }
+
+  // ================= USAGE =================
+
+  /// Get daily usage stats and cap status.
+  Future<UsageInfo> getUsage(String userId) async {
+    final response = await _client
+        .get(Uri.parse('$baseUrl/api/usage/$userId'), headers: _headers())
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to load usage', response.statusCode);
+    }
+    return UsageInfo.fromJson(jsonDecode(response.body));
+  }
+
+  // ================= PRIVACY =================
+
+  /// Get privacy policy.
+  Future<Map<String, dynamic>> getPrivacyPolicy() async {
+    final response = await _client
+        .get(Uri.parse('$baseUrl/api/privacy/policy'), headers: _headers())
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to load privacy policy', response.statusCode);
+    }
+    return jsonDecode(response.body);
+  }
+
+  /// Record parental consent.
+  Future<Map<String, dynamic>> recordConsent({
+    required String parentEmail,
+    required bool accepted,
+  }) async {
+    final response = await _client
+        .post(
+          Uri.parse('$baseUrl/api/privacy/consent'),
+          headers: _headers(),
+          body: jsonEncode({
+            'parent_email': parentEmail,
+            'accepted': accepted,
+          }),
+        )
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to record consent', response.statusCode);
+    }
+    return jsonDecode(response.body);
+  }
+
+  /// Delete all user data (Right to be forgotten).
+  Future<bool> deleteUserData(String userId) async {
+    final response = await _client
+        .delete(Uri.parse('$baseUrl/api/privacy/user/$userId'), headers: _headers())
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to delete user data', response.statusCode);
+    }
+    final data = jsonDecode(response.body);
+    return data['success'] == true;
+  }
+
+  // ================= PAYMENT =================
+
+  /// Get subscription and character unlock pricing plans.
   Future<Map<String, dynamic>> getPricing() async {
     final response = await _client
-        .get(Uri.parse('$baseUrl/api/payment/plans'))
+        .get(Uri.parse('$baseUrl/api/payment/plans'), headers: _headers())
         .timeout(AppConfig.requestTimeout);
     if (response.statusCode != 200) {
       throw ApiException('Failed to load pricing', response.statusCode);
@@ -209,7 +751,7 @@ class ApiService {
     final response = await _client
         .post(
           Uri.parse('$baseUrl/api/payment/checkout'),
-          headers: {'Content-Type': 'application/json'},
+          headers: _headers(),
           body: jsonEncode({
             'user_id': userId,
             'gateway': gateway,
@@ -233,7 +775,7 @@ class ApiService {
     final response = await _client
         .post(
           Uri.parse('$baseUrl/api/payment/verify'),
-          headers: {'Content-Type': 'application/json'},
+          headers: _headers(),
           body: jsonEncode({
             'payment_id': paymentId,
             'gateway': gateway,
@@ -250,7 +792,7 @@ class ApiService {
   /// Restore purchases for a user.
   Future<List<dynamic>> restorePurchases(String userId) async {
     final response = await _client
-        .post(Uri.parse('$baseUrl/api/payment/restore/$userId'))
+        .post(Uri.parse('$baseUrl/api/payment/restore/$userId'), headers: _headers())
         .timeout(AppConfig.requestTimeout);
     if (response.statusCode != 200) {
       throw ApiException('Failed to restore purchases', response.statusCode);
@@ -259,14 +801,15 @@ class ApiService {
   }
 
   /// Get active entitlements for a user.
-  Future<List<dynamic>> getEntitlements(String userId) async {
+  Future<List<Entitlement>> getEntitlements(String userId) async {
     final response = await _client
-        .get(Uri.parse('$baseUrl/api/payment/entitlements/$userId'))
+        .get(Uri.parse('$baseUrl/api/payment/entitlements/$userId'), headers: _headers())
         .timeout(AppConfig.requestTimeout);
     if (response.statusCode != 200) {
       throw ApiException('Failed to fetch entitlements', response.statusCode);
     }
-    return jsonDecode(response.body);
+    final list = jsonDecode(response.body) as List<dynamic>;
+    return list.map((e) => Entitlement.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   void dispose() {
