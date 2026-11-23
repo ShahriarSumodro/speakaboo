@@ -7,6 +7,7 @@ Handles the core turn-based conversation flow.
 import base64
 import json
 import logging
+import time
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 from typing import Optional
@@ -109,6 +110,42 @@ async def process_turn(
         character = load_character(state.character_id)
     except FileNotFoundError:
         raise HTTPException(status_code=500, detail="Character data missing")
+
+    # Daily Cap & Character Entitlement check
+    from backend.repositories import get_repository
+    from backend.config import load_settings
+    settings = load_settings()
+    repo = await get_repository()
+
+    # 1. Check Character Unlock Entitlement if character is locked
+    if character.locked:
+        ents = await repo.get_entitlements(state.user_id)
+        now = time.time()
+        has_character = any(
+            e.type == "character" and e.value == character.id and (e.expires_at is None or e.expires_at > now)
+            for e in ents
+        )
+        if not has_character:
+            raise HTTPException(
+                status_code=403,
+                detail=f"{character.name} is a premium companion. Please unlock to practice.",
+            )
+
+    # 2. Check Daily Practice Cap
+    ents = await repo.get_entitlements(state.user_id)
+    now = time.time()
+    has_monthly = any(
+        e.type == "plan" and (e.expires_at is None or e.expires_at > now)
+        for e in ents
+    )
+    daily_cap = settings.usage.basic_daily_minutes if has_monthly else settings.usage.free_daily_minutes
+
+    usage = await repo.get_daily_usage(state.user_id)
+    if usage and usage.minutes_spoken >= daily_cap:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Daily limit of {daily_cap} minutes reached. Come back tomorrow or upgrade for more practice time!",
+        )
 
     # Read audio
     audio_bytes = await audio.read()

@@ -1,8 +1,8 @@
 # Speakaboo Progress
 
-## Current Phase: 5 - Monetization
-## Current Task: PaymentGateway interface, mock bKash/Nagad, entitlements, daily cap UX
-## NEXT ACTION: Implement PaymentGateway interface, mock bKash/Nagad providers, webhook/verification endpoints, and daily cap UX.
+## Current Phase: 6 - Device Readiness
+## Current Task: DeviceTransport interface with BLE stub, pairing screen, and multi-character group chat stub
+## NEXT ACTION: Implement DeviceTransport interface with BLE stub, Bluetooth pairing screen, multi-character group chat design stub, and ARCHITECTURE.md hardware docs.
 
 ---
 
@@ -51,16 +51,11 @@
 - [x] **GATE 4:** All 15 Flutter tests passed, 0 analyzer issues, every screen passes DESIGN.md rules
 
 ## Phase 5: Monetization
-- [ ] Plans and pricing config
-- [ ] PaymentGateway interface, mock bKash/Nagad, webhook flow
-- [ ] Paywall bottom sheet, restore, expiry
-- [ ] Daily cap UX
-
-## Phase 5: Monetization
-- [ ] Plans and pricing config
-- [ ] PaymentGateway interface, mock bKash/Nagad, webhook flow
-- [ ] Paywall bottom sheet, restore, expiry
-- [ ] Daily cap UX
+- [x] Plans: base monthly plan (200 BDT) and per-character unlock (350 BDT) in config
+- [x] PaymentGateway interface, mock bKash and Nagad implementations, webhook and verification flow
+- [x] Paywall bottom sheet, restore purchases, expiry handling
+- [x] Daily cap UX: friendly "come back tomorrow or upgrade" sheet (DailyCapSheet)
+- [x] Entitlement enforcement in turn pipeline (blocks locked character practice and enforces daily practice limit)
 
 ## Phase 6: Device Readiness
 - [ ] DeviceTransport interface with BLE stub
@@ -83,11 +78,17 @@
 (none)
 
 ## Last Test Results
-- **Backend pytest:** 76 passed, 0 failed (2026-11-23)
-- **Flutter analyze:** No issues found
-- **Flutter test:** pending
+- **Backend pytest:** 105 passed, 0 failed (2026-11-23)
+- **Flutter analyze:** No issues found (2026-11-23)
+- **Flutter test:** 16 passed, 0 failed (2026-11-23)
 
 ## Self-Critique Log
+
+### Phase 5 (2026-11-23)
+- ✅ Hard Rule 8 respected: PaymentGateway interface with mock bKash and Nagad implementations. Real merchant integration ready without faking success in production paths.
+- ✅ Timeouts and expiration handled: PaymentIntent expires in 15 mins, subscriptions expire in 30 days, character unlocks permanent.
+- ✅ DailyCapSheet provides friendly "come back tomorrow or upgrade" UX per DESIGN.md rules (60-30-10 palette, minimum 44px tap targets).
+- ✅ Turn endpoint enforces daily cap and character unlock entitlements before running the engine.
 
 ### Phase 0-1 (2026-11-23)
 - ✅ All provider interfaces are abstract with swap-by-config

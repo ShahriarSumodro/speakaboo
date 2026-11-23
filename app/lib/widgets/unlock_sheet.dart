@@ -9,6 +9,7 @@ class UnlockSheet extends StatelessWidget {
   final String priceText;
   final VoidCallback onPayWithBkash;
   final VoidCallback onPayWithNagad;
+  final VoidCallback? onRestore;
 
   const UnlockSheet({
     super.key,
@@ -16,6 +17,7 @@ class UnlockSheet extends StatelessWidget {
     required this.priceText,
     required this.onPayWithBkash,
     required this.onPayWithNagad,
+    this.onRestore,
   });
 
   @override
@@ -101,11 +103,21 @@ class UnlockSheet extends StatelessWidget {
               ),
             ),
             const SizedBox(height: SpeakabooTheme.spacingSm),
-            Center(
-              child: TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (onRestore != null)
+                  TextButton(
+                    onPressed: onRestore,
+                    child: const Text('Restore Purchases'),
+                  )
+                else
+                  const SizedBox(),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+              ],
             ),
           ],
         ),

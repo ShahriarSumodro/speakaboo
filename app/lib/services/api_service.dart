@@ -170,13 +170,101 @@ class ApiService {
     }
 
     if (response.statusCode != 200) {
+      String detailMsg = 'Failed to process turn';
+      try {
+        final body = jsonDecode(response.body);
+        if (body is Map && body['detail'] != null) {
+          detailMsg = body['detail'].toString();
+        }
+      } catch (_) {}
       throw ApiException(
-        'Failed to process turn',
+        detailMsg,
         response.statusCode,
       );
     }
 
     return TurnResult.fromJson(jsonDecode(response.body));
+  }
+
+  /// Get subscription and character unlock pricing.
+  Future<Map<String, dynamic>> getPricing() async {
+    final response = await _client
+        .get(Uri.parse('$baseUrl/api/payment/plans'))
+        .timeout(AppConfig.requestTimeout);
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to load pricing', response.statusCode);
+    }
+    return jsonDecode(response.body);
+  }
+
+  /// Create checkout session for bKash or Nagad.
+  Future<Map<String, dynamic>> createCheckout({
+    required String userId,
+    required String gateway,
+    required String purpose,
+    String targetId = '',
+  }) async {
+    final response = await _client
+        .post(
+          Uri.parse('$baseUrl/api/payment/checkout'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'user_id': userId,
+            'gateway': gateway,
+            'purpose': purpose,
+            'target_id': targetId,
+          }),
+        )
+        .timeout(AppConfig.requestTimeout);
+    if (response.statusCode != 200) {
+      throw ApiException('Checkout failed', response.statusCode);
+    }
+    return jsonDecode(response.body);
+  }
+
+  /// Verify payment and activate entitlement.
+  Future<Map<String, dynamic>> verifyPayment({
+    required String paymentId,
+    required String gateway,
+    String verificationToken = '',
+  }) async {
+    final response = await _client
+        .post(
+          Uri.parse('$baseUrl/api/payment/verify'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'payment_id': paymentId,
+            'gateway': gateway,
+            'verification_token': verificationToken,
+          }),
+        )
+        .timeout(AppConfig.requestTimeout);
+    if (response.statusCode != 200) {
+      throw ApiException('Payment verification failed', response.statusCode);
+    }
+    return jsonDecode(response.body);
+  }
+
+  /// Restore purchases for a user.
+  Future<List<dynamic>> restorePurchases(String userId) async {
+    final response = await _client
+        .post(Uri.parse('$baseUrl/api/payment/restore/$userId'))
+        .timeout(AppConfig.requestTimeout);
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to restore purchases', response.statusCode);
+    }
+    return jsonDecode(response.body);
+  }
+
+  /// Get active entitlements for a user.
+  Future<List<dynamic>> getEntitlements(String userId) async {
+    final response = await _client
+        .get(Uri.parse('$baseUrl/api/payment/entitlements/$userId'))
+        .timeout(AppConfig.requestTimeout);
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to fetch entitlements', response.statusCode);
+    }
+    return jsonDecode(response.body);
   }
 
   void dispose() {

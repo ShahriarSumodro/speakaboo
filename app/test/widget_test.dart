@@ -12,6 +12,7 @@ import 'package:speakaboo/widgets/character_face.dart';
 import 'package:speakaboo/widgets/correction_chip.dart';
 import 'package:speakaboo/widgets/empty_state.dart';
 import 'package:speakaboo/widgets/unlock_sheet.dart';
+import 'package:speakaboo/widgets/daily_cap_sheet.dart';
 import 'package:speakaboo/widgets/correction_detail_sheet.dart';
 import 'package:speakaboo/screens/talk_screen.dart';
 import 'package:speakaboo/screens/characters_screen.dart';
@@ -272,6 +273,45 @@ void main() {
 
     await tester.tap(find.text('Pay with Nagad'));
     expect(nagadTapped, isTrue);
+  });
+
+  testWidgets('DailyCapSheet renders friendly cap message and upgrade options',
+      (WidgetTester tester) async {
+    bool bkashTapped = false;
+    bool nagadTapped = false;
+    bool restoreTapped = false;
+    bool dismissTapped = false;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DailyCapSheet(
+            onUpgradeBkash: () => bkashTapped = true,
+            onUpgradeNagad: () => nagadTapped = true,
+            onRestore: () => restoreTapped = true,
+            onDismiss: () => dismissTapped = true,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Daily Practice Completed! 🌟'), findsOneWidget);
+    expect(find.text('Upgrade Pro with bKash (200 BDT/mo)'), findsOneWidget);
+    expect(find.text('Upgrade Pro with Nagad (200 BDT/mo)'), findsOneWidget);
+    expect(find.text('Restore Purchases'), findsOneWidget);
+    expect(find.text('Come Back Tomorrow'), findsOneWidget);
+
+    await tester.tap(find.text('Upgrade Pro with bKash (200 BDT/mo)'));
+    expect(bkashTapped, isTrue);
+
+    await tester.tap(find.text('Upgrade Pro with Nagad (200 BDT/mo)'));
+    expect(nagadTapped, isTrue);
+
+    await tester.tap(find.text('Restore Purchases'));
+    expect(restoreTapped, isTrue);
+
+    await tester.tap(find.text('Come Back Tomorrow'));
+    expect(dismissTapped, isTrue);
   });
 
   testWidgets('CorrectionDetailSheet renders tip details',
