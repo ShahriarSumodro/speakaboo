@@ -20,7 +20,7 @@ class CharactersScreen extends StatelessWidget {
       'greeting': 'Welcome to my farm! Every word you plant here will grow strong.',
       'locked': false,
       'price_bdt': 0,
-      'voice_id': 'Arista-PlayAI',
+      'voice_id': 'austin',
     },
     {
       'id': 'dhaka_detective',
@@ -30,17 +30,17 @@ class CharactersScreen extends StatelessWidget {
       'greeting': 'Aha! Let us examine the evidence of your spoken English together.',
       'locked': true,
       'price_bdt': 350,
-      'voice_id': 'Kabir-Voice',
+      'voice_id': 'daniel',
     },
     {
-      'id': 'eco_scholar',
+      'id': 'professor_anika',
       'name': 'Professor Anika',
       'tagline': 'Nature & Science Conversations',
       'description': 'A warm and thoughtful researcher who loves discussing geography, wildlife, and technology.',
       'greeting': 'Hello learner! Every journey of discovery starts with a single spoken sentence.',
       'locked': true,
       'price_bdt': 350,
-      'voice_id': 'Anika-Voice',
+      'voice_id': 'diana',
     },
   ];
 

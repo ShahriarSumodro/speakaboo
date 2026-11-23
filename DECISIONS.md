@@ -6,13 +6,13 @@ Every assumption made instead of asking the user, with reasoning.
 
 ## Architecture Decisions
 
-### D001: LLM Model Choice
-**Decision:** Default to `meta-llama/llama-4-scout-17b-16e-instruct` on Groq as the LLM provider.
-**Reason:** Groq's free tier models change frequently. This model is available on Groq's free tier at time of development. The model ID is read from config (`.env`), so swapping is trivial.
+### D001: LLM Model Choice (Updated V2)
+**Decision:** Default to `openai/gpt-oss-120b` on Groq, backed by automatic runtime fallbacks (`llama-3.3-70b-versatile`, `llama-3.1-8b-instant`).
+**Reason:** `meta-llama/llama-4-scout-17b-16e-instruct` was retired by Groq. `openai/gpt-oss-120b` provides fast, structured JSON output and strong conversational instruction following. The fallback list ensures zero downtime if a model is decommissioned.
 
-### D002: TTS Provider
-**Decision:** Use Groq's PlayAI TTS (`playai-tts` model with `Arista-PlayAI` voice) as default TTS.
-**Reason:** Groq offers TTS on their API. Voice ID is configurable per character. If Groq TTS is unavailable or too expensive, the provider interface allows swapping.
+### D002: TTS Provider (Updated V2)
+**Decision:** Default to `canopylabs/orpheus-v1-english` on Groq with valid character-assigned voices: `austin` (Farmer Reggie), `daniel` (Detective Kabir), `diana` (Professor Anika).
+**Reason:** `playai-tts` and `Arista-PlayAI` were retired by Groq. Orpheus provides high-quality conversational English speech under the 200-character chunk limit with official, distinct voices.
 
 ### D003: Database
 **Decision:** SQLite for development, behind a repository abstraction layer.

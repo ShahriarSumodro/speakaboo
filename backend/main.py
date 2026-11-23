@@ -10,7 +10,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from backend.config import load_settings
+from backend.config import load_settings, validate_providers
 from backend.routes import health, auth, characters, conversation, usage, learning, parent, payment, privacy
 from backend.engine.telemetry import telemetry
 
@@ -30,6 +30,8 @@ logger = logging.getLogger("speakaboo")
 async def lifespan(app: FastAPI):
     """Application lifespan: startup and shutdown."""
     logger.info("Speakaboo backend starting up")
+    # Strict startup validation: enforce real providers and valid keys/models in normal mode
+    validate_providers(settings)
     logger.info(f"STT provider: {settings.stt.provider} ({settings.stt.model})")
     logger.info(f"LLM provider: {settings.llm.provider} ({settings.llm.model})")
     logger.info(f"TTS provider: {settings.tts.provider} ({settings.tts.model})")

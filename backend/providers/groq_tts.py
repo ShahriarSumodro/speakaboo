@@ -1,7 +1,9 @@
 """
 Groq TTS Provider
 
-Uses the Groq API for text-to-speech synthesis.
+Uses the Groq API for text-to-speech synthesis via canopylabs/orpheus-v1-english.
+Valid voices: autumn, diana, hannah, austin, daniel, troy.
+Enforces strict <= 200 characters per synthesized chunk.
 """
 
 import logging
@@ -24,7 +26,14 @@ INITIAL_BACKOFF = 1.0
 class GroqTtsProvider(TtsProvider):
     """Groq TTS provider with retry and backoff."""
 
-    def __init__(self, api_key: str, model: str = "playai-tts", default_voice: str = "Arista-PlayAI"):
+    VALID_VOICES = ("autumn", "diana", "hannah", "austin", "daniel", "troy")
+
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "canopylabs/orpheus-v1-english",
+        default_voice: str = "austin",
+    ):
         if not api_key:
             raise ValueError("Groq API key is required for GroqTtsProvider")
         self._api_key = api_key
@@ -32,17 +41,20 @@ class GroqTtsProvider(TtsProvider):
         self._default_voice = default_voice
 
     async def synthesize(
-        self, text: str, voice_id: str, speed: float = 1.0
+        self, text: str, voice_id: str = "", speed: float = 1.0
     ) -> TtsResult:
         if not text:
             raise ProviderError("Empty text input", provider=self.name)
 
-        # Enforce 200-char chunk limit
+        # Enforce strict 200-char chunk limit for Orpheus
         if len(text) > 200:
-            logger.warning(f"TTS text exceeds 200 chars ({len(text)}), truncating")
+            logger.warning(f"TTS text exceeds 200 chars ({len(text)}), truncating to 200 chars")
             text = text[:200]
 
-        voice = voice_id or self._default_voice
+        voice = (voice_id or self._default_voice).lower()
+        if voice not in self.VALID_VOICES:
+            logger.warning(f"Voice '{voice}' not in valid Orpheus voices {self.VALID_VOICES}; falling back to '{self._default_voice}'")
+            voice = self._default_voice
 
         payload = {
             "model": self._model,
@@ -92,7 +104,7 @@ class GroqTtsProvider(TtsProvider):
 
                 audio_bytes = response.content
 
-                # Estimate duration from WAV data (rough)
+                # Estimate duration from WAV data (rough: 32000 bytes/sec for 16kHz 16-bit mono)
                 estimated_duration = max(0.1, len(audio_bytes) / 32000)
 
                 return TtsResult(

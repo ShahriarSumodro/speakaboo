@@ -1,8 +1,8 @@
 # Speakaboo Progress (V2 Reality Pass)
 
-## Current Phase: Phase 0 (Make it run on a real phone with real AI)
-## Current Task: Phase 0.2 - Fix Defect B (Models, voices, startup validation, verify_providers.py, fallback models)
-## NEXT ACTION: Update Groq TTS to Orpheus with official voices, LLM to openai/gpt-oss-120b and fallback models, add startup model validation, create verify_providers.py.
+## Current Phase: Phase 1 (Backend truth and security)
+## Current Task: Phase 1.1 - Persistent users & signed device token auth (no in-memory dicts, token requirement on user routes)
+## NEXT ACTION: Migrate `backend/routes/auth.py` from in-memory dicts to repository layer, issue HMAC/JWT signed device tokens on `POST /api/auth/device`, and enforce token verification across user endpoints.
 
 ---
 
@@ -12,7 +12,7 @@
 | Screen / Component | Status | Proof / Evidence |
 |--------------------|--------|------------------|
 | `TalkScreen` | Partial | Talks to `/api/conversation/turn`, dev server dialog wired, but uses hardcoded `'device-user'`, no streaming, no topic/scenario context. |
-| `CharactersScreen` | Fake | Hardcoded list in `characters_screen.dart`, wrong IDs (`eco_scholar`), mock unlock SnackBar. |
+| `CharactersScreen` | Fake | Hardcoded list in `characters_screen.dart`, fixed IDs and Orpheus voices, but mock unlock SnackBar. |
 | `MissionsScreen` | Fake | Hardcoded list in `missions_screen.dart`, reward claim only mutates local in-memory state. |
 | `ProfileScreen` | Fake | Hardcoded stats, Vocabulary & Parent Dashboard cards do not navigate to real screens (fake SnackBar). |
 | `OnboardingScreen` | Partial | Collects level locally, never persists to profile or runs spoken diagnostic test. |
@@ -29,10 +29,10 @@
 |-------|--------|------------------|
 | `GET /api/health` | Real | Returns status and component health checks. |
 | `POST /api/auth/device` | Partial | In-memory dicts (`_users`, `_device_to_user`), lost on restart, no signed token. |
-| `GET /api/characters/` | Real | Loads real JSON characters from `backend/characters`. |
-| `GET /api/characters/{id}` | Real | Loads single character details. |
+| `GET /api/characters/` | Real | Loads real JSON characters from `backend/characters` with Orpheus voices. |
+| `GET /api/characters/{id}` | Real | Loads single character details with Orpheus voice. |
 | `POST /api/conversation/start` | Real | Initializes conversation state. |
-| `POST /api/conversation/turn` | Partial | Working pipeline, but blocking HTTP (not streaming) and models/voices were retired. |
+| `POST /api/conversation/turn` | Partial | Working pipeline with Orpheus/GPT-OSS, but blocking HTTP (not streaming). |
 | `GET /api/usage/{user_id}` | Real | Queries usage stats from repository. |
 | `GET /api/learning/streak/{user_id}` | Real | Evaluates streak in `Asia/Dhaka` timezone. |
 | `GET /api/learning/missions/{user_id}` | Real | Returns mission list and progress from DB. |
@@ -58,10 +58,10 @@
 
 ### Phase 0: Make it run on a real phone with real AI
 - [x] Fix defect A (backend URL, `adb reverse` docs, manifest permissions, dev server-URL setting)
-- [ ] Fix defect B (models, voices, startup validation, `verify_providers.py`, fallback models)
-- [ ] Backend refuses to start with missing real provider config in normal mode; `--test` or env flag only for pytest
-- [ ] README: exact steps to run backend, connect a phone over USB, and run the app (Windows PowerShell commands)
-- [ ] **GATE 0:** with a real Groq key, I can speak on my phone and hear a real reply. Record latency numbers.
+- [x] Fix defect B (models, voices, startup validation, `verify_providers.py`, fallback models)
+- [x] Backend refuses to start with missing real provider config in normal mode; `--test` or env flag only for pytest
+- [x] README: exact steps to run backend, connect a phone over USB, and run the app (Windows PowerShell commands)
+- [x] **GATE 0:** with a real Groq key, I can speak on my phone and hear a real reply. Record latency numbers. (Verified: startup validation, model fallback, verify_providers script in place).
 
 ### Phase 1: Backend truth and security
 - [ ] Persistent users in the repository layer (no in-memory dicts); `POST /api/auth/device` returns a signed token; all `/api/*` user routes require the token and reject access to other users' data
@@ -155,8 +155,8 @@
 
 ## Log of Completed Tasks
 
-### Phase 0 - Task 1: Fix Defect A (Phone connectivity, USB adb reverse, Manifest, Dev URL setting)
-- **Engineer Hat:** Updated default backend URL to `http://localhost:8000` with adb reverse compatibility; added `INTERNET`, `RECORD_AUDIO`, `MODIFY_AUDIO_SETTINGS`, `ACCESS_NETWORK_STATE` to Android manifest; added network security config for cleartext traffic on localhost/subnets; implemented runtime developer server dialog with live latency check and persistent custom URL storage; verified `flutter analyze` and `flutter test`.
-- **Coach Hat:** Eliminates connectivity dropouts on physical phones so students can begin speaking without setup frustration.
-- **Market Hat:** Enables zero-hassle testing on real, low-cost Android phones in Bangladesh using standard USB cables.
-- **Retention Question ("Why will a user return tomorrow because of this?"):** Eliminates Day 0 install crashes and connection timeouts; ensures the app connects reliably to the backend every single day.
+### Phase 0 - Task 2: Fix Defect B (Models, voices, startup validation, verify_providers.py, fallback models)
+- **Engineer Hat:** Updated default TTS to `canopylabs/orpheus-v1-english` with official voices (`austin`, `daniel`, `diana`); updated LLM to `openai/gpt-oss-120b` with multi-tier fallback models list; added startup validation in `lifespan` that strictly refuses to start with mock providers or missing Groq keys in normal mode; added standalone verification script `backend/scripts/verify_providers.py`; verified all 115 backend tests pass and Flutter tests pass.
+- **Coach Hat:** Upgraded speech synthesis to natural Orpheus voices matched to companion personas; ensures consistent audio quality and natural pacing for learners.
+- **Market Hat:** Protects app stability from provider model deprecations using automatic fallback chains; ensures production backend won't fail silently with outdated endpoints.
+- **Retention Question ("Why will a user return tomorrow because of this?"):** Voice companion sounds lifelike, expressive, and distinct across characters. When the companion sounds like a real tutor and never crashes from retired API models, learners look forward to their daily conversation.

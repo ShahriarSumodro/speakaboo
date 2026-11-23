@@ -2,6 +2,7 @@
 Groq LLM Provider
 
 Uses the Groq API for chat completions (OpenAI-compatible endpoint).
+Supports automatic fallback models if the primary model is decommissioned or throttled.
 """
 
 import logging
@@ -23,13 +24,27 @@ INITIAL_BACKOFF = 1.0
 
 
 class GroqLlmProvider(LlmProvider):
-    """Groq LLM provider with retry and backoff."""
+    """Groq LLM provider with retry, backoff, and model fallback."""
 
-    def __init__(self, api_key: str, model: str = "meta-llama/llama-4-scout-17b-16e-instruct"):
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "openai/gpt-oss-120b",
+        fallback_models: Optional[list[str]] = None,
+    ):
         if not api_key:
             raise ValueError("Groq API key is required for GroqLlmProvider")
         self._api_key = api_key
         self._model = model
+        self._fallback_models = fallback_models or [
+            model,
+            "openai/gpt-oss-120b",
+            "llama-3.3-70b-versatile",
+            "llama-3.1-8b-instant",
+        ]
+        # Ensure unique order
+        seen = set()
+        self._models_to_try = [m for m in [model] + list(self._fallback_models) if not (m in seen or seen.add(m))]
 
     async def chat(
         self,
@@ -41,76 +56,88 @@ class GroqLlmProvider(LlmProvider):
         if not messages:
             raise ProviderError("No messages provided", provider=self.name)
 
-        payload: dict = {
-            "model": self._model,
-            "messages": [{"role": m.role, "content": m.content} for m in messages],
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-        }
-
-        if json_mode:
-            payload["response_format"] = {"type": "json_object"}
-
-        backoff = INITIAL_BACKOFF
         last_error: Optional[Exception] = None
 
-        for attempt in range(MAX_RETRIES):
-            try:
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    response = await client.post(
-                        GROQ_CHAT_URL,
-                        headers={
-                            "Authorization": f"Bearer {self._api_key}",
-                            "Content-Type": "application/json",
-                        },
-                        json=payload,
+        for model_candidate in self._models_to_try:
+            payload: dict = {
+                "model": model_candidate,
+                "messages": [{"role": m.role, "content": m.content} for m in messages],
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+            }
+
+            if json_mode:
+                payload["response_format"] = {"type": "json_object"}
+
+            backoff = INITIAL_BACKOFF
+
+            for attempt in range(MAX_RETRIES):
+                try:
+                    async with httpx.AsyncClient(timeout=30.0) as client:
+                        response = await client.post(
+                            GROQ_CHAT_URL,
+                            headers={
+                                "Authorization": f"Bearer {self._api_key}",
+                                "Content-Type": "application/json",
+                            },
+                            json=payload,
+                        )
+
+                    if response.status_code == 429:
+                        retry_after = float(response.headers.get("retry-after", backoff))
+                        logger.warning(
+                            f"Groq LLM ({model_candidate}) rate limited (attempt {attempt + 1}/{MAX_RETRIES}), "
+                            f"retrying in {retry_after:.1f}s"
+                        )
+                        if attempt < MAX_RETRIES - 1:
+                            await asyncio.sleep(retry_after)
+                            backoff *= 2
+                            continue
+                        # If retries exhausted on this model, try next model in fallback list
+                        break
+
+                    if response.status_code in (400, 404):
+                        # Often indicates model decommissioned or invalid model name
+                        logger.warning(
+                            f"Groq model '{model_candidate}' returned HTTP {response.status_code}: "
+                            f"{response.text[:200]}. Attempting fallback model."
+                        )
+                        last_error = ProviderError(
+                            f"Model error {response.status_code}: {response.text[:200]}",
+                            provider=self.name,
+                            status_code=response.status_code,
+                        )
+                        break
+
+                    if response.status_code != 200:
+                        raise ProviderError(
+                            f"Groq LLM error: {response.status_code} {response.text[:200]}",
+                            provider=self.name,
+                            status_code=response.status_code,
+                        )
+
+                    data = response.json()
+                    choice = data["choices"][0]
+                    usage = data.get("usage", {})
+
+                    return LlmResult(
+                        content=choice["message"]["content"],
+                        tokens_in=usage.get("prompt_tokens", 0),
+                        tokens_out=usage.get("completion_tokens", 0),
+                        model=data.get("model", model_candidate),
                     )
 
-                if response.status_code == 429:
-                    retry_after = float(response.headers.get("retry-after", backoff))
+                except (httpx.TimeoutException, httpx.ConnectError) as e:
+                    last_error = e
                     logger.warning(
-                        f"Groq LLM rate limited (attempt {attempt + 1}/{MAX_RETRIES}), "
-                        f"retrying in {retry_after:.1f}s"
+                        f"Groq LLM connection error (attempt {attempt + 1}/{MAX_RETRIES}): {e}"
                     )
                     if attempt < MAX_RETRIES - 1:
-                        await asyncio.sleep(retry_after)
+                        await asyncio.sleep(backoff)
                         backoff *= 2
-                        continue
-                    raise RateLimitError(
-                        "Groq LLM rate limit exceeded after retries",
-                        provider=self.name,
-                        retry_after=retry_after,
-                    )
-
-                if response.status_code != 200:
-                    raise ProviderError(
-                        f"Groq LLM error: {response.status_code} {response.text[:200]}",
-                        provider=self.name,
-                        status_code=response.status_code,
-                    )
-
-                data = response.json()
-                choice = data["choices"][0]
-                usage = data.get("usage", {})
-
-                return LlmResult(
-                    content=choice["message"]["content"],
-                    tokens_in=usage.get("prompt_tokens", 0),
-                    tokens_out=usage.get("completion_tokens", 0),
-                    model=data.get("model", self._model),
-                )
-
-            except (httpx.TimeoutException, httpx.ConnectError) as e:
-                last_error = e
-                logger.warning(
-                    f"Groq LLM connection error (attempt {attempt + 1}/{MAX_RETRIES}): {e}"
-                )
-                if attempt < MAX_RETRIES - 1:
-                    await asyncio.sleep(backoff)
-                    backoff *= 2
 
         raise ProviderError(
-            f"Groq LLM failed after {MAX_RETRIES} retries: {last_error}",
+            f"Groq LLM failed across candidates {self._models_to_try}: {last_error}",
             provider=self.name,
         )
 
