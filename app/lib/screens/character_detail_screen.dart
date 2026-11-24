@@ -24,6 +24,7 @@ class CharacterDetailScreen extends StatefulWidget {
 class _CharacterDetailScreenState extends State<CharacterDetailScreen> {
   bool _isPlayingPreview = false;
   bool _isLoadingPreview = false;
+  bool _previewFailed = false;
   Uint8List? _previewAudioBytes;
 
   Future<void> _playVoicePreview() async {
@@ -34,6 +35,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen> {
 
     setState(() {
       _isLoadingPreview = true;
+      _previewFailed = false;
     });
 
     try {
@@ -45,10 +47,20 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen> {
       });
 
       await audio.playChunks([_previewAudioBytes!]);
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
+        setState(() {
+          _previewFailed = true;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not play voice preview: $e')),
+          SnackBar(
+            content: const Text('Voice preview temporarily unavailable. Please try again.'),
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: SpeakabooTheme.warning,
+              onPressed: _playVoicePreview,
+            ),
+          ),
         );
       }
     } finally {
@@ -202,17 +214,40 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen> {
 
           // Hear their voice button
           Center(
-            child: OutlinedButton.icon(
-              onPressed: _isLoadingPreview ? null : _playVoicePreview,
-              icon: _isLoadingPreview
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                  : Icon(_isPlayingPreview ? Icons.volume_up : Icons.play_arrow),
-              label: Text(_isPlayingPreview ? 'Playing Sample...' : 'Hear their voice'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: SpeakabooTheme.accent,
-                side: const BorderSide(color: SpeakabooTheme.accent),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
+            child: Column(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _isLoadingPreview ? null : _playVoicePreview,
+                  icon: _isLoadingPreview
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : Icon(_isPlayingPreview ? Icons.volume_up : Icons.play_arrow),
+                  label: Text(_isPlayingPreview ? 'Playing Sample...' : 'Hear their voice'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: SpeakabooTheme.accent,
+                    side: const BorderSide(color: SpeakabooTheme.accent),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  ),
+                ),
+                if (_previewFailed) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Voice preview temporarily unavailable.',
+                        style: TextStyle(fontSize: 12, color: SpeakabooTheme.error),
+                      ),
+                      const SizedBox(width: 6),
+                      TextButton.icon(
+                        key: const Key('retry_preview_btn'),
+                        icon: const Icon(Icons.refresh, size: 14),
+                        label: const Text('Retry'),
+                        onPressed: _playVoicePreview,
+                      ),
+                    ],
+                  ),
+                ],
+              ],
             ),
           ),
 

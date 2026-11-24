@@ -58,3 +58,35 @@ class TestSystemPrompt:
         char = load_character("rule_farmer")
         prompt = build_system_prompt(char, feedback_style_override="Be very detailed and analytical")
         assert "very detailed" in prompt
+
+
+class TestCharacterPreviewAudio:
+
+    def test_get_preview_audio_success(self):
+        from fastapi.testclient import TestClient
+        from backend.main import app
+        client = TestClient(app)
+
+        res = client.get("/api/characters/rule_farmer/preview-audio")
+        assert res.status_code == 200
+        assert "audio/wav" in res.headers["content-type"]
+        assert len(res.content) > 0
+
+    def test_get_preview_audio_nonexistent(self):
+        from fastapi.testclient import TestClient
+        from backend.main import app
+        client = TestClient(app)
+
+        res = client.get("/api/characters/nonexistent_char/preview-audio")
+        assert res.status_code == 404
+
+    def test_get_preview_audio_cached(self):
+        from fastapi.testclient import TestClient
+        from backend.main import app
+        client = TestClient(app)
+
+        res1 = client.get("/api/characters/dhaka_detective/preview-audio")
+        assert res1.status_code == 200
+        res2 = client.get("/api/characters/dhaka_detective/preview-audio")
+        assert res2.status_code == 200
+        assert res1.content == res2.content

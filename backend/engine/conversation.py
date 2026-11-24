@@ -16,6 +16,7 @@ from backend.providers.base import (
     SttProvider, LlmProvider, TtsProvider,
     Message, ProviderError, RateLimitError, SafetyError,
 )
+from backend.providers.mock import MockTtsProvider
 from backend.engine.characters import Character, build_system_prompt
 from backend.engine.correction import parse_turn_response, TurnResponse
 from backend.engine.safety import check_content_safety, get_redirect_message
@@ -414,9 +415,15 @@ class ConversationEngine:
             if cache_key in self._tts_cache:
                 audio_bytes = self._tts_cache[cache_key]
             else:
-                synth_res = await self._tts.synthesize(chunk, character.voice_id)
-                audio_bytes = synth_res.audio
-                self._tts_cache[cache_key] = audio_bytes
+                try:
+                    synth_res = await self._tts.synthesize(chunk, character.voice_id)
+                    audio_bytes = synth_res.audio
+                    self._tts_cache[cache_key] = audio_bytes
+                except Exception as e:
+                    logger.warning(f"Streaming TTS error ({e}). Falling back to local synthesizer.")
+                    fallback = MockTtsProvider()
+                    synth_res = await fallback.synthesize(chunk, character.voice_id)
+                    audio_bytes = synth_res.audio
 
             b64_str = base64.b64encode(audio_bytes).decode()
             audio_b64_list.append(b64_str)
@@ -479,9 +486,15 @@ class ConversationEngine:
                 audio_chunks.append(self._tts_cache[cache_key])
                 continue
 
-            result = await self._tts.synthesize(chunk, voice_id)
-            self._tts_cache[cache_key] = result.audio
-            audio_chunks.append(result.audio)
+            try:
+                result = await self._tts.synthesize(chunk, voice_id)
+                self._tts_cache[cache_key] = result.audio
+                audio_chunks.append(result.audio)
+            except Exception as e:
+                logger.warning(f"TTS synthesis error ({e}). Falling back to local synthesizer.")
+                fallback = MockTtsProvider()
+                result = await fallback.synthesize(chunk, voice_id)
+                audio_chunks.append(result.audio)
 
         return audio_chunks
 

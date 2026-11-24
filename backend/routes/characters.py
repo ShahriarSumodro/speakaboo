@@ -5,6 +5,7 @@ Single source of truth for character companions: list, detail, personality trait
 sample lines, pricing, and audio voice preview generation.
 """
 
+import logging
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
@@ -13,6 +14,8 @@ from backend.engine.characters import list_characters, load_character
 from backend.config import load_settings
 from backend.providers.groq_tts import GroqTtsProvider
 from backend.providers.mock import MockTtsProvider
+
+logger = logging.getLogger("speakaboo.routes.characters")
 
 router = APIRouter(prefix="/api/characters", tags=["characters"])
 
@@ -103,4 +106,15 @@ async def get_character_preview_audio(character_id: str):
         _preview_cache[character_id] = res.audio
         return Response(content=res.audio, media_type="audio/wav")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate voice preview: {e}")
+        logger.warning(
+            f"Primary TTS preview synthesis failed for '{character_id}' ({e}). "
+            f"Falling back to local synthesizer to guarantee valid audio preview."
+        )
+        try:
+            fallback_tts = MockTtsProvider()
+            res = await fallback_tts.synthesize(text=c.greeting, voice_id=c.voice_id)
+            _preview_cache[character_id] = res.audio
+            return Response(content=res.audio, media_type="audio/wav")
+        except Exception as fallback_err:
+            logger.error(f"Fallback synthesizer also failed for '{character_id}': {fallback_err}")
+            raise HTTPException(status_code=500, detail="Preview audio not available")

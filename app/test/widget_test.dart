@@ -1090,6 +1090,48 @@ void main() {
     expect(find.text('Science & Nature Conversations'), findsOneWidget);
     expect(find.text('Hear their voice'), findsOneWidget);
     expect(find.text('"Every observation matters."'), findsOneWidget);
+
+    // Test voice preview failure shows friendly message and Retry button
+    int previewAttempts = 0;
+    final failMockClient = MockClient((request) async {
+      if (request.url.path.contains('/preview-audio')) {
+        previewAttempts++;
+        if (previewAttempts == 1) {
+          return http.Response('Internal Error', 500);
+        }
+        return http.Response.bytes(base64Decode('UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA='), 200);
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final failApi = ApiService(baseUrl: 'http://localhost:8000', client: failMockClient);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<ApiService>.value(value: failApi),
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
+          ChangeNotifierProvider<AudioService>.value(value: audio),
+          ChangeNotifierProvider<ConversationProvider>.value(value: conv),
+        ],
+        child: MaterialApp(home: CharacterDetailScreen(character: character)),
+      ),
+    );
+
+    await tester.tap(find.text('Hear their voice'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    // Verify friendly message and Retry button appear, not raw exception
+    expect(find.text('Voice preview temporarily unavailable.'), findsOneWidget);
+    expect(find.byKey(const Key('retry_preview_btn')), findsOneWidget);
+    expect(find.textContaining('ApiException'), findsNothing);
+
+    // Tap Retry
+    await tester.tap(find.byKey(const Key('retry_preview_btn')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(previewAttempts, 2);
   });
 
   testWidgets('ShadowingScreen renders shadowing scripts and controls', (WidgetTester tester) async {
