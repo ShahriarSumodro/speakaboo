@@ -77,6 +77,52 @@ class DailyCapSheet extends StatelessWidget {
               ],
             ),
             const SizedBox(height: SpeakabooTheme.spacingSm),
+            Container(
+              key: const Key('streak_celebration_banner'),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    SpeakabooTheme.accent.withValues(alpha: 0.15),
+                    SpeakabooTheme.warning.withValues(alpha: 0.15),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
+                border: Border.all(
+                  color: SpeakabooTheme.accent.withValues(alpha: 0.3),
+                ),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.local_fire_department, color: Colors.deepOrange, size: 24),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '🔥 Today\'s Speaking Streak Secured!',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: SpeakabooTheme.textPrimary,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Daily habit locked in. Consistency over intensity (Fogg 2009)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: SpeakabooTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: SpeakabooTheme.spacingSm),
             const Text(
               'Awesome work practicing today! Your streak is saved. You can practice again tomorrow after midnight (Asia/Dhaka) or upgrade to Speakaboo Pro for unlimited learning.',
               style: TextStyle(

@@ -688,6 +688,8 @@ void main() {
     );
 
     expect(find.text('Daily Practice Completed! 🌟'), findsOneWidget);
+    expect(find.byKey(const Key('streak_celebration_banner')), findsOneWidget);
+    expect(find.text('🔥 Today\'s Speaking Streak Secured!'), findsOneWidget);
     expect(find.text('Upgrade Pro with bKash (200 BDT/mo)'), findsOneWidget);
     expect(find.text('Upgrade Pro with Nagad (200 BDT/mo)'), findsOneWidget);
     expect(find.text('Restore Purchases'), findsOneWidget);
