@@ -309,7 +309,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: SpeakabooTheme.spacingLg),
+            const SizedBox(height: SpeakabooTheme.spacingMd),
+
+            // Dual Identity & CEFR Milestone Progress Card (CD-009)
+            _buildMilestoneCard(
+              level: level,
+              weeklyMinutes: _progress?.weeklyMinutes ?? 0.0,
+            ),
+            const SizedBox(height: SpeakabooTheme.spacingMd),
 
             // Metrics Row
             Row(
@@ -584,6 +591,116 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildMilestoneCard({required String level, required double weeklyMinutes}) {
+    final lvl = level.toLowerCase();
+    String emotionalIdentity;
+    String cefrMilestone;
+    String nextMilestone;
+    double targetMinutes;
+
+    if (lvl.contains('inter')) {
+      emotionalIdentity = 'Confident Everyday Speaker';
+      cefrMilestone = 'CEFR B1-B2 Milestone';
+      nextMilestone = 'Fluent Conversationalist (CEFR C1)';
+      targetMinutes = 45.0;
+    } else if (lvl.contains('adv')) {
+      emotionalIdentity = 'Fluent Conversationalist';
+      cefrMilestone = 'CEFR C1 Milestone';
+      nextMilestone = 'Master Storyteller';
+      targetMinutes = 60.0;
+    } else {
+      emotionalIdentity = 'Curious Daily Explorer';
+      cefrMilestone = 'CEFR A1-A2 Milestone';
+      nextMilestone = 'Confident Speaker (CEFR B1)';
+      targetMinutes = 30.0;
+    }
+
+    final progressRatio = (weeklyMinutes / targetMinutes).clamp(0.0, 1.0);
+
+    return Container(
+      key: const Key('cefr_identity_card'),
+      padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
+      decoration: BoxDecoration(
+        color: SpeakabooTheme.surface,
+        borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
+        border: Border.all(color: SpeakabooTheme.accent.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: SpeakabooTheme.accent.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.school_outlined, size: 20, color: SpeakabooTheme.accent),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      emotionalIdentity,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: SpeakabooTheme.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      cefrMilestone,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: SpeakabooTheme.accent,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Chip(
+                label: Text(
+                  '${(progressRatio * 100).toInt()}%',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                backgroundColor: SpeakabooTheme.accent,
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progressRatio,
+              minHeight: 6,
+              backgroundColor: SpeakabooTheme.background,
+              valueColor: const AlwaysStoppedAnimation<Color>(SpeakabooTheme.accent),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '${weeklyMinutes.toStringAsFixed(1)} / ${targetMinutes.toInt()} mins this week',
+                style: const TextStyle(fontSize: 11, color: SpeakabooTheme.textSecondary),
+              ),
+              Text(
+                'Next: $nextMilestone',
+                style: const TextStyle(fontSize: 11, color: SpeakabooTheme.textSecondary, fontStyle: FontStyle.italic),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

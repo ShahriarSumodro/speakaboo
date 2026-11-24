@@ -472,6 +472,13 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('Learner'), findsOneWidget);
+    expect(find.byKey(const Key('cefr_identity_card')), findsOneWidget);
+    expect(find.text('Curious Daily Explorer'), findsOneWidget);
+    expect(find.text('CEFR A1-A2 Milestone'), findsOneWidget);
+
+    await tester.drag(find.byType(ListView), const Offset(0, -400));
+    await tester.pumpAndSettle();
+
     expect(find.text('Vocabulary Notebook'), findsOneWidget);
     expect(find.text('Parent Dashboard'), findsOneWidget);
   });
