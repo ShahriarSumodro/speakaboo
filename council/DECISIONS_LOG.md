@@ -31,7 +31,7 @@ Running log of Council Decisions (ADR style).
 - **Context & Evidence:** `[RESEARCH]` Ellis (2006). Enforces max 1 error per turn prioritizing `tenses_and_verbs` > `subject_verb_agreement` > `prepositions` > `articles`.
 - **Vote:** 3-0
 - **Expected Impact:** Medium on Learning Value and Retention.
-- **Status:** In Progress
+- **Status:** Verified `[RAN]`
 
 ### CD-002: Visual Target-Word Alignment in Shadowing
 - **Date:** 2026-11-24
@@ -41,7 +41,7 @@ Running log of Council Decisions (ADR style).
 - **Context & Evidence:** `[READ]` `shadowing_screen.dart`. Word-level color coding (green/amber/gray) for target sentence alignment.
 - **Vote:** 3-0
 - **Expected Impact:** High on Usability and Learning Value.
-- **Status:** In Progress
+- **Status:** Verified `[RAN]`
 
 ### CD-003: Low-Anxiety Quick Icebreaker Diagnostic & Skip Option
 - **Date:** 2026-11-24
@@ -51,7 +51,7 @@ Running log of Council Decisions (ADR style).
 - **Context & Evidence:** `[RESEARCH]` MacIntyre (1999). 10-second friendly icebreaker with skip button.
 - **Vote:** 3-0
 - **Expected Impact:** High on Day-1 First-Minute Win.
-- **Status:** In Progress
+- **Status:** Verified `[RAN]`
 
 ### CD-004: Direct Distribution USSD TrxID Verification in UnlockSheet
 - **Date:** 2026-11-24
@@ -61,7 +61,7 @@ Running log of Council Decisions (ADR style).
 - **Context & Evidence:** `[DATA]` 40%+ Bangladeshi MFS users use USSD. Adds manual TrxID verification in direct flavor.
 - **Vote:** 3-0
 - **Expected Impact:** High on Direct Distribution Monetization.
-- **Status:** In Progress
+- **Status:** Verified `[RAN]`
 
 ### CD-005: Native Audio Pronunciation & Speaking Task Hook for Word of the Day
 - **Date:** 2026-11-24
@@ -71,4 +71,56 @@ Running log of Council Decisions (ADR style).
 - **Context & Evidence:** `[READ]` `missions_screen.dart`. Audio pronunciation button + 1-tap "Practice with Reggie" action.
 - **Vote:** 3-0
 - **Expected Impact:** Medium on Daily Return Pull.
+- **Status:** Verified `[RAN]`
+
+---
+
+### CD-006: Pre-Task Planning Scaffold Sheet before Roleplays
+- **Date:** 2026-11-24
+- **Cycle:** Cycle 02
+- **Proposer:** Dr. Rahman
+- **Decision:** Add (`app/lib/screens/scenarios_screen.dart`)
+- **Context & Evidence:** `[RESEARCH]` Ellis (2005). 45s timer + 3 guiding prompts.
+- **Vote:** 3-0
+- **Expected Impact:** High on Roleplay Fluency.
+- **Status:** In Progress
+
+### CD-007: 1-Tap WhatsApp Learning Report for Parents
+- **Date:** 2026-11-24
+- **Cycle:** Cycle 02
+- **Proposer:** Tanvir
+- **Decision:** Add (`app/lib/screens/parent_dashboard_screen.dart`)
+- **Context & Evidence:** `[DATA]` WhatsApp sharing behind Parent PIN without PII.
+- **Vote:** 3-0
+- **Expected Impact:** High on Parent Retention.
+- **Status:** In Progress
+
+### CD-008: Active Character Trial Remaining Badge in TalkScreen
+- **Date:** 2026-11-24
+- **Cycle:** Cycle 02
+- **Proposer:** Maya
+- **Decision:** Add (`app/lib/screens/talk_screen.dart`)
+- **Context & Evidence:** `[READ]` In-session trial time indicator prevents unexpected paywall drop.
+- **Vote:** 3-0
+- **Expected Impact:** Medium on Usability.
+- **Status:** In Progress
+
+### CD-009: Dual Plain-Language Identity & Formal CEFR Progress Bar
+- **Date:** 2026-11-24
+- **Cycle:** Cycle 02
+- **Proposer:** Tanvir & Dr. Rahman
+- **Decision:** Change (`app/lib/screens/profile_screen.dart`)
+- **Context & Evidence:** `[RESEARCH]` Identity framing ("Confident Everyday Speaker (CEFR B1)").
+- **Vote:** 3-0
+- **Expected Impact:** Medium on Retention.
+- **Status:** In Progress
+
+### CD-010: Visual Celebration Accent on Daily Practice Completion
+- **Date:** 2026-11-24
+- **Cycle:** Cycle 02
+- **Proposer:** Tanvir
+- **Decision:** Change (`app/lib/widgets/daily_cap_sheet.dart`)
+- **Context & Evidence:** `[RESEARCH]` Fogg Behavior Model. Lightweight celebratory accent on daily streak lock-in.
+- **Vote:** 3-0
+- **Expected Impact:** Low-Medium on Habit Lock-In.
 - **Status:** In Progress

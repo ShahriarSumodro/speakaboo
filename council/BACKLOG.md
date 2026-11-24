@@ -4,17 +4,27 @@ Ranked list of ideas and improvements evaluated by Maya, Dr. Rahman, and Tanvir,
 
 ---
 
-## Ranked Backlog
+## Active Backlog (Cycle 3 Candidates)
 
 | Rank | ID | Title | Proposer | Target Component | Expected Impact | Feasibility | Reason / Status |
 |---|---|---|---|---|---|---|---|
-| 1 | B001 | Low-Anxiety Beginner Diagnostic: 10s Friendly Icebreaker | Dr. Rahman & Tanvir | `OnboardingScreen` | High | High | A 20s test causes first-minute drop-off for shy learners. Replace with a 1-sentence friendly greeting test. |
-| 2 | B002 | Visual Word-by-Word Alignment in Shadowing | Maya & Dr. Rahman | `ShadowingScreen` | High | Medium | Current shadowing gives an aggregate pace score; highlighting matching vs lagging words gives real phonetic practice. |
-| 3 | B003 | Direct Distribution USSD / Manual Transaction ID Field | Tanvir | `UnlockSheet` | High | High | Many bKash/Nagad users pay via USSD (*247#) rather than web checkout. Allowing manual TrxID entry boosts conversion in Bangladesh. |
-| 4 | B004 | Native Audio Pronunciation for Word of the Day | Tanvir & Dr. Rahman | `MissionsScreen` | Medium | High | Learners see the word and Bengali meaning, but cannot hear it spoken aloud without starting a conversation. |
-| 5 | B005 | Guided Pre-Task Planning 45-Second Countdown | Dr. Rahman | `ScenariosScreen` / `TalkScreen` | Medium | High | SLA research (Ellis 2005) shows pre-task planning increases fluency and complexity; add visual timer and guiding questions. |
-| 6 | B006 | Active Character Trial Countdown in TalkScreen | Maya | `TalkScreen` | Medium | High | When a learner uses a locked character on trial, show seconds remaining (e.g. "1:45 remaining") to avoid abrupt paywall shock. |
-| 7 | B007 | One-Tap CEFR Milestones & Level Progress Bar | Tanvir | `ProfileScreen` | Medium | Medium | Map speaking minutes and vocabulary mastery to next CEFR level (A1 -> A2 -> B1) for visible progress. |
-| 8 | B008 | WhatsApp Weekly Learning Report for Parents | Tanvir | `ParentDashboardScreen` | High | Medium | Parents in Bangladesh share achievements via WhatsApp. Enable 1-tap WhatsApp summary share. |
-| 9 | B009 | Confetti Celebration on Daily Streak Save | Tanvir | `DailyCapSheet` | Low | High | Visual delight and dopamine reward when the daily habit is locked in. |
-| 10 | B010 | Strict LLM Single-Focus Error Extraction Guard | Maya & Dr. Rahman | `backend/engine/correction.py` | Medium | High | If LLM mistakenly returns multiple grammar issues, enforce only the highest severity error is shown to the learner. |
+| 1 | B011 | Spoken Recall Microphone Tap Target & Timeout in Vocabulary | Maya & Dr. Rahman | `VocabularyScreen` | Small | High | Improve flashcard review UX with explicit stop/timeout button for spoken self-test. |
+| 2 | B012 | Active Experiment Variant Debug Badge in Settings | Maya | `SettingsScreen` | Small | High | Transparently display active A/B teaching variant (e.g. `EXP001: recast_only`) for testers and curious educators. |
+
+---
+
+## Completed in Cycle 2
+- **B005 (CD-006):** Pre-Task Planning Scaffold Sheet (45s Timer + 3 Prompts) before Roleplay Scenarios in `ScenariosScreen`. (Status: Implemented & Verified `[RAN]`)
+- **B008 (CD-007):** 1-Tap WhatsApp Learning Report for Parents behind PIN in `ParentDashboardScreen`. (Status: Implemented & Verified `[RAN]`)
+- **B006 (CD-008):** Active Character Free-Trial Remaining Badge in `TalkScreen`. (Status: Implemented & Verified `[RAN]`)
+- **B007 (CD-009):** Dual Plain-Language Identity & Formal CEFR Progress Bar in `ProfileScreen`. (Status: Implemented & Verified `[RAN]`)
+- **B009 (CD-010):** Visual Celebration Accent & Streak Lock-in Banner in `DailyCapSheet`. (Status: Implemented & Verified `[RAN]`)
+
+---
+
+## Completed in Cycle 1
+- **B001 (CD-003):** Low-Anxiety Beginner Diagnostic: 10s Friendly Icebreaker + Skip to Practice in `OnboardingScreen`. (Status: Implemented & Verified `[RAN]`)
+- **B002 (CD-002):** Visual Word-by-Word Alignment Chips in `ShadowingScreen`. (Status: Implemented & Verified `[RAN]`)
+- **B003 (CD-004):** Direct Distribution USSD / Manual TrxID Verification in `UnlockSheet` and `backend/routes/payment.py`. (Status: Implemented & Verified `[RAN]`)
+- **B004 (CD-005):** Native Audio Pronunciation + Practice Hook for Word of the Day in `MissionsScreen`. (Status: Implemented & Verified `[RAN]`)
+- **B010 (CD-001):** Strict Single-Focus Error Extraction Guard & Hierarchy in `backend/engine/correction.py`. (Status: Implemented & Verified `[RAN]`)
