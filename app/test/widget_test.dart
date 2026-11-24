@@ -6,6 +6,7 @@ import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speakaboo/config/theme.dart';
+import 'package:speakaboo/config/app_config.dart';
 import 'package:speakaboo/services/api_service.dart';
 import 'package:speakaboo/services/audio_service.dart';
 import 'package:speakaboo/services/analytics_service.dart';
@@ -583,17 +584,21 @@ void main() {
     expect(tapped, isTrue);
   });
 
-  testWidgets('UnlockSheet renders bKash and Nagad buttons',
+  testWidgets('UnlockSheet renders bKash and Nagad buttons in direct flavor and Play in play flavor',
       (WidgetTester tester) async {
     bool bkashTapped = false;
     bool nagadTapped = false;
+    bool playTapped = false;
 
+    // Direct flavor
+    AppConfig.flavor = AppFlavor.direct;
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: UnlockSheet(
             title: 'Detective Kabir',
             priceText: '350 BDT',
+            onPayWithPlay: () => playTapped = true,
             onPayWithBkash: () => bkashTapped = true,
             onPayWithNagad: () => nagadTapped = true,
           ),
@@ -604,25 +609,53 @@ void main() {
     expect(find.text('Unlock Detective Kabir'), findsOneWidget);
     expect(find.text('Pay with bKash'), findsOneWidget);
     expect(find.text('Pay with Nagad'), findsOneWidget);
+    expect(find.text('Unlock with Google Play'), findsNothing);
 
     await tester.tap(find.text('Pay with bKash'));
     expect(bkashTapped, isTrue);
 
     await tester.tap(find.text('Pay with Nagad'));
     expect(nagadTapped, isTrue);
+
+    // Play flavor
+    AppConfig.flavor = AppFlavor.play;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: UnlockSheet(
+            title: 'Detective Kabir',
+            priceText: '350 BDT',
+            onPayWithPlay: () => playTapped = true,
+            onPayWithBkash: () => bkashTapped = true,
+            onPayWithNagad: () => nagadTapped = true,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Unlock with Google Play'), findsOneWidget);
+    expect(find.text('Pay with bKash'), findsNothing);
+    expect(find.text('Pay with Nagad'), findsNothing);
+
+    await tester.tap(find.text('Unlock with Google Play'));
+    expect(playTapped, isTrue);
   });
 
-  testWidgets('DailyCapSheet renders friendly cap message and upgrade options',
+  testWidgets('DailyCapSheet renders friendly cap message and upgrade options in both flavors',
       (WidgetTester tester) async {
     bool bkashTapped = false;
     bool nagadTapped = false;
+    bool playTapped = false;
     bool restoreTapped = false;
     bool dismissTapped = false;
 
+    // Direct flavor
+    AppConfig.flavor = AppFlavor.direct;
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: DailyCapSheet(
+            onUpgradePlay: () => playTapped = true,
             onUpgradeBkash: () => bkashTapped = true,
             onUpgradeNagad: () => nagadTapped = true,
             onRestore: () => restoreTapped = true,
@@ -643,6 +676,29 @@ void main() {
 
     await tester.tap(find.text('Upgrade Pro with Nagad (200 BDT/mo)'));
     expect(nagadTapped, isTrue);
+
+    // Play flavor
+    AppConfig.flavor = AppFlavor.play;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DailyCapSheet(
+            onUpgradePlay: () => playTapped = true,
+            onUpgradeBkash: () => bkashTapped = true,
+            onUpgradeNagad: () => nagadTapped = true,
+            onRestore: () => restoreTapped = true,
+            onDismiss: () => dismissTapped = true,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Upgrade Pro with Google Play (200 BDT/mo)'), findsOneWidget);
+    expect(find.text('Upgrade Pro with bKash (200 BDT/mo)'), findsNothing);
+    expect(find.text('Upgrade Pro with Nagad (200 BDT/mo)'), findsNothing);
+
+    await tester.tap(find.text('Upgrade Pro with Google Play (200 BDT/mo)'));
+    expect(playTapped, isTrue);
 
     await tester.tap(find.text('Restore Purchases'));
     expect(restoreTapped, isTrue);

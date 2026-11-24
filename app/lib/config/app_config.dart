@@ -5,10 +5,27 @@ library;
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+enum AppFlavor {
+  /// Google Play distribution (only policy-compliant Google Play Billing allowed)
+  play,
+
+  /// Direct distribution outside Play (e.g. website, APK with bKash/Nagad)
+  direct,
+}
+
 class AppConfig {
   AppConfig._();
 
   static const String _storageKey = 'custom_backend_url';
+
+  /// Compile-time build flavor: 'play' (default) or 'direct'
+  static AppFlavor flavor = () {
+    const flavorStr = String.fromEnvironment('FLAVOR', defaultValue: 'play');
+    return flavorStr.toLowerCase() == 'direct' ? AppFlavor.direct : AppFlavor.play;
+  }();
+
+  static bool get isPlayFlavor => flavor == AppFlavor.play;
+  static bool get isDirectFlavor => flavor == AppFlavor.direct;
 
   /// Compile-time default backend URL - defaults to http://localhost:8000 for USB dev with adb reverse
   static const String defaultBackendUrl = String.fromEnvironment(

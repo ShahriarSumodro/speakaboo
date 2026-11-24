@@ -113,6 +113,8 @@ class BaseRepository(ABC):
     async def get_entitlements(self, user_id: str) -> list[Entitlement]: ...
     @abstractmethod
     async def add_entitlement(self, entitlement: Entitlement) -> Entitlement: ...
+    @abstractmethod
+    async def revoke_entitlement(self, user_id: str, type: str, value: str) -> bool: ...
 
     # --- Mistake logs ---
     @abstractmethod
@@ -655,6 +657,14 @@ class SqliteRepository(BaseRepository):
         )
         self._conn.commit()
         return entitlement
+
+    async def revoke_entitlement(self, user_id: str, type: str, value: str) -> bool:
+        cursor = self._conn.execute(
+            "DELETE FROM entitlements WHERE user_id = ? AND type = ? AND value = ?",
+            (user_id, type, value),
+        )
+        self._conn.commit()
+        return cursor.rowcount > 0
 
     # --- Mistake logs ---
     async def log_mistake(self, mistake: MistakeLog) -> MistakeLog:

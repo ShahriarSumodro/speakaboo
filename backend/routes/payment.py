@@ -64,6 +64,19 @@ class VerifyResponse(BaseModel):
     entitlement_granted: Optional[str] = None
 
 
+class RefundRequest(BaseModel):
+    payment_id: str
+    reason: str = "customer_request"
+
+
+class RefundResponse(BaseModel):
+    payment_id: str
+    success: bool
+    status: str
+    revoked_entitlement: Optional[str] = None
+    message: str
+
+
 class EntitlementResponse(BaseModel):
     id: str
     user_id: str
@@ -277,3 +290,42 @@ async def restore_purchases(
 ):
     """Restore active purchases for the user."""
     return await get_user_entitlements(user_id, repo)
+
+
+@router.post("/refund", response_model=RefundResponse)
+async def refund_payment(
+    request: RefundRequest, repo: BaseRepository = Depends(get_repository)
+):
+    """Process a refund for a completed payment and revoke the granted entitlement."""
+    payment = await repo.get_payment(request.payment_id)
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment transaction not found")
+
+    if payment.get("status") == "refunded":
+        return RefundResponse(
+            payment_id=payment["id"],
+            success=True,
+            status="refunded",
+            revoked_entitlement=f"{payment['purpose']}:{payment['target_id']}",
+            message="Payment was already refunded.",
+        )
+
+    if payment.get("status") != "completed":
+        raise HTTPException(status_code=400, detail="Only completed payments can be refunded")
+
+    # Update payment status in ledger
+    await repo.update_payment_status(payment["id"], "refunded")
+
+    # Determine entitlement to revoke
+    ent_type = "plan" if payment["purpose"] == "monthly_plan" else "character"
+    ent_val = "monthly" if payment["purpose"] == "monthly_plan" else payment["target_id"]
+
+    revoked = await repo.revoke_entitlement(payment["user_id"], ent_type, ent_val)
+
+    return RefundResponse(
+        payment_id=payment["id"],
+        success=True,
+        status="refunded",
+        revoked_entitlement=f"{ent_type}:{ent_val}" if revoked else None,
+        message="Payment refunded and entitlement revoked successfully.",
+    )

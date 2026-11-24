@@ -80,10 +80,35 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen> {
       builder: (_) => UnlockSheet(
         title: widget.character.name,
         priceText: '${widget.character.priceBdt} BDT',
+        onPayWithPlay: () => _handlePayment('google_play'),
         onPayWithBkash: () => _handlePayment('bkash'),
         onPayWithNagad: () => _handlePayment('nagad'),
+        onRestore: () => _handleRestore(),
       ),
     );
+  }
+
+  Future<void> _handleRestore() async {
+    Navigator.pop(context);
+    final api = context.read<ApiService>();
+    final auth = context.read<AuthProvider>();
+    try {
+      final restored = await api.restorePurchases(auth.userId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Purchases restored: ${restored.length} item(s) found.'),
+            backgroundColor: SpeakabooTheme.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Restore error: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _handlePayment(String gateway) async {

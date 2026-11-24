@@ -2,26 +2,31 @@
 library;
 
 import 'package:flutter/material.dart';
+import '../config/app_config.dart';
 import '../config/theme.dart';
 
 class UnlockSheet extends StatelessWidget {
   final String title;
   final String priceText;
-  final VoidCallback onPayWithBkash;
-  final VoidCallback onPayWithNagad;
+  final VoidCallback? onPayWithPlay;
+  final VoidCallback? onPayWithBkash;
+  final VoidCallback? onPayWithNagad;
   final VoidCallback? onRestore;
 
   const UnlockSheet({
     super.key,
     required this.title,
     required this.priceText,
-    required this.onPayWithBkash,
-    required this.onPayWithNagad,
+    this.onPayWithPlay,
+    this.onPayWithBkash,
+    this.onPayWithNagad,
     this.onRestore,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isPlay = AppConfig.isPlayFlavor;
+
     return Container(
       padding: const EdgeInsets.all(SpeakabooTheme.spacingLg),
       decoration: const BoxDecoration(
@@ -63,45 +68,67 @@ class UnlockSheet extends StatelessWidget {
               ),
             ),
             const SizedBox(height: SpeakabooTheme.spacingLg),
-            // bKash Button
-            SizedBox(
-              width: double.infinity,
-              height: SpeakabooTheme.minTapTarget,
-              child: ElevatedButton(
-                onPressed: onPayWithBkash,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE2136E),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
+            if (isPlay) ...[
+              // Google Play In-App Billing Button
+              SizedBox(
+                width: double.infinity,
+                height: SpeakabooTheme.minTapTarget,
+                child: ElevatedButton.icon(
+                  onPressed: onPayWithPlay,
+                  icon: const Icon(Icons.shop_outlined, color: Colors.white),
+                  label: const Text(
+                    'Unlock with Google Play',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF01875F),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
+                    ),
                   ),
                 ),
-                child: const Text(
-                  'Pay with bKash',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
               ),
-            ),
-            const SizedBox(height: SpeakabooTheme.spacingSm),
-            // Nagad Button
-            SizedBox(
-              width: double.infinity,
-              height: SpeakabooTheme.minTapTarget,
-              child: ElevatedButton(
-                onPressed: onPayWithNagad,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFF7921E),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
+            ] else ...[
+              // Direct Distribution: bKash & Nagad
+              SizedBox(
+                width: double.infinity,
+                height: SpeakabooTheme.minTapTarget,
+                child: ElevatedButton(
+                  onPressed: onPayWithBkash,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFE2136E),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
+                    ),
+                  ),
+                  child: const Text(
+                    'Pay with bKash',
+                    style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
-                child: const Text(
-                  'Pay with Nagad',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: SpeakabooTheme.spacingSm),
+              SizedBox(
+                width: double.infinity,
+                height: SpeakabooTheme.minTapTarget,
+                child: ElevatedButton(
+                  onPressed: onPayWithNagad,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF7921E),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
+                    ),
+                  ),
+                  child: const Text(
+                    'Pay with Nagad',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
-            ),
+            ],
             const SizedBox(height: SpeakabooTheme.spacingSm),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

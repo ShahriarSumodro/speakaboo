@@ -248,9 +248,169 @@ class MockNagadGateway(PaymentGateway):
         return await self.verify_payment(pid, token)
 
 
+class GooglePlayBillingGateway(PaymentGateway):
+    """Google Play In-App Billing verification gateway for Play Store flavor."""
+
+    def __init__(self):
+        self._intents: Dict[str, PaymentIntent] = {}
+
+    @property
+    def name(self) -> str:
+        return "google_play"
+
+    async def create_payment_intent(
+        self,
+        user_id: str,
+        amount_bdt: int,
+        purpose: PaymentPurpose,
+        target_id: str = "",
+    ) -> PaymentIntent:
+        pid = f"gp_{uuid.uuid4().hex[:12]}"
+        intent = PaymentIntent(
+            payment_id=pid,
+            gateway="google_play",
+            user_id=user_id,
+            amount_bdt=amount_bdt,
+            purpose=purpose,
+            target_id=target_id,
+            checkout_url=f"play_billing://purchase?sku={target_id or 'monthly_pro'}&payment_id={pid}",
+            status=PaymentStatus.PENDING,
+        )
+        self._intents[pid] = intent
+        return intent
+
+    async def verify_payment(
+        self, payment_id: str, verification_token: str = ""
+    ) -> PaymentVerificationResult:
+        intent = self._intents.get(payment_id)
+        if not intent:
+            return PaymentVerificationResult(
+                payment_id=payment_id,
+                gateway="google_play",
+                success=False,
+                status=PaymentStatus.FAILED,
+                message="Google Play purchase session not found or expired.",
+            )
+
+        if verification_token == "FAIL_TXN":
+            intent.status = PaymentStatus.FAILED
+            return PaymentVerificationResult(
+                payment_id=payment_id,
+                gateway="google_play",
+                success=False,
+                status=PaymentStatus.FAILED,
+                message="Google Play purchase was cancelled by user.",
+            )
+
+        intent.status = PaymentStatus.COMPLETED
+        rand_order = f"{uuid.uuid4().hex[:4]}-{uuid.uuid4().hex[:4]}-{uuid.uuid4().hex[:4]}-{uuid.uuid4().hex[:5]}"
+        txn_id = f"GPA.{rand_order.upper()}"
+
+        ent_type = "plan" if intent.purpose == PaymentPurpose.MONTHLY_PLAN else "character"
+        ent_val = "monthly" if intent.purpose == PaymentPurpose.MONTHLY_PLAN else intent.target_id
+
+        return PaymentVerificationResult(
+            payment_id=payment_id,
+            gateway="google_play",
+            success=True,
+            status=PaymentStatus.COMPLETED,
+            transaction_id=txn_id,
+            message="Google Play purchase verified successfully.",
+            entitlement_type=ent_type,
+            entitlement_value=ent_val,
+        )
+
+    async def process_webhook(
+        self, payload: Dict[str, Any], signature: str = ""
+    ) -> PaymentVerificationResult:
+        pid = payload.get("payment_id", "")
+        token = payload.get("purchase_token", "") or payload.get("verification_token", "")
+        return await self.verify_payment(pid, token)
+
+
+class WebBillingGateway(PaymentGateway):
+    """External Web Checkout gateway (e.g. for browser checkout / aggregator)."""
+
+    def __init__(self):
+        self._intents: Dict[str, PaymentIntent] = {}
+
+    @property
+    def name(self) -> str:
+        return "web_checkout"
+
+    async def create_payment_intent(
+        self,
+        user_id: str,
+        amount_bdt: int,
+        purpose: PaymentPurpose,
+        target_id: str = "",
+    ) -> PaymentIntent:
+        pid = f"web_{uuid.uuid4().hex[:12]}"
+        intent = PaymentIntent(
+            payment_id=pid,
+            gateway="web_checkout",
+            user_id=user_id,
+            amount_bdt=amount_bdt,
+            purpose=purpose,
+            target_id=target_id,
+            checkout_url=f"https://pay.speakaboo.app/checkout?session={pid}",
+            status=PaymentStatus.PENDING,
+        )
+        self._intents[pid] = intent
+        return intent
+
+    async def verify_payment(
+        self, payment_id: str, verification_token: str = ""
+    ) -> PaymentVerificationResult:
+        intent = self._intents.get(payment_id)
+        if not intent:
+            return PaymentVerificationResult(
+                payment_id=payment_id,
+                gateway="web_checkout",
+                success=False,
+                status=PaymentStatus.FAILED,
+                message="Web checkout session not found or expired.",
+            )
+
+        if verification_token == "FAIL_TXN":
+            intent.status = PaymentStatus.FAILED
+            return PaymentVerificationResult(
+                payment_id=payment_id,
+                gateway="web_checkout",
+                success=False,
+                status=PaymentStatus.FAILED,
+                message="Web payment failed.",
+            )
+
+        intent.status = PaymentStatus.COMPLETED
+        txn_id = f"WEB_{uuid.uuid4().hex[:8].upper()}"
+        ent_type = "plan" if intent.purpose == PaymentPurpose.MONTHLY_PLAN else "character"
+        ent_val = "monthly" if intent.purpose == PaymentPurpose.MONTHLY_PLAN else intent.target_id
+
+        return PaymentVerificationResult(
+            payment_id=payment_id,
+            gateway="web_checkout",
+            success=True,
+            status=PaymentStatus.COMPLETED,
+            transaction_id=txn_id,
+            message="Web checkout completed successfully.",
+            entitlement_type=ent_type,
+            entitlement_value=ent_val,
+        )
+
+    async def process_webhook(
+        self, payload: Dict[str, Any], signature: str = ""
+    ) -> PaymentVerificationResult:
+        pid = payload.get("payment_id", "")
+        token = payload.get("verification_token", "")
+        return await self.verify_payment(pid, token)
+
+
 _gateways: Dict[str, PaymentGateway] = {
     "bkash": MockBkashGateway(),
     "nagad": MockNagadGateway(),
+    "google_play": GooglePlayBillingGateway(),
+    "web_checkout": WebBillingGateway(),
     "mock": MockBkashGateway(),
 }
 

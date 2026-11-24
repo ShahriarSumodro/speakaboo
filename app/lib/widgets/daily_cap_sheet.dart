@@ -2,24 +2,29 @@
 library;
 
 import 'package:flutter/material.dart';
+import '../config/app_config.dart';
 import '../config/theme.dart';
 
 class DailyCapSheet extends StatelessWidget {
-  final VoidCallback onUpgradeBkash;
-  final VoidCallback onUpgradeNagad;
+  final VoidCallback? onUpgradePlay;
+  final VoidCallback? onUpgradeBkash;
+  final VoidCallback? onUpgradeNagad;
   final VoidCallback onRestore;
   final VoidCallback onDismiss;
 
   const DailyCapSheet({
     super.key,
-    required this.onUpgradeBkash,
-    required this.onUpgradeNagad,
+    this.onUpgradePlay,
+    this.onUpgradeBkash,
+    this.onUpgradeNagad,
     required this.onRestore,
     required this.onDismiss,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isPlay = AppConfig.isPlayFlavor;
+
     return Container(
       padding: const EdgeInsets.all(SpeakabooTheme.spacingLg),
       decoration: const BoxDecoration(
@@ -81,45 +86,67 @@ class DailyCapSheet extends StatelessWidget {
               ),
             ),
             const SizedBox(height: SpeakabooTheme.spacingLg),
-            // bKash Button
-            SizedBox(
-              width: double.infinity,
-              height: SpeakabooTheme.minTapTarget,
-              child: ElevatedButton(
-                onPressed: onUpgradeBkash,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE2136E),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
+            if (isPlay) ...[
+              // Google Play In-App Purchase
+              SizedBox(
+                width: double.infinity,
+                height: SpeakabooTheme.minTapTarget,
+                child: ElevatedButton.icon(
+                  onPressed: onUpgradePlay,
+                  icon: const Icon(Icons.shop_outlined, color: Colors.white),
+                  label: const Text(
+                    'Upgrade Pro with Google Play (200 BDT/mo)',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF01875F),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
+                    ),
                   ),
                 ),
-                child: const Text(
-                  'Upgrade Pro with bKash (200 BDT/mo)',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
               ),
-            ),
-            const SizedBox(height: SpeakabooTheme.spacingSm),
-            // Nagad Button
-            SizedBox(
-              width: double.infinity,
-              height: SpeakabooTheme.minTapTarget,
-              child: ElevatedButton(
-                onPressed: onUpgradeNagad,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFF7921E),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
+            ] else ...[
+              // Direct Distribution: bKash & Nagad
+              SizedBox(
+                width: double.infinity,
+                height: SpeakabooTheme.minTapTarget,
+                child: ElevatedButton(
+                  onPressed: onUpgradeBkash,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFE2136E),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
+                    ),
+                  ),
+                  child: const Text(
+                    'Upgrade Pro with bKash (200 BDT/mo)',
+                    style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
-                child: const Text(
-                  'Upgrade Pro with Nagad (200 BDT/mo)',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: SpeakabooTheme.spacingSm),
+              SizedBox(
+                width: double.infinity,
+                height: SpeakabooTheme.minTapTarget,
+                child: ElevatedButton(
+                  onPressed: onUpgradeNagad,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF7921E),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
+                    ),
+                  ),
+                  child: const Text(
+                    'Upgrade Pro with Nagad (200 BDT/mo)',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
-            ),
+            ],
             const SizedBox(height: SpeakabooTheme.spacingSm),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
