@@ -54,6 +54,8 @@ class ConversationProvider extends ChangeNotifier {
   String _practiceMode = 'accuracy'; // 'accuracy' or 'fluency'
   String _coachMode = 'balanced';   // 'gentle', 'balanced', 'strict'
   bool _useStreaming = true;
+  bool _isTrial = false;
+  int? _trialSecondsRemaining;
 
   ConversationProvider({
     required this.api,
@@ -75,6 +77,14 @@ class ConversationProvider extends ChangeNotifier {
   String? get topicId => _topicId;
   String get practiceMode => _practiceMode;
   String get coachMode => _coachMode;
+  bool get isTrial => _isTrial;
+  int? get trialSecondsRemaining => _trialSecondsRemaining;
+
+  void setTrial({required bool isTrial, int? secondsRemaining}) {
+    _isTrial = isTrial;
+    _trialSecondsRemaining = secondsRemaining;
+    notifyListeners();
+  }
 
   void setPracticeMode(String mode) {
     _practiceMode = mode;
@@ -120,6 +130,8 @@ class ConversationProvider extends ChangeNotifier {
 
       _conversationId = result.conversationId;
       _characterName = result.characterName;
+      _isTrial = result.isTrial;
+      _trialSecondsRemaining = result.trialSecondsRemaining;
       _messages.clear();
 
       // Add greeting as first message
@@ -272,6 +284,10 @@ class ConversationProvider extends ChangeNotifier {
 
       _lastLatencyMs = result.latencyMs;
       _level = result.level;
+      if (result.isTrial) {
+        _isTrial = true;
+        _trialSecondsRemaining = result.trialSecondsRemaining;
+      }
 
       // Add user message
       if (result.userTranscript.isNotEmpty) {
@@ -361,6 +377,8 @@ class ConversationProvider extends ChangeNotifier {
     _currentCharacterId = null;
     _scenarioId = null;
     _topicId = null;
+    _isTrial = false;
+    _trialSecondsRemaining = null;
     _messages.clear();
     _status = ConversationStatus.idle;
     _errorMessage = null;

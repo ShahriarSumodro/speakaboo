@@ -25,6 +25,8 @@ class TurnResult {
   final String level;
   final double latencyMs;
   final bool safetyBlocked;
+  final bool isTrial;
+  final int? trialSecondsRemaining;
 
   TurnResult({
     required this.conversationId,
@@ -37,6 +39,8 @@ class TurnResult {
     required this.level,
     required this.latencyMs,
     this.safetyBlocked = false,
+    this.isTrial = false,
+    this.trialSecondsRemaining,
   });
 
   factory TurnResult.fromJson(Map<String, dynamic> json) {
@@ -56,6 +60,8 @@ class TurnResult {
       level: json['level'] ?? 'beginner',
       latencyMs: (json['latency_ms'] ?? 0).toDouble(),
       safetyBlocked: json['safety_blocked'] ?? false,
+      isTrial: json['is_trial'] ?? false,
+      trialSecondsRemaining: json['trial_seconds_remaining'] as int?,
     );
   }
 }
@@ -94,11 +100,15 @@ class StartConversationResult {
   final String conversationId;
   final String characterName;
   final String greeting;
+  final bool isTrial;
+  final int? trialSecondsRemaining;
 
   StartConversationResult({
     required this.conversationId,
     required this.characterName,
     required this.greeting,
+    this.isTrial = false,
+    this.trialSecondsRemaining,
   });
 
   factory StartConversationResult.fromJson(Map<String, dynamic> json) {
@@ -106,6 +116,8 @@ class StartConversationResult {
       conversationId: json['conversation_id'] ?? '',
       characterName: json['character_name'] ?? '',
       greeting: json['greeting'] ?? '',
+      isTrial: json['is_trial'] ?? false,
+      trialSecondsRemaining: json['trial_seconds_remaining'] as int?,
     );
   }
 }

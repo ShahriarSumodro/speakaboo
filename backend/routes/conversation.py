@@ -86,6 +86,8 @@ class StartConversationResponse(BaseModel):
     conversation_id: str
     character_name: str
     greeting: str
+    is_trial: bool = False
+    trial_seconds_remaining: Optional[int] = None
 
 
 class HintRequest(BaseModel):
@@ -121,6 +123,8 @@ class TurnResponseModel(BaseModel):
     latency_ms: float
     cost_usd: float = 0.0
     safety_blocked: bool = False
+    is_trial: bool = False
+    trial_seconds_remaining: Optional[int] = None
 
 
 def _categorize_error(original: str, better: str, reason: str) -> str:
@@ -252,6 +256,8 @@ async def start_conversation(request: StartConversationRequest):
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Character not found: {request.character_id}")
 
+    is_trial = False
+    trial_seconds_remaining = None
     if character.locked:
         repo = await get_repository()
         ents = await repo.get_entitlements(request.user_id)
@@ -267,6 +273,8 @@ async def start_conversation(request: StartConversationRequest):
                     status_code=403,
                     detail=f"Your 2-minute free trial with {character.name} has ended! Unlock {character.name} for {character.price_bdt} BDT to continue.",
                 )
+            is_trial = True
+            trial_seconds_remaining = max(0, int(120 - seconds_used))
 
     engine = get_engine()
     repo = await get_repository()
@@ -301,6 +309,8 @@ async def start_conversation(request: StartConversationRequest):
         conversation_id=state.id,
         character_name=character.name,
         greeting=greeting,
+        is_trial=is_trial,
+        trial_seconds_remaining=trial_seconds_remaining,
     )
 
 
@@ -348,6 +358,20 @@ async def process_turn(
 
     await _record_turn_metrics(state, result)
 
+    is_trial = False
+    trial_seconds_remaining = None
+    if character.locked:
+        ents = await repo.get_entitlements(state.user_id)
+        now = time.time()
+        has_character = any(
+            e.type == "character" and e.value == character.id and (e.expires_at is None or e.expires_at > now)
+            for e in ents
+        )
+        if not has_character:
+            is_trial = True
+            seconds_used = await repo.get_character_usage_seconds(state.user_id, character.id)
+            trial_seconds_remaining = max(0, int(120 - seconds_used))
+
     return TurnResponseModel(
         conversation_id=result.conversation_id,
         turn_id=result.turn_id,
@@ -360,6 +384,8 @@ async def process_turn(
         latency_ms=result.latency_ms,
         cost_usd=result.cost_usd,
         safety_blocked=result.safety_blocked,
+        is_trial=is_trial,
+        trial_seconds_remaining=trial_seconds_remaining,
     )
 
 

@@ -104,6 +104,8 @@ void main() {
               'conversation_id': 'test-conv-123',
               'character_name': 'Farmer Reggie',
               'greeting': 'Welcome to my farm!',
+              'is_trial': true,
+              'trial_seconds_remaining': 105,
             }),
             200);
       }
@@ -137,6 +139,8 @@ void main() {
     expect(find.text('Farmer Reggie'), findsOneWidget);
     expect(find.text('Welcome to my farm!'), findsOneWidget);
     expect(find.byType(CharacterFace), findsOneWidget);
+    expect(find.byKey(const Key('trial_countdown_badge')), findsOneWidget);
+    expect(find.text('1:45 trial'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox());
   });

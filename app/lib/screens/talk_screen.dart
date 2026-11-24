@@ -117,6 +117,36 @@ class _TalkScreenState extends State<TalkScreen> {
             ),
           ),
           const Spacer(),
+          // Trial countdown badge (CD-008)
+          if (conv.isTrial && conv.trialSecondsRemaining != null) ...[
+            Container(
+              key: const Key('trial_countdown_badge'),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: SpeakabooTheme.warning.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm),
+                border: Border.all(
+                  color: SpeakabooTheme.warning.withValues(alpha: 0.4),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.hourglass_top, size: 14, color: SpeakabooTheme.warning),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${(conv.trialSecondsRemaining! ~/ 60)}:${(conv.trialSecondsRemaining! % 60).toString().padLeft(2, '0')} trial',
+                    style: const TextStyle(
+                      fontSize: SpeakabooTheme.smallSize,
+                      fontWeight: FontWeight.bold,
+                      color: SpeakabooTheme.warning,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 4),
+          ],
           // Mode chip
           InkWell(
             onTap: () {

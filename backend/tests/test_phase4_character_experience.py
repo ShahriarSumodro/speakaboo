@@ -22,6 +22,8 @@ async def test_locked_character_allows_2_minute_trial_and_caps():
     # 1. Before trial, user should be able to start conversation
     res = client.post("/api/conversation/start", json={"user_id": user_id, "character_id": character_id})
     assert res.status_code == 200, res.text
+    assert res.json().get("is_trial") is True
+    assert res.json().get("trial_seconds_remaining") == 120
     conv_id = res.json()["conversation_id"]
 
     # 2. Check usage is currently 0
@@ -32,6 +34,8 @@ async def test_locked_character_allows_2_minute_trial_and_caps():
     await repo.increment_character_usage_seconds(user_id, character_id, 60.0)
     res = client.post("/api/conversation/start", json={"user_id": user_id, "character_id": character_id})
     assert res.status_code == 200
+    assert res.json().get("is_trial") is True
+    assert res.json().get("trial_seconds_remaining") == 60
 
     # 4. Increment trial to 120 seconds (exhausting the free trial)
     await repo.increment_character_usage_seconds(user_id, character_id, 60.0)
