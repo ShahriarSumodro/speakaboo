@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../config/theme.dart';
 import '../models/parent_summary.dart';
@@ -33,7 +34,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
 
   void _checkPinStatus() {
     final auth = context.read<AuthProvider>();
-    if (!auth.profile!.hasParentPin) {
+    if (auth.profile == null || !auth.profile!.hasParentPin) {
       // Prompt to create PIN
       _showSetPinDialog();
     } else {
@@ -225,6 +226,31 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
                                   const SizedBox(width: 8),
                                   Expanded(child: _buildMetricTile('${_summary!.currentStreak} days', 'Daily Streak')),
                                 ],
+                              ),
+                              const SizedBox(height: 14),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  key: const Key('whatsapp_parent_report_btn'),
+                                  onPressed: () {
+                                    final text = '🌟 Proud parent moment! My child practiced English speaking for ${_summary!.weeklyMinutes.toStringAsFixed(1)} minutes (${_summary!.totalWords} words) with a ${_summary!.currentStreak}-day streak on Speakaboo! 🚀 Practice makes confident speakers. https://speakaboo.app';
+                                    Clipboard.setData(ClipboardData(text: text));
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Weekly achievement report copied for WhatsApp!'),
+                                        backgroundColor: SpeakabooTheme.success,
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.share, size: 18, color: SpeakabooTheme.accent),
+                                  label: const Text('Share Achievement on WhatsApp', style: TextStyle(fontWeight: FontWeight.w600)),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: SpeakabooTheme.accent,
+                                    side: const BorderSide(color: SpeakabooTheme.accent),
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm)),
+                                  ),
+                                ),
                               ),
                             ],
                           ),

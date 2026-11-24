@@ -35,6 +35,7 @@ import 'package:speakaboo/screens/topics_screen.dart';
 import 'package:speakaboo/screens/shadowing_screen.dart';
 import 'package:speakaboo/screens/vocabulary_screen.dart';
 import 'package:speakaboo/screens/settings_screen.dart';
+import 'package:speakaboo/screens/parent_dashboard_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -1083,5 +1084,66 @@ void main() {
     expect(find.text('App Theme'), findsOneWidget);
     expect(find.text('Server Connection (Dev)'), findsOneWidget);
     expect(find.text('Delete My Data'), findsOneWidget);
+  });
+
+  testWidgets('ParentDashboardScreen sets PIN, unlocks, and copies WhatsApp report', (WidgetTester tester) async {
+    final mockClient = MockClient((request) async {
+      if (request.url.path.endsWith('/api/auth/set-parent-pin')) {
+        return http.Response(jsonEncode({'success': true}), 200);
+      }
+      if (request.url.path.contains('/api/parent/summary/')) {
+        return http.Response(
+          jsonEncode({
+            'user_id': 'test_user',
+            'weekly_minutes': 14.5,
+            'total_words': 320,
+            'current_streak': 5,
+            'accuracy_trend': [0.75, 0.82],
+            'safety_flags_count': 0,
+            'topics_practiced': ['Daily Routine'],
+            'weekly_goal_met': true,
+            'tips': ['Praise effort rather than perfection.'],
+          }),
+          200,
+        );
+      }
+      if (request.url.path.contains('/api/parent/safety-flags/')) {
+        return http.Response(jsonEncode({'safety_flags': []}), 200);
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
+    final auth = AuthProvider(api: api);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
+        ],
+        child: const MaterialApp(home: ParentDashboardScreen()),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    // Should prompt for PIN creation
+    expect(find.text('Set 4-Digit Parent PIN'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), '4321');
+    await tester.tap(find.text('Save PIN'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    // Dashboard unlocked
+    expect(find.text("This Week's Progress"), findsOneWidget);
+    expect(find.text('14.5 min'), findsOneWidget);
+    expect(find.text('Share Achievement on WhatsApp'), findsOneWidget);
+
+    // Tap share achievement
+    await tester.tap(find.byKey(const Key('whatsapp_parent_report_btn')));
+    await tester.pump();
+    expect(find.text('Weekly achievement report copied for WhatsApp!'), findsOneWidget);
   });
 }
