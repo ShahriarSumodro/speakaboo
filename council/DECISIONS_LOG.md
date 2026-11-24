@@ -83,7 +83,7 @@ Running log of Council Decisions (ADR style).
 - **Context & Evidence:** `[RESEARCH]` Ellis (2005). 45s timer + 3 guiding prompts.
 - **Vote:** 3-0
 - **Expected Impact:** High on Roleplay Fluency.
-- **Status:** In Progress
+- **Status:** Verified `[RAN]`
 
 ### CD-007: 1-Tap WhatsApp Learning Report for Parents
 - **Date:** 2026-11-24
@@ -93,7 +93,7 @@ Running log of Council Decisions (ADR style).
 - **Context & Evidence:** `[DATA]` WhatsApp sharing behind Parent PIN without PII.
 - **Vote:** 3-0
 - **Expected Impact:** High on Parent Retention.
-- **Status:** In Progress
+- **Status:** Verified `[RAN]`
 
 ### CD-008: Active Character Trial Remaining Badge in TalkScreen
 - **Date:** 2026-11-24
@@ -103,7 +103,7 @@ Running log of Council Decisions (ADR style).
 - **Context & Evidence:** `[READ]` In-session trial time indicator prevents unexpected paywall drop.
 - **Vote:** 3-0
 - **Expected Impact:** Medium on Usability.
-- **Status:** In Progress
+- **Status:** Verified `[RAN]`
 
 ### CD-009: Dual Plain-Language Identity & Formal CEFR Progress Bar
 - **Date:** 2026-11-24
@@ -113,7 +113,7 @@ Running log of Council Decisions (ADR style).
 - **Context & Evidence:** `[RESEARCH]` Identity framing ("Confident Everyday Speaker (CEFR B1)").
 - **Vote:** 3-0
 - **Expected Impact:** Medium on Retention.
-- **Status:** In Progress
+- **Status:** Verified `[RAN]`
 
 ### CD-010: Visual Celebration Accent on Daily Practice Completion
 - **Date:** 2026-11-24
@@ -123,4 +123,26 @@ Running log of Council Decisions (ADR style).
 - **Context & Evidence:** `[RESEARCH]` Fogg Behavior Model. Lightweight celebratory accent on daily streak lock-in.
 - **Vote:** 3-0
 - **Expected Impact:** Low-Medium on Habit Lock-In.
+- **Status:** Verified `[RAN]`
+
+---
+
+### CD-011: Vocabulary Spoken Recall Micro-Timeout and Stop Button
+- **Date:** 2026-11-24
+- **Cycle:** Cycle 03
+- **Proposer:** Maya & Dr. Rahman
+- **Decision:** Change (`app/lib/screens/vocabulary_screen.dart`)
+- **Context & Evidence:** `[RESEARCH]` Nation (2001). 10s auto-stop safeguard and explicit tap-to-stop for spoken flashcard review.
+- **Vote:** 3-0
+- **Expected Impact:** Small on UX and Battery.
+- **Status:** In Progress
+
+### CD-012: Teaching Engine Experiment Variant Debug Badge in Settings
+- **Date:** 2026-11-24
+- **Cycle:** Cycle 03
+- **Proposer:** Maya
+- **Decision:** Add (`app/lib/screens/settings_screen.dart`)
+- **Context & Evidence:** `[READ]` Diagnostic visibility for pedagogical A/B experiment variants in Settings.
+- **Vote:** 3-0
+- **Expected Impact:** Small on Pedagogical Verification.
 - **Status:** In Progress

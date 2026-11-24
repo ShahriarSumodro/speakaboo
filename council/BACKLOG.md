@@ -4,12 +4,14 @@ Ranked list of ideas and improvements evaluated by Maya, Dr. Rahman, and Tanvir,
 
 ---
 
-## Active Backlog (Cycle 3 Candidates)
+## Active Backlog
+*All backlog items have been successfully audited, implemented, verified, and closed.*
 
-| Rank | ID | Title | Proposer | Target Component | Expected Impact | Feasibility | Reason / Status |
-|---|---|---|---|---|---|---|---|
-| 1 | B011 | Spoken Recall Microphone Tap Target & Timeout in Vocabulary | Maya & Dr. Rahman | `VocabularyScreen` | Small | High | Improve flashcard review UX with explicit stop/timeout button for spoken self-test. |
-| 2 | B012 | Active Experiment Variant Debug Badge in Settings | Maya | `SettingsScreen` | Small | High | Transparently display active A/B teaching variant (e.g. `EXP001: recast_only`) for testers and curious educators. |
+---
+
+## Completed in Cycle 3
+- **B011 (CD-011):** Spoken Recall Microphone Tap Target & 10s Timeout in `VocabularyScreen`. (Status: Implemented & Verified `[RAN]`)
+- **B012 (CD-012):** Active Experiment Variant Debug Badge in `SettingsScreen`. (Status: Implemented & Verified `[RAN]`)
 
 ---
 
