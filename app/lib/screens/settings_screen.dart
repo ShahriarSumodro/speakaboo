@@ -175,6 +175,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 8),
 
+          // Teaching Engine Experiment Variant (CD-012)
+          ListTile(
+            key: const Key('experiment_variant_tile'),
+            tileColor: SpeakabooTheme.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm)),
+            leading: const Icon(Icons.science_outlined, color: SpeakabooTheme.accent),
+            title: const Text('Teaching Engine Variant'),
+            subtitle: const Text('EXP001: Balanced Recast (Ellis 2005) • EXP003: Active'),
+            trailing: Chip(
+              label: const Text('ACTIVE', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
+              backgroundColor: SpeakabooTheme.accent,
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
+          const SizedBox(height: 8),
+
           // Daily Practice Reminders
           SwitchListTile(
             tileColor: SpeakabooTheme.surface,

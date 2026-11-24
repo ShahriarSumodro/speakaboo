@@ -1165,6 +1165,8 @@ void main() {
     expect(find.text('Settings'), findsOneWidget);
     expect(find.text('App Theme'), findsOneWidget);
     expect(find.text('Server Connection (Dev)'), findsOneWidget);
+    expect(find.text('Teaching Engine Variant'), findsOneWidget);
+    expect(find.byKey(const Key('experiment_variant_tile')), findsOneWidget);
     expect(find.text('Delete My Data'), findsOneWidget);
   });
 
