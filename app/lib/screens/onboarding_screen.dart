@@ -203,6 +203,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
                 child: const Text('Start Speaking Practice'),
               ),
+              const SizedBox(height: SpeakabooTheme.spacingSm),
+              TextButton(
+                onPressed: widget.onFinish,
+                child: const Text(
+                  'Skip diagnostic, start speaking right away!',
+                  style: TextStyle(color: SpeakabooTheme.textSecondary, fontSize: 13),
+                ),
+              ),
             ],
           ),
         ),
@@ -345,42 +353,70 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _showDiagnosticDialog() {
+    bool isQuickIcebreaker = true;
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Spoken Diagnostic Test'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Sample Prompt:\n"Tell us about your hometown, what you enjoy doing in your free time, and why you want to learn English."',
-              style: TextStyle(fontSize: 13, color: SpeakabooTheme.textSecondary),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _diagnosticController,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                hintText: 'Type or speak your English sample answer here...',
-                border: OutlineInputBorder(),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Voice Check (Optional)'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  ChoiceChip(
+                    label: const Text('Quick Icebreaker (10s)'),
+                    selected: isQuickIcebreaker,
+                    onSelected: (val) {
+                      setDialogState(() => isQuickIcebreaker = true);
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: const Text('Full Diagnostic'),
+                    selected: !isQuickIcebreaker,
+                    onSelected: (val) {
+                      setDialogState(() => isQuickIcebreaker = false);
+                    },
+                  ),
+                ],
               ),
+              const SizedBox(height: 12),
+              Text(
+                isQuickIcebreaker
+                    ? 'Friendly Icebreaker Prompt:\n"Say hello to your coach and tell them your favorite food, animal, or hobby!"'
+                    : 'Full Assessment Prompt:\n"Tell us about your hometown, what you enjoy doing in your free time, and why you want to learn English."',
+                style: const TextStyle(fontSize: 13, color: SpeakabooTheme.textSecondary, height: 1.4),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _diagnosticController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: isQuickIcebreaker
+                      ? 'e.g. "Hello! I love eating biryani and reading books."'
+                      : 'Type or speak your English sample answer here...',
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Skip for Now'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                _runDiagnosticPlacement();
+              },
+              child: const Text('Check Level'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _runDiagnosticPlacement();
-            },
-            child: const Text('Evaluate Level'),
-          ),
-        ],
       ),
     );
   }
