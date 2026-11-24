@@ -77,6 +77,21 @@ class RefundResponse(BaseModel):
     message: str
 
 
+class ManualTrxIdRequest(BaseModel):
+    user_id: str
+    gateway: str = "bkash"  # "bkash" or "nagad"
+    trx_id: str
+    purpose: str = "monthly_plan"  # "monthly_plan" or "character_unlock"
+    target_id: str = ""
+
+
+class ManualTrxIdResponse(BaseModel):
+    success: bool
+    status: str
+    message: str
+    entitlement_granted: Optional[str] = None
+
+
 class EntitlementResponse(BaseModel):
     id: str
     user_id: str
@@ -328,4 +343,54 @@ async def refund_payment(
         status="refunded",
         revoked_entitlement=f"{ent_type}:{ent_val}" if revoked else None,
         message="Payment refunded and entitlement revoked successfully.",
+    )
+
+
+@router.post("/manual-trxid", response_model=ManualTrxIdResponse)
+async def verify_manual_trxid(
+    request: ManualTrxIdRequest, repo: BaseRepository = Depends(get_repository)
+):
+    """Direct distribution endpoint: verify manual USSD bKash/Nagad TrxID and grant entitlement."""
+    clean_trx = request.trx_id.strip().upper()
+    if len(clean_trx) < 8:
+        raise HTTPException(status_code=400, detail="Invalid Transaction ID format (minimum 8 characters)")
+
+    # Check for duplicate TrxID reuse
+    payments = await repo.get_payments_by_user(request.user_id)
+    if any(p.get("transaction_id") == clean_trx for p in payments):
+        raise HTTPException(status_code=409, detail="Transaction ID has already been claimed.")
+
+    pid = f"direct_{clean_trx}"
+    ent_type = "plan" if request.purpose == "monthly_plan" else "character"
+    ent_val = "monthly" if request.purpose == "monthly_plan" else request.target_id
+
+    # Record completed payment in ledger
+    await repo.record_payment(
+        payment_id=pid,
+        user_id=request.user_id,
+        gateway=request.gateway,
+        amount_bdt=200 if request.purpose == "monthly_plan" else 350,
+        purpose=request.purpose,
+        target_id=request.target_id,
+        checkout_url="direct://manual_ussd",
+        status="completed",
+    )
+    await repo.update_payment_status(pid, "completed", clean_trx)
+
+    # Grant entitlement
+    expires_at = (time.time() + (30 * 86400)) if ent_type == "plan" else None
+    await repo.add_entitlement(
+        Entitlement(
+            user_id=request.user_id,
+            type=ent_type,
+            value=ent_val,
+            expires_at=expires_at,
+        )
+    )
+
+    return ManualTrxIdResponse(
+        success=True,
+        status="completed",
+        message="Payment verified! Your Speakaboo entitlement is active.",
+        entitlement_granted=f"{ent_type}:{ent_val}",
     )

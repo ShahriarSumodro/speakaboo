@@ -200,3 +200,35 @@ async def test_refund_and_entitlement_revocation(client, setup_user):
     )
     assert res_re_refund.status_code == 200
     assert res_re_refund.json()["status"] == "refunded"
+
+
+@pytest.mark.asyncio
+async def test_manual_trxid_verification(client, setup_user):
+    """Test direct distribution manual USSD TrxID submission (CD-004)."""
+    uid = setup_user
+    res = client.post(
+        "/api/payment/manual-trxid",
+        json={
+            "user_id": uid,
+            "gateway": "bkash",
+            "trx_id": "BL9A3KQ912",
+            "purpose": "monthly_plan",
+        },
+    )
+    assert res.status_code == 200, res.text
+    data = res.json()
+    assert data["success"] is True
+    assert data["status"] == "completed"
+    assert data["entitlement_granted"] == "plan:monthly"
+
+    # Verify duplicate TrxID rejection (HTTP 409)
+    res_dup = client.post(
+        "/api/payment/manual-trxid",
+        json={
+            "user_id": uid,
+            "gateway": "bkash",
+            "trx_id": "BL9A3KQ912",
+            "purpose": "monthly_plan",
+        },
+    )
+    assert res_dup.status_code == 409
