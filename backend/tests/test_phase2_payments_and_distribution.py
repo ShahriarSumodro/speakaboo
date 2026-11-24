@@ -206,12 +206,13 @@ async def test_refund_and_entitlement_revocation(client, setup_user):
 async def test_manual_trxid_verification(client, setup_user):
     """Test direct distribution manual USSD TrxID submission (CD-004)."""
     uid = setup_user
+    test_trx = f"TRX{uuid.uuid4().hex[:8].upper()}"
     res = client.post(
         "/api/payment/manual-trxid",
         json={
             "user_id": uid,
             "gateway": "bkash",
-            "trx_id": "BL9A3KQ912",
+            "trx_id": test_trx,
             "purpose": "monthly_plan",
         },
     )
@@ -227,7 +228,7 @@ async def test_manual_trxid_verification(client, setup_user):
         json={
             "user_id": uid,
             "gateway": "bkash",
-            "trx_id": "BL9A3KQ912",
+            "trx_id": test_trx,
             "purpose": "monthly_plan",
         },
     )

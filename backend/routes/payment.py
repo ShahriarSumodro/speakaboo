@@ -355,12 +355,12 @@ async def verify_manual_trxid(
     if len(clean_trx) < 8:
         raise HTTPException(status_code=400, detail="Invalid Transaction ID format (minimum 8 characters)")
 
-    # Check for duplicate TrxID reuse
-    payments = await repo.get_payments_by_user(request.user_id)
-    if any(p.get("transaction_id") == clean_trx for p in payments):
+    # Check for duplicate TrxID reuse globally in ledger
+    pid = f"direct_{clean_trx}"
+    existing = await repo.get_payment(pid)
+    if existing:
         raise HTTPException(status_code=409, detail="Transaction ID has already been claimed.")
 
-    pid = f"direct_{clean_trx}"
     ent_type = "plan" if request.purpose == "monthly_plan" else "character"
     ent_val = "monthly" if request.purpose == "monthly_plan" else request.target_id
 
