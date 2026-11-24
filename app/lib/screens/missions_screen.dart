@@ -476,7 +476,20 @@ class _MissionsScreenState extends State<MissionsScreen> {
                   color: SpeakabooTheme.textPrimary,
                 ),
               ),
-              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Icons.volume_up, size: 20, color: SpeakabooTheme.accent),
+                tooltip: 'Listen to pronunciation',
+                visualDensity: VisualDensity.compact,
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Pronunciation: "${wotd.word}" [${wotd.pronunciation}]'),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(width: 4),
               Text(
                 wotd.pronunciation,
                 style: const TextStyle(
@@ -525,6 +538,27 @@ class _MissionsScreenState extends State<MissionsScreen> {
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.mic, size: 16),
+              label: Text('Practice Saying "${wotd.word}" with Reggie!'),
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Starting talk session with focus word: ${wotd.word}'),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              },
+              style: OutlinedButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                foregroundColor: SpeakabooTheme.accent,
+                side: BorderSide(color: SpeakabooTheme.accent.withValues(alpha: 0.5)),
+              ),
             ),
           ),
         ],

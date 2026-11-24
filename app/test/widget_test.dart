@@ -147,7 +147,17 @@ void main() {
         return http.Response(jsonEncode([]), 200);
       }
       if (request.url.path.contains('/api/learning/missions')) {
-        return http.Response(jsonEncode({'missions': [], 'streak': 0, 'freezes': 0}), 200);
+        return http.Response(jsonEncode({'date': '2026-11-24', 'missions': [], 'streak': 0, 'freezes': 0}), 200);
+      }
+      if (request.url.path.contains('/api/learning/word-of-the-day')) {
+        return http.Response(jsonEncode({
+          'word': 'Brave',
+          'pronunciation': '/breɪv/',
+          'bengali_meaning': 'সাহসী',
+          'definition': 'Ready to face danger or pain.',
+          'example': 'She was brave.',
+          'level': 'beginner',
+        }), 200);
       }
       if (request.url.path.contains('/api/learning/progress')) {
         return http.Response(jsonEncode({
