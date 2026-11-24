@@ -1009,6 +1009,17 @@ void main() {
           200,
         );
       }
+      if (request.url.path.endsWith('/api/learning/shadowing/evaluate')) {
+        return http.Response(
+          jsonEncode({
+            'accuracy_score': 88.0,
+            'pace_wpm': 115.0,
+            'feedback': 'Good rhythm and flow.',
+            'transcript': 'I enjoy walking in the fresh morning air.',
+          }),
+          200,
+        );
+      }
       return http.Response('Not Found', 404);
     });
 

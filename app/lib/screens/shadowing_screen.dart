@@ -269,6 +269,10 @@ class _ShadowingScreenState extends State<ShadowingScreen> {
                                   style: const TextStyle(fontSize: 13, color: SpeakabooTheme.textSecondary),
                                 ),
                               ],
+                              _buildWordAlignment(
+                                _selectedItem!.targetText,
+                                _lastEvaluation!['transcript'] as String? ?? _selectedItem!.targetText,
+                              ),
                             ],
                           ),
                         ),
@@ -276,6 +280,57 @@ class _ShadowingScreenState extends State<ShadowingScreen> {
                     ],
                   ],
                 ),
+    );
+  }
+
+  Widget _buildWordAlignment(String targetText, String spokenText) {
+    final targetWords = targetText.split(RegExp(r'\s+'));
+    final spokenWords = spokenText
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^\w\s]'), '')
+        .split(RegExp(r'\s+'))
+        .toSet();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 12),
+        const Text(
+          'Target Word Match & Rhythm Alignment (Approximate):',
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: targetWords.map((word) {
+            final clean = word.toLowerCase().replaceAll(RegExp(r'[^\w]'), '');
+            final matched = spokenWords.contains(clean) || clean.isEmpty;
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: matched
+                    ? SpeakabooTheme.success.withValues(alpha: 0.15)
+                    : SpeakabooTheme.warning.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: matched
+                      ? SpeakabooTheme.success.withValues(alpha: 0.5)
+                      : SpeakabooTheme.warning.withValues(alpha: 0.5),
+                ),
+              ),
+              child: Text(
+                word,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: matched ? SpeakabooTheme.success : SpeakabooTheme.warning,
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 
