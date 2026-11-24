@@ -99,3 +99,29 @@ class TestParseResponse:
         })
         result = parse_turn_response(raw)
         assert result.feedback_level == "gentle"  # Falls back to gentle
+
+    def test_single_focus_error_guard_prioritizes_tenses_over_articles(self):
+        """When multiple corrections are present, highest pedagogical priority is kept."""
+        raw = json.dumps({
+            "version": 1,
+            "reply": "I see what happened.",
+            "corrections": [
+                {
+                    "original": "a orange",
+                    "better": "an orange",
+                    "reason_short": "use an before vowels",
+                },
+                {
+                    "original": "Yesterday I go",
+                    "better": "Yesterday I went",
+                    "reason_short": "past tense requires went",
+                },
+            ],
+            "new_words": [],
+        })
+        result = parse_turn_response(raw)
+        assert result.correction is not None
+        # tenses_and_verbs (priority 1) beats articles (priority 4)
+        assert result.correction.original == "Yesterday I go"
+        assert result.correction.better == "Yesterday I went"
+        assert result.correction.category == "tenses_and_verbs"

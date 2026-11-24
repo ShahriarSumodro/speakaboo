@@ -20,6 +20,47 @@ class Correction:
     original: str
     better: str
     reason_short: str
+    category: str = ""
+
+    def __post_init__(self):
+        if not self.category and self.original and self.better:
+            self.category = categorize_error(self.original, self.better, self.reason_short)
+
+
+PEDAGOGICAL_ERROR_PRIORITY = {
+    "tenses_and_verbs": 1,
+    "subject_verb_agreement": 2,
+    "prepositions": 3,
+    "articles": 4,
+    "word_choice": 5,
+}
+
+
+def categorize_error(original: str, better: str, reason: str = "") -> str:
+    """Categorize grammar mistakes into core Bengali learner difficulty areas.
+    
+    Pedagogical priority order:
+    1. Tenses and verbs (communicative breakdown)
+    2. Subject-verb agreement (comprehensibility)
+    3. Prepositions
+    4. Articles
+    5. General word choice
+    """
+    orig_l = original.lower()
+    reason_l = reason.lower()
+    if any(s in reason_l for s in ["agreement", "subject-verb"]):
+        return "subject_verb_agreement"
+    if any(k in reason_l for k in ["tense", "past", "went", "did", "was", "were"]) or (
+        "verb" in reason_l and "subject-verb" not in reason_l
+    ):
+        return "tenses_and_verbs"
+    if any(s in reason_l for s in ["plural", "singular"]):
+        return "subject_verb_agreement"
+    if "preposition" in reason_l or any(re.search(rf"\b{p}\b", orig_l) for p in ["in", "on", "at", "to", "for", "with", "by", "from"]):
+        return "prepositions"
+    if "article" in reason_l or re.search(r"\b(a|an|the)\b", orig_l):
+        return "articles"
+    return "word_choice"
 
 
 @dataclass
@@ -40,6 +81,7 @@ class TurnResponse:
                 "original": self.correction.original,
                 "better": self.correction.better,
                 "reason_short": self.correction.reason_short,
+                "category": self.correction.category,
             } if self.correction else None,
             "new_words": self.new_words,
             "feedback_level": self.feedback_level,
@@ -143,18 +185,42 @@ def _validate_and_build(data: Any) -> TurnResponse:
         else:
             reply = truncated
 
-    # Optional correction
+    # Optional correction (Enforce CD-001 single focus error guard)
     correction = None
     corr_data = data.get("correction")
-    if corr_data and isinstance(corr_data, dict):
+    if corr_data is None and "corrections" in data:
+        corr_data = data.get("corrections")
+
+    if isinstance(corr_data, list) and len(corr_data) > 0:
+        candidates = []
+        for item in corr_data:
+            if isinstance(item, dict) and item.get("original") and item.get("better"):
+                cat = item.get("category") or categorize_error(
+                    item["original"], item["better"], item.get("reason_short", "")
+                )
+                prio = PEDAGOGICAL_ERROR_PRIORITY.get(cat, 99)
+                candidates.append((prio, item, cat))
+        if candidates:
+            # Sort by pedagogical priority: tenses_and_verbs (1) > agreement (2) > prep (3) > articles (4)
+            candidates.sort(key=lambda x: x[0])
+            best_prio, best_item, best_cat = candidates[0]
+            correction = Correction(
+                original=best_item.get("original", ""),
+                better=best_item.get("better", ""),
+                reason_short=best_item.get("reason_short", ""),
+                category=best_cat,
+            )
+    elif isinstance(corr_data, dict):
         original = corr_data.get("original", "")
         better = corr_data.get("better", "")
         reason = corr_data.get("reason_short", "")
+        cat = corr_data.get("category", "")
         if original and better:
             correction = Correction(
                 original=original,
                 better=better,
                 reason_short=reason,
+                category=cat,
             )
 
     # New words
