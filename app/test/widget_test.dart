@@ -983,6 +983,75 @@ void main() {
     expect(find.byType(TextField), findsOneWidget);
   });
 
+  testWidgets('VocabularyScreen opens review dialog with spoken recall test and stop target', (WidgetTester tester) async {
+    final mockClient = MockClient((request) async {
+      if (request.url.path.contains('/api/learning/vocabulary/review')) {
+        return http.Response(jsonEncode({'success': true}), 200);
+      }
+      if (request.url.path.contains('/api/learning/vocabulary/')) {
+        return http.Response(
+          jsonEncode({
+            'cards': [
+              {
+                'id': 'v_harvest',
+                'word': 'Harvest',
+                'definition': 'The process or period of gathering crops.',
+                'example': 'We had a good harvest this season.',
+                'box': 1,
+                'next_review': '2026-11-25',
+                'mastered': false,
+                'ease_factor': 2.5,
+                'repetitions': 0,
+              }
+            ]
+          }),
+          200,
+        );
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
+    final auth = AuthProvider(api: api);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
+        ],
+        child: const MaterialApp(home: VocabularyScreen()),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Harvest'), findsOneWidget);
+    // Open review dialog
+    await tester.tap(find.byIcon(Icons.quiz));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Nation (2001) Spoken Recall Test'), findsOneWidget);
+    expect(find.byKey(const Key('vocab_spoken_recall_btn')), findsOneWidget);
+
+    // Tap mic to start listening
+    await tester.tap(find.byKey(const Key('vocab_spoken_recall_btn')));
+    await tester.pump();
+    expect(find.text('Listening... (10s max)'), findsOneWidget);
+
+    // Tap stop to finish early
+    await tester.tap(find.byKey(const Key('vocab_spoken_recall_btn')));
+    await tester.pump();
+    expect(find.text('Say "Harvest" out loud'), findsOneWidget);
+
+    // Rate card
+    await tester.tap(find.text('Good'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+  });
+
   testWidgets('CharacterDetailScreen renders character information and sample phrases', (WidgetTester tester) async {
     final character = Character(
       id: 'prof_anika',

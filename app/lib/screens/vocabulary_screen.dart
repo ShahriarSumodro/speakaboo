@@ -1,6 +1,7 @@
 /// Vocabulary notebook screen with Leitner box spaced repetition.
 library;
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../config/theme.dart';
@@ -108,43 +109,130 @@ class _VocabularyScreenState extends State<VocabularyScreen> {
   }
 
   void _showReviewDialog(VocabCard card) {
+    bool isRecording = false;
+    int secondsLeft = 10;
+    Timer? countdownTimer;
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(card.word, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Definition:', style: const TextStyle(fontWeight: FontWeight.bold)),
-            Text(card.definition),
-            if (card.example.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text('Example:', style: const TextStyle(fontWeight: FontWeight.bold)),
-              Text('"${card.example}"', style: const TextStyle(fontStyle: FontStyle.italic)),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: Text(card.word, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Definition:', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(card.definition),
+                if (card.example.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  const Text('Example:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text('"${card.example}"', style: const TextStyle(fontStyle: FontStyle.italic)),
+                ],
+                const SizedBox(height: 12),
+                // Spoken Recall Practice (CD-011)
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: SpeakabooTheme.background,
+                    borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm),
+                    border: Border.all(color: SpeakabooTheme.accent.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        key: const Key('vocab_spoken_recall_btn'),
+                        icon: Icon(
+                          isRecording ? Icons.stop_circle : Icons.mic,
+                          color: isRecording ? SpeakabooTheme.error : SpeakabooTheme.accent,
+                          size: 26,
+                        ),
+                        tooltip: isRecording ? 'Stop & Check' : 'Speak to Test Recall',
+                        onPressed: () {
+                          if (isRecording) {
+                            countdownTimer?.cancel();
+                            setDialogState(() {
+                              isRecording = false;
+                            });
+                          } else {
+                            setDialogState(() {
+                              isRecording = true;
+                              secondsLeft = 10;
+                            });
+                            countdownTimer?.cancel();
+                            countdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+                              if (secondsLeft > 1) {
+                                setDialogState(() => secondsLeft--);
+                              } else {
+                                t.cancel();
+                                setDialogState(() {
+                                  isRecording = false;
+                                });
+                              }
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isRecording ? 'Listening... (${secondsLeft}s max)' : 'Say "${card.word}" out loud',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: isRecording ? SpeakabooTheme.accent : SpeakabooTheme.textPrimary,
+                              ),
+                            ),
+                            const Text(
+                              'Nation (2001) Spoken Recall Test',
+                              style: TextStyle(fontSize: 10, color: SpeakabooTheme.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text('Box ${card.box} • Repetitions: ${card.repetitions}', style: const TextStyle(fontSize: 12, color: SpeakabooTheme.textSecondary)),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  countdownTimer?.cancel();
+                  _submitReview(card.id, 'again');
+                },
+                child: const Text('Again', style: TextStyle(color: SpeakabooTheme.error)),
+              ),
+              TextButton(
+                onPressed: () {
+                  countdownTimer?.cancel();
+                  _submitReview(card.id, 'hard');
+                },
+                child: const Text('Hard', style: TextStyle(color: SpeakabooTheme.warning)),
+              ),
+              TextButton(
+                onPressed: () {
+                  countdownTimer?.cancel();
+                  _submitReview(card.id, 'good');
+                },
+                child: const Text('Good', style: TextStyle(color: SpeakabooTheme.accent)),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  countdownTimer?.cancel();
+                  _submitReview(card.id, 'easy');
+                },
+                child: const Text('Easy'),
+              ),
             ],
-            const SizedBox(height: 12),
-            Text('Box ${card.box} • Repetitions: ${card.repetitions}', style: const TextStyle(fontSize: 12, color: SpeakabooTheme.textSecondary)),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => _submitReview(card.id, 'again'),
-            child: const Text('Again', style: TextStyle(color: SpeakabooTheme.error)),
-          ),
-          TextButton(
-            onPressed: () => _submitReview(card.id, 'hard'),
-            child: const Text('Hard', style: TextStyle(color: SpeakabooTheme.warning)),
-          ),
-          TextButton(
-            onPressed: () => _submitReview(card.id, 'good'),
-            child: const Text('Good', style: TextStyle(color: SpeakabooTheme.accent)),
-          ),
-          ElevatedButton(
-            onPressed: () => _submitReview(card.id, 'easy'),
-            child: const Text('Easy'),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
