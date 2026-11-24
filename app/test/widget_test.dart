@@ -890,6 +890,15 @@ void main() {
 
     expect(find.text('Vegetable Market'), findsOneWidget);
     expect(find.text('Start Roleplay'), findsOneWidget);
+
+    // Tap Start Roleplay to open pre-task planning scaffold sheet (CD-006)
+    await tester.tap(find.text('Start Roleplay'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Pre-Task Prep: Vegetable Market'), findsOneWidget);
+    expect(find.text('1. What is your goal?'), findsOneWidget);
+    expect(find.text('Ready! Start Roleplay'), findsOneWidget);
   });
 
   testWidgets('TopicsScreen renders topics list', (WidgetTester tester) async {
