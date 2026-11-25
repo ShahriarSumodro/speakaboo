@@ -3,8 +3,8 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 import '../config/app_config.dart';
 import '../models/user_profile.dart';
 import '../models/character.dart';
@@ -27,6 +27,7 @@ class TurnResult {
   final bool safetyBlocked;
   final bool isTrial;
   final int? trialSecondsRemaining;
+  final String? ttsError;
 
   TurnResult({
     required this.conversationId,
@@ -41,6 +42,7 @@ class TurnResult {
     this.safetyBlocked = false,
     this.isTrial = false,
     this.trialSecondsRemaining,
+    this.ttsError,
   });
 
   factory TurnResult.fromJson(Map<String, dynamic> json) {
@@ -62,6 +64,7 @@ class TurnResult {
       safetyBlocked: json['safety_blocked'] ?? false,
       isTrial: json['is_trial'] ?? false,
       trialSecondsRemaining: json['trial_seconds_remaining'] as int?,
+      ttsError: json['tts_error'] as String?,
     );
   }
 }
@@ -498,16 +501,24 @@ class ApiService {
         .transform(utf8.decoder)
         .transform(const LineSplitter());
 
+    String? currentEvent;
     await for (final line in lineStream) {
-      if (line.startsWith('data: ')) {
+      if (line.startsWith('event: ')) {
+        currentEvent = line.substring(7).trim();
+      } else if (line.startsWith('data: ')) {
         final jsonStr = line.substring(6).trim();
         if (jsonStr.isNotEmpty) {
           try {
             final data = jsonDecode(jsonStr);
             if (data is Map<String, dynamic>) {
+              if (currentEvent != null && !data.containsKey('type')) {
+                data['type'] = currentEvent;
+              }
               yield data;
             }
-          } catch (_) {}
+          } catch (e) {
+            debugPrint('Failed to parse SSE data JSON: $e');
+          }
         }
       }
     }

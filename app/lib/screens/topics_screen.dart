@@ -77,16 +77,18 @@ class _TopicsScreenState extends State<TopicsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Conversation Topics'),
-        backgroundColor: SpeakabooTheme.background,
+        title: Text('Conversation Topics', style: TextStyle(color: colors.textPrimary)),
+        backgroundColor: colors.background,
+        foregroundColor: colors.textPrimary,
         elevation: 0,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _topics.isEmpty
-              ? const Center(child: Text('No topics available.'))
+              ? Center(child: Text('No topics available.', style: TextStyle(color: colors.textSecondary)))
               : ListView.builder(
                   padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
                   itemCount: _topics.length,
@@ -94,23 +96,23 @@ class _TopicsScreenState extends State<TopicsScreen> {
                     final t = _topics[index];
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
-                      color: SpeakabooTheme.surface,
+                      color: colors.surface,
                       elevation: 0,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd)),
                       child: ExpansionTile(
-                        title: Text(t.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('${t.category} • ${t.difficulty.toUpperCase()}'),
+                        title: Text(t.title, style: TextStyle(fontWeight: FontWeight.bold, color: colors.textPrimary)),
+                        subtitle: Text('${t.category} • ${t.difficulty.toUpperCase()}', style: TextStyle(color: colors.textSecondary)),
                         children: [
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('Discussion Starters:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                                Text('Discussion Starters:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: colors.textPrimary)),
                                 const SizedBox(height: 6),
                                 ...t.starters.map((starter) => Padding(
                                       padding: const EdgeInsets.only(bottom: 4),
-                                      child: Text('• "$starter"', style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 13)),
+                                      child: Text('• "$starter"', style: TextStyle(fontStyle: FontStyle.italic, fontSize: 13, color: colors.textSecondary)),
                                     )),
                                 const SizedBox(height: 10),
                                 SizedBox(
@@ -118,7 +120,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
                                   child: ElevatedButton(
                                     onPressed: () => _startTopic(t),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: SpeakabooTheme.accent,
+                                      backgroundColor: colors.accent,
                                       foregroundColor: Colors.white,
                                     ),
                                     child: const Text('Practice This Topic'),

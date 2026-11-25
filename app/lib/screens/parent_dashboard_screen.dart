@@ -181,18 +181,21 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Parent Dashboard'),
-        backgroundColor: SpeakabooTheme.background,
+        title: Text('Parent Dashboard', style: TextStyle(color: colors.textPrimary)),
+        backgroundColor: colors.background,
+        foregroundColor: colors.textPrimary,
         elevation: 0,
       ),
       body: !_isUnlocked
-          ? const Center(child: Text('Parent PIN required.'))
+          ? Center(child: Text('Parent PIN required.', style: TextStyle(color: colors.textSecondary)))
           : _isLoading
               ? const Center(child: CircularProgressIndicator())
               : _summary == null
-                  ? const Center(child: Text('Could not load summary.'))
+                  ? Center(child: Text('Could not load summary.', style: TextStyle(color: colors.textSecondary)))
                   : ListView(
                       padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
                       children: [
@@ -200,7 +203,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
                         Container(
                           padding: const EdgeInsets.all(SpeakabooTheme.spacingLg),
                           decoration: BoxDecoration(
-                            color: SpeakabooTheme.surface,
+                            color: colors.surface,
                             borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
                           ),
                           child: Column(
@@ -209,11 +212,15 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Text('This Week\'s Progress', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                  Text(
+                                    'This Week\'s Progress',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: colors.textPrimary),
+                                  ),
                                   if (_summary!.weeklyGoalMet)
-                                    const Chip(
-                                      label: Text('Goal Met! 🌟', style: TextStyle(color: Colors.white, fontSize: 11)),
-                                      backgroundColor: SpeakabooTheme.success,
+                                    Chip(
+                                      label: const Text('Goal Met! 🌟', style: TextStyle(color: Colors.white, fontSize: 11)),
+                                      backgroundColor: colors.success,
+                                      side: BorderSide(color: colors.success),
                                     ),
                                 ],
                               ),
@@ -236,17 +243,17 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
                                     final text = '🌟 Proud parent moment! My child practiced English speaking for ${_summary!.weeklyMinutes.toStringAsFixed(1)} minutes (${_summary!.totalWords} words) with a ${_summary!.currentStreak}-day streak on Speakaboo! 🚀 Practice makes confident speakers. https://speakaboo.app';
                                     Clipboard.setData(ClipboardData(text: text));
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Weekly achievement report copied for WhatsApp!'),
-                                        backgroundColor: SpeakabooTheme.success,
+                                      SnackBar(
+                                        content: const Text('Weekly achievement report copied for WhatsApp!'),
+                                        backgroundColor: colors.success,
                                       ),
                                     );
                                   },
-                                  icon: const Icon(Icons.share, size: 18, color: SpeakabooTheme.accent),
+                                  icon: Icon(Icons.share, size: 18, color: colors.accent),
                                   label: const Text('Share Achievement on WhatsApp', style: TextStyle(fontWeight: FontWeight.w600)),
                                   style: OutlinedButton.styleFrom(
-                                    foregroundColor: SpeakabooTheme.accent,
-                                    side: const BorderSide(color: SpeakabooTheme.accent),
+                                    foregroundColor: colors.accent,
+                                    side: BorderSide(color: colors.accent),
                                     padding: const EdgeInsets.symmetric(vertical: 12),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm)),
                                   ),
@@ -261,7 +268,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
                         Container(
                           padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
                           decoration: BoxDecoration(
-                            color: SpeakabooTheme.surface,
+                            color: colors.surface,
                             borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
                           ),
                           child: Column(
@@ -271,11 +278,14 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
                                 children: [
                                   Icon(
                                     _safetyFlags.isEmpty ? Icons.verified_user : Icons.warning_amber,
-                                    color: _safetyFlags.isEmpty ? SpeakabooTheme.success : SpeakabooTheme.warning,
+                                    color: _safetyFlags.isEmpty ? colors.success : colors.warning,
                                     size: 22,
                                   ),
                                   const SizedBox(width: 8),
-                                  const Text('Safety & Moderation Filter', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                  Text(
+                                    'Safety & Moderation Filter',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: colors.textPrimary),
+                                  ),
                                 ],
                               ),
                               const SizedBox(height: 6),
@@ -283,7 +293,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
                                 _safetyFlags.isEmpty
                                     ? 'No harmful topics or profanity detected. All conversations are safe and child-friendly.'
                                     : '${_safetyFlags.length} safety alert(s) logged for parental review.',
-                                style: const TextStyle(fontSize: 13, color: SpeakabooTheme.textSecondary),
+                                style: TextStyle(fontSize: 13, color: colors.textSecondary),
                               ),
                               if (_safetyFlags.isNotEmpty) ...[
                                 const SizedBox(height: 8),
@@ -292,12 +302,12 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
                                       child: Container(
                                         padding: const EdgeInsets.all(8),
                                         decoration: BoxDecoration(
-                                          color: SpeakabooTheme.background,
+                                          color: colors.background,
                                           borderRadius: BorderRadius.circular(6),
                                         ),
                                         child: Text(
                                           'Alert [${flag.severity.toUpperCase()}]: ${flag.reason} - "${flag.utterancePreview}"',
-                                          style: const TextStyle(fontSize: 12),
+                                          style: TextStyle(fontSize: 12, color: colors.textPrimary),
                                         ),
                                       ),
                                     )),
@@ -309,11 +319,14 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
 
                         // Coach Tips for Parents
                         if (_summary!.tips.isNotEmpty) ...[
-                          const Text('Speaking Coach Tips for Parents', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                          Text(
+                            'Speaking Coach Tips for Parents',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: colors.textPrimary),
+                          ),
                           const SizedBox(height: 8),
                           ..._summary!.tips.map((tip) => Card(
                                 margin: const EdgeInsets.only(bottom: 8),
-                                color: SpeakabooTheme.surface,
+                                color: colors.surface,
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm)),
                                 child: Padding(
@@ -321,9 +334,14 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
                                   child: Row(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      const Icon(Icons.lightbulb_outline, color: SpeakabooTheme.accent, size: 20),
+                                      Icon(Icons.lightbulb_outline, color: colors.accent, size: 20),
                                       const SizedBox(width: 8),
-                                      Expanded(child: Text(tip, style: const TextStyle(fontSize: 13))),
+                                      Expanded(
+                                        child: Text(
+                                          tip,
+                                          style: TextStyle(fontSize: 13, color: colors.textPrimary),
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -335,17 +353,18 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
   }
 
   Widget _buildMetricTile(String value, String label) {
+    final colors = context.colors;
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: SpeakabooTheme.background,
+        color: colors.background,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         children: [
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: SpeakabooTheme.accent)),
+          Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: colors.accent)),
           const SizedBox(height: 2),
-          Text(label, style: const TextStyle(fontSize: 11, color: SpeakabooTheme.textSecondary), textAlign: TextAlign.center),
+          Text(label, style: TextStyle(fontSize: 11, color: colors.textSecondary), textAlign: TextAlign.center),
         ],
       ),
     );

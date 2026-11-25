@@ -122,7 +122,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(res['message'] ?? 'Referral reward claimed!'),
-                      backgroundColor: SpeakabooTheme.success,
+                      backgroundColor: context.colors.success,
                     ),
                   );
                 }
@@ -132,7 +132,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Failed to claim: $e'),
-                      backgroundColor: SpeakabooTheme.error,
+                      backgroundColor: context.colors.error,
                     ),
                   );
                 }
@@ -220,6 +220,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final profile = auth.profile;
+    final colors = context.colors;
 
     final displayName = profile?.displayName ?? 'Learner';
     final level = profile?.level.toUpperCase() ?? 'BEGINNER';
@@ -229,19 +230,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: SpeakabooTheme.background,
+        backgroundColor: colors.background,
+        foregroundColor: colors.textPrimary,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'Learner Profile',
           style: TextStyle(
             fontSize: SpeakabooTheme.headingSize,
             fontWeight: FontWeight.bold,
-            color: SpeakabooTheme.textPrimary,
+            color: colors.textPrimary,
           ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings, color: SpeakabooTheme.textPrimary),
+            icon: Icon(Icons.settings, color: colors.textPrimary),
             tooltip: 'Settings',
             onPressed: () {
               Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
@@ -258,7 +260,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Container(
               padding: const EdgeInsets.all(SpeakabooTheme.spacingLg),
               decoration: BoxDecoration(
-                color: SpeakabooTheme.surface,
+                color: colors.surface,
                 borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
               ),
               child: Row(
@@ -266,8 +268,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Container(
                     width: 60,
                     height: 60,
-                    decoration: const BoxDecoration(
-                      color: SpeakabooTheme.accent,
+                    decoration: BoxDecoration(
+                      color: colors.accent,
                       shape: BoxShape.circle,
                     ),
                     child: Center(
@@ -284,25 +286,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         Text(
                           displayName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: SpeakabooTheme.baseFontSize + 2,
                             fontWeight: FontWeight.bold,
-                            color: SpeakabooTheme.textPrimary,
+                            color: colors.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           '$plan • ${profile?.dailyGoalMinutes ?? 10} min/day goal',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: SpeakabooTheme.captionSize,
-                            color: SpeakabooTheme.textSecondary,
+                            color: colors.textSecondary,
                           ),
                         ),
                       ],
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.edit, size: 20, color: SpeakabooTheme.accent),
+                    icon: Icon(Icons.edit, size: 20, color: colors.accent),
                     tooltip: 'Edit Profile',
                     onPressed: _showEditProfileDialog,
                   ),
@@ -331,9 +333,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: SpeakabooTheme.spacingLg),
 
             // Practice Modes Quick Access
-            const Text(
+            Text(
               'Practice Modes',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: SpeakabooTheme.textPrimary),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: colors.textPrimary),
             ),
             const SizedBox(height: 8),
             Row(
@@ -374,36 +376,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Container(
                 padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
                 decoration: BoxDecoration(
-                  color: SpeakabooTheme.surface,
+                  color: colors.surface,
                   borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.menu_book, color: SpeakabooTheme.accent, size: 28),
+                    Icon(Icons.menu_book, color: colors.accent, size: 28),
                     const SizedBox(width: SpeakabooTheme.spacingMd),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Vocabulary Notebook',
                             style: TextStyle(
                               fontSize: SpeakabooTheme.baseFontSize,
                               fontWeight: FontWeight.bold,
-                              color: SpeakabooTheme.textPrimary,
+                              color: colors.textPrimary,
                             ),
                           ),
                           Text(
                             '$_vocabCount saved word(s) with Leitner spaced repetition.',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: SpeakabooTheme.captionSize,
-                              color: SpeakabooTheme.textSecondary,
+                              color: colors.textSecondary,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const Icon(Icons.chevron_right, color: SpeakabooTheme.textSecondary),
+                    Icon(Icons.chevron_right, color: colors.textSecondary),
                   ],
                 ),
               ),
@@ -419,13 +421,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Container(
                 padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
                 decoration: BoxDecoration(
-                  color: SpeakabooTheme.surface,
+                  color: colors.surface,
                   borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.family_restroom, color: SpeakabooTheme.accent, size: 28),
-                    SizedBox(width: SpeakabooTheme.spacingMd),
+                    Icon(Icons.family_restroom, color: colors.accent, size: 28),
+                    const SizedBox(width: SpeakabooTheme.spacingMd),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -435,20 +437,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             style: TextStyle(
                               fontSize: SpeakabooTheme.baseFontSize,
                               fontWeight: FontWeight.bold,
-                              color: SpeakabooTheme.textPrimary,
+                              color: colors.textPrimary,
                             ),
                           ),
                           Text(
                             'Review weekly speaking minutes, words, and safety filter alerts.',
                             style: TextStyle(
                               fontSize: SpeakabooTheme.captionSize,
-                              color: SpeakabooTheme.textSecondary,
+                              color: colors.textSecondary,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    Icon(Icons.chevron_right, color: SpeakabooTheme.textSecondary),
+                    Icon(Icons.chevron_right, color: colors.textSecondary),
                   ],
                 ),
               ),
@@ -471,17 +473,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Container(
                 padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF2A221D), Color(0xFF1B1613)],
+                  gradient: LinearGradient(
+                    colors: context.isDarkMode
+                        ? const [Color(0xFF2A221D), Color(0xFF1B1613)]
+                        : const [Color(0xFF3E2723), Color(0xFF2E1C14)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
-                  border: Border.all(color: SpeakabooTheme.accent.withValues(alpha: 0.3)),
+                  border: Border.all(color: colors.accent.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.share, color: SpeakabooTheme.accent, size: 28),
+                    Icon(Icons.share, color: colors.accent, size: 28),
                     const SizedBox(width: SpeakabooTheme.spacingMd),
                     Expanded(
                       child: Column(
@@ -505,7 +509,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ],
                       ),
                     ),
-                    const Icon(Icons.arrow_forward, color: SpeakabooTheme.accent),
+                    Icon(Icons.arrow_forward, color: colors.accent),
                   ],
                 ),
               ),
@@ -516,7 +520,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Container(
               padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
               decoration: BoxDecoration(
-                color: SpeakabooTheme.surface,
+                color: colors.surface,
                 borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
               ),
               child: Column(
@@ -524,23 +528,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.card_giftcard, color: SpeakabooTheme.accent, size: 24),
+                      Icon(Icons.card_giftcard, color: colors.accent, size: 24),
                       const SizedBox(width: 8),
-                      const Text(
+                      Text(
                         'Refer Friends (+100 XP)',
                         style: TextStyle(
                           fontSize: SpeakabooTheme.baseFontSize,
                           fontWeight: FontWeight.bold,
-                          color: SpeakabooTheme.textPrimary,
+                          color: colors.textPrimary,
                         ),
                       ),
                       const Spacer(),
                       Text(
                         'Code: ${_referral?.referralCode ?? "..."}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: SpeakabooTheme.captionSize,
                           fontWeight: FontWeight.bold,
-                          color: SpeakabooTheme.accent,
+                          color: colors.accent,
                         ),
                       ),
                     ],
@@ -548,9 +552,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 6),
                   Text(
                     '${_referral?.referralCount ?? 0} friends joined. ${_referral?.xpEarned ?? 0} XP earned.',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: SpeakabooTheme.captionSize,
-                      color: SpeakabooTheme.textSecondary,
+                      color: colors.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -596,6 +600,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildMilestoneCard({required String level, required double weeklyMinutes}) {
+    final colors = context.colors;
     final lvl = level.toLowerCase();
     String emotionalIdentity;
     String cefrMilestone;
@@ -625,9 +630,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       key: const Key('cefr_identity_card'),
       padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
       decoration: BoxDecoration(
-        color: SpeakabooTheme.surface,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
-        border: Border.all(color: SpeakabooTheme.accent.withValues(alpha: 0.25)),
+        border: Border.all(color: colors.accent.withValues(alpha: 0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -637,10 +642,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: SpeakabooTheme.accent.withValues(alpha: 0.15),
+                  color: colors.accent.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.school_outlined, size: 20, color: SpeakabooTheme.accent),
+                child: Icon(Icons.school_outlined, size: 20, color: colors.accent),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -649,18 +654,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     Text(
                       emotionalIdentity,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: SpeakabooTheme.textPrimary,
+                        color: colors.textPrimary,
                       ),
                     ),
                     Text(
                       cefrMilestone,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: SpeakabooTheme.accent,
+                        color: colors.accent,
                       ),
                     ),
                   ],
@@ -671,7 +676,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   '${(progressRatio * 100).toInt()}%',
                   style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
-                backgroundColor: SpeakabooTheme.accent,
+                backgroundColor: colors.accent,
+                side: BorderSide(color: colors.accent),
                 visualDensity: VisualDensity.compact,
               ),
             ],
@@ -682,8 +688,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: LinearProgressIndicator(
               value: progressRatio,
               minHeight: 6,
-              backgroundColor: SpeakabooTheme.background,
-              valueColor: const AlwaysStoppedAnimation<Color>(SpeakabooTheme.accent),
+              backgroundColor: colors.background,
+              valueColor: AlwaysStoppedAnimation<Color>(colors.accent),
             ),
           ),
           const SizedBox(height: 6),
@@ -692,11 +698,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: [
               Text(
                 '${weeklyMinutes.toStringAsFixed(1)} / ${targetMinutes.toInt()} mins this week',
-                style: const TextStyle(fontSize: 11, color: SpeakabooTheme.textSecondary),
+                style: TextStyle(fontSize: 11, color: colors.textSecondary),
               ),
               Text(
                 'Next: $nextMilestone',
-                style: const TextStyle(fontSize: 11, color: SpeakabooTheme.textSecondary, fontStyle: FontStyle.italic),
+                style: TextStyle(fontSize: 11, color: colors.textSecondary, fontStyle: FontStyle.italic),
               ),
             ],
           ),
@@ -706,29 +712,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildMetricTile(String value, String label, IconData icon) {
+    final colors = context.colors;
     return Container(
       padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
       decoration: BoxDecoration(
-        color: SpeakabooTheme.surface,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
       ),
       child: Column(
         children: [
-          Icon(icon, color: SpeakabooTheme.accent, size: 24),
+          Icon(icon, color: colors.accent, size: 24),
           const SizedBox(height: 6),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: SpeakabooTheme.textPrimary,
+              color: colors.textPrimary,
             ),
           ),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 10,
-              color: SpeakabooTheme.textSecondary,
+              color: colors.textSecondary,
             ),
             textAlign: TextAlign.center,
           ),
@@ -738,20 +745,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildActionTile({required String title, required IconData icon, required VoidCallback onTap}) {
+    final colors = context.colors;
     return InkWell(
       borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm),
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         decoration: BoxDecoration(
-          color: SpeakabooTheme.surface,
+          color: colors.surface,
           borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm),
         ),
         child: Column(
           children: [
-            Icon(icon, color: SpeakabooTheme.accent, size: 22),
+            Icon(icon, color: colors.accent, size: 22),
             const SizedBox(height: 4),
-            Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colors.textPrimary)),
           ],
         ),
       ),

@@ -52,11 +52,13 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Scaffold(
-      backgroundColor: SpeakabooTheme.background,
+      backgroundColor: colors.background,
       appBar: AppBar(
-        title: const Text('Companion Toy (BLE)'),
-        backgroundColor: SpeakabooTheme.surface,
+        title: Text('Companion Toy (BLE)', style: TextStyle(color: colors.textPrimary)),
+        backgroundColor: colors.background,
+        foregroundColor: colors.textPrimary,
         elevation: 0,
       ),
       body: SafeArea(
@@ -68,8 +70,8 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
               padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
               decoration: BoxDecoration(
                 color: _connectedDeviceId != null
-                    ? SpeakabooTheme.accent.withValues(alpha: 0.12)
-                    : SpeakabooTheme.surface,
+                    ? colors.accent.withValues(alpha: 0.12)
+                    : colors.surface,
                 borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
               ),
               child: Row(
@@ -78,7 +80,7 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
                     _connectedDeviceId != null
                         ? Icons.bluetooth_connected
                         : Icons.bluetooth_searching,
-                    color: SpeakabooTheme.accent,
+                    color: colors.accent,
                     size: 28,
                   ),
                   const SizedBox(width: SpeakabooTheme.spacingMd),
@@ -90,19 +92,19 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
                           _connectedDeviceId != null
                               ? 'Connected to Toy'
                               : 'No Toy Connected',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: SpeakabooTheme.baseFontSize,
                             fontWeight: FontWeight.bold,
-                            color: SpeakabooTheme.textPrimary,
+                            color: colors.textPrimary,
                           ),
                         ),
                         Text(
                           _connectedDeviceId != null
                               ? 'Audio relay and push-to-talk active'
                               : 'The app works fully standalone or with the toy',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: SpeakabooTheme.captionSize,
-                            color: SpeakabooTheme.textSecondary,
+                            color: colors.textSecondary,
                           ),
                         ),
                       ],
@@ -117,24 +119,24 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'Nearby Companion Toys',
                   style: TextStyle(
                     fontSize: SpeakabooTheme.subheadingSize,
                     fontWeight: FontWeight.bold,
-                    color: SpeakabooTheme.textPrimary,
+                    color: colors.textPrimary,
                   ),
                 ),
                 TextButton.icon(
                   onPressed: _toggleScan,
                   icon: Icon(
                     _isScanning ? Icons.stop : Icons.refresh,
-                    color: SpeakabooTheme.accent,
+                    color: colors.accent,
                   ),
                   label: Text(
                     _isScanning ? 'Stop' : 'Scan',
-                    style: const TextStyle(
-                      color: SpeakabooTheme.accent,
+                    style: TextStyle(
+                      color: colors.accent,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -150,17 +152,17 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
                 margin: const EdgeInsets.only(bottom: SpeakabooTheme.spacingSm),
                 padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
                 decoration: BoxDecoration(
-                  color: SpeakabooTheme.surface,
+                  color: colors.surface,
                   borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
                   border: isConnected
-                      ? Border.all(color: SpeakabooTheme.accent, width: 2)
+                      ? Border.all(color: colors.accent, width: 2)
                       : null,
                 ),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.smart_toy_outlined,
-                      color: SpeakabooTheme.accent,
+                      color: colors.accent,
                       size: 32,
                     ),
                     const SizedBox(width: SpeakabooTheme.spacingMd),
@@ -170,18 +172,18 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
                         children: [
                           Text(
                             device['name'],
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: SpeakabooTheme.baseFontSize,
                               fontWeight: FontWeight.bold,
-                              color: SpeakabooTheme.textPrimary,
+                              color: colors.textPrimary,
                             ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             'Battery: ${device['battery']}% • Signal: ${device['rssi']} dBm',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: SpeakabooTheme.captionSize,
-                              color: SpeakabooTheme.textSecondary,
+                              color: colors.textSecondary,
                             ),
                           ),
                         ],
@@ -193,8 +195,8 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
                         onPressed: () => _toggleConnect(device['id']),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: isConnected
-                              ? SpeakabooTheme.textSecondary
-                              : SpeakabooTheme.accent,
+                              ? colors.textSecondary
+                              : colors.accent,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius:
@@ -212,34 +214,34 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
             const SizedBox(height: SpeakabooTheme.spacingLg),
 
             // Audio Relay Settings
-            const Text(
+            Text(
               'Hardware Audio Relay Settings',
               style: TextStyle(
                 fontSize: SpeakabooTheme.subheadingSize,
                 fontWeight: FontWeight.bold,
-                color: SpeakabooTheme.textPrimary,
+                color: colors.textPrimary,
               ),
             ),
             const SizedBox(height: SpeakabooTheme.spacingSm),
             Material(
-              color: SpeakabooTheme.surface,
+              color: colors.surface,
               borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
               clipBehavior: Clip.antiAlias,
               child: Column(
                 children: [
                   SwitchListTile(
-                    title: const Text('Relay Microphone Input'),
-                    subtitle: const Text('Capture speech through physical toy mic'),
+                    title: Text('Relay Microphone Input', style: TextStyle(color: colors.textPrimary)),
+                    subtitle: Text('Capture speech through physical toy mic', style: TextStyle(color: colors.textSecondary)),
                     value: _relayMic,
-                    activeThumbColor: SpeakabooTheme.accent,
+                    activeThumbColor: colors.accent,
                     onChanged: (val) => setState(() => _relayMic = val),
                   ),
                   const Divider(height: 1),
                   SwitchListTile(
-                    title: const Text('Relay Speaker Output'),
-                    subtitle: const Text('Play companion voice on toy speaker'),
+                    title: Text('Relay Speaker Output', style: TextStyle(color: colors.textPrimary)),
+                    subtitle: Text('Play companion voice on toy speaker', style: TextStyle(color: colors.textSecondary)),
                     value: _relaySpeaker,
-                    activeThumbColor: SpeakabooTheme.accent,
+                    activeThumbColor: colors.accent,
                     onChanged: (val) => setState(() => _relaySpeaker = val),
                   ),
                 ],

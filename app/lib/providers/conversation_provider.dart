@@ -192,6 +192,8 @@ class ConversationProvider extends ChangeNotifier {
       List<String> newWords = [];
       final List<Uint8List> audioChunks = [];
       bool gotTranscript = false;
+      String? ttsError;
+      String? streamError;
 
       final stream = api.streamTurn(
         conversationId: _conversationId!,
@@ -199,26 +201,46 @@ class ConversationProvider extends ChangeNotifier {
       );
 
       await for (final event in stream) {
-        final type = event['type'] as String?;
+        final type = (event['type'] ?? event['event']) as String?;
 
         if (type == 'transcript') {
-          transcript = event['text'] ?? '';
-          if (transcript.isNotEmpty && !gotTranscript) {
-            gotTranscript = true;
-            _messages.add(ChatMessage(text: transcript, isUser: true));
-            notifyListeners();
+          final t = (event['text'] ?? event['transcript'] ?? '') as String;
+          if (t.isNotEmpty) {
+            transcript = t;
+            if (!gotTranscript) {
+              gotTranscript = true;
+              _messages.add(ChatMessage(text: transcript, isUser: true));
+              notifyListeners();
+            }
           }
-        } else if (type == 'reply_chunk') {
-          replyText += event['text'] ?? '';
+        } else if (type == 'reply_start' || type == 'reply_chunk') {
+          final chunk = (event['text'] ?? event['reply']) as String?;
+          if (chunk != null && chunk.isNotEmpty) {
+            replyText = (type == 'reply_start') ? chunk : (replyText + chunk);
+          }
+          if (event['correction'] != null) {
+            correction = CorrectionData.fromJson(event['correction']);
+          }
+          if (event['new_words'] != null) {
+            newWords = List<String>.from(event['new_words']);
+          }
         } else if (type == 'audio_chunk') {
           final b64 = event['audio_base64'] as String?;
           if (b64 != null && b64.isNotEmpty) {
             audioChunks.add(base64Decode(b64));
           }
+        } else if (type == 'tts_error') {
+          ttsError = event['error'] as String? ?? 'I could not make my voice. Tap to retry.';
+          debugPrint('TTS streaming stage error: ${event['detail'] ?? event['error']}');
+        } else if (type == 'error') {
+          streamError = event['error'] as String? ?? event['detail'] as String?;
+          debugPrint('Stream turn error event: $streamError');
         } else if (type == 'turn_complete') {
-          final turn = event['turn'] as Map<String, dynamic>? ?? {};
-          if (turn['reply'] != null) {
-            replyText = turn['reply'];
+          final turn = (event['turn'] is Map<String, dynamic>)
+              ? event['turn'] as Map<String, dynamic>
+              : event;
+          if (turn['reply'] != null && (turn['reply'] as String).isNotEmpty) {
+            replyText = turn['reply'] as String;
           }
           if (turn['correction'] != null) {
             correction = CorrectionData.fromJson(turn['correction']);
@@ -227,10 +249,13 @@ class ConversationProvider extends ChangeNotifier {
             newWords = List<String>.from(turn['new_words']);
           }
           if (turn['level'] != null) {
-            _level = turn['level'];
+            _level = turn['level'] as String;
           }
           if (turn['latency_ms'] != null) {
             _lastLatencyMs = (turn['latency_ms'] as num).toDouble();
+          }
+          if (turn['tts_error'] != null) {
+            ttsError = turn['tts_error'] as String;
           }
         }
       }
@@ -240,7 +265,7 @@ class ConversationProvider extends ChangeNotifier {
         _messages.add(ChatMessage(text: transcript, isUser: true));
       }
 
-      // Add completed AI response
+      // Add completed AI response if available
       if (replyText.isNotEmpty) {
         _messages.add(ChatMessage(
           text: replyText,
@@ -248,6 +273,13 @@ class ConversationProvider extends ChangeNotifier {
           correction: correction,
           newWords: newWords,
         ));
+      } else if (streamError != null) {
+        debugPrint('Streaming failed with error: $streamError');
+        _handleError('I could not think of a reply. Tap to retry.', retryable: true);
+        return;
+      } else if (transcript.isEmpty) {
+        _handleError('I could not hear that. Tap to retry.', retryable: true);
+        return;
       }
 
       notifyListeners();
@@ -260,13 +292,19 @@ class ConversationProvider extends ChangeNotifier {
         await audio.playChunks(audioChunks);
 
         _status = ConversationStatus.ready;
+        if (ttsError != null) {
+          _errorMessage = ttsError;
+        }
         notifyListeners();
       } else {
         _status = ConversationStatus.ready;
+        if (ttsError != null) {
+          _errorMessage = ttsError;
+        }
         notifyListeners();
       }
-    } catch (_) {
-      // Fallback to blocking endpoint on any streaming failure
+    } catch (e) {
+      debugPrint('Streaming turn error ($e). Falling back to blocking endpoint.');
       await _processAudioBlocking(audioBytes);
     }
   }
@@ -298,16 +336,24 @@ class ConversationProvider extends ChangeNotifier {
       }
 
       // Add AI response
-      _messages.add(ChatMessage(
-        text: result.reply,
-        isUser: false,
-        correction: result.correction,
-        newWords: result.newWords,
-      ));
+      if (result.reply.isNotEmpty) {
+        _messages.add(ChatMessage(
+          text: result.reply,
+          isUser: false,
+          correction: result.correction,
+          newWords: result.newWords,
+        ));
+      }
 
       notifyListeners();
 
-      // Play audio response
+      // Handle TTS error gracefully
+      if (result.ttsError != null) {
+        debugPrint('Turn TTS error: ${result.ttsError}');
+        _errorMessage = 'I could not make my voice. Tap to retry.';
+      }
+
+      // Play audio response if present
       if (result.audioChunks.isNotEmpty) {
         _status = ConversationStatus.playing;
         notifyListeners();
@@ -321,13 +367,17 @@ class ConversationProvider extends ChangeNotifier {
         notifyListeners();
       }
     } on ApiException catch (e) {
+      debugPrint('Turn API exception: $e');
       if (e.statusCode == 429) {
         _handleError(e.message, retryable: true, isBusy: true);
+      } else if (e.statusCode == 400 || e.message.contains('Empty audio')) {
+        _handleError('I could not hear that. Tap to retry.', retryable: true);
       } else {
-        _handleError(e.message, retryable: e.retryable);
+        _handleError('I could not think of a reply. Tap to retry.', retryable: true);
       }
     } catch (e) {
-      _handleError('Something went wrong. Try again.');
+      debugPrint('Turn unexpected error: $e');
+      _handleError('I could not think of a reply. Tap to retry.', retryable: true);
     }
   }
 

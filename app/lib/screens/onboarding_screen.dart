@@ -90,6 +90,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -106,44 +107,44 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: SpeakabooTheme.surface,
+                    color: colors.surface,
                     borderRadius: BorderRadius.circular(SpeakabooTheme.radiusLg),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.record_voice_over,
                     size: 44,
-                    color: SpeakabooTheme.accent,
+                    color: colors.accent,
                   ),
                 ),
               ),
               const SizedBox(height: SpeakabooTheme.spacingMd),
-              const Text(
+              Text(
                 'Welcome to Speakaboo!',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: SpeakabooTheme.headingSize,
                   fontWeight: FontWeight.bold,
-                  color: SpeakabooTheme.textPrimary,
+                  color: colors.textPrimary,
                 ),
               ),
               const SizedBox(height: SpeakabooTheme.spacingSm),
-              const Text(
+              Text(
                 'Personalize your coaching journey for maximum speaking confidence.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: SpeakabooTheme.baseFontSize,
-                  color: SpeakabooTheme.textSecondary,
+                  color: colors.textSecondary,
                 ),
               ),
               const SizedBox(height: SpeakabooTheme.spacingLg),
 
               // Age band
-              const Text(
+              Text(
                 'Who is learning?',
                 style: TextStyle(
                   fontSize: SpeakabooTheme.captionSize,
                   fontWeight: FontWeight.bold,
-                  color: SpeakabooTheme.textSecondary,
+                  color: colors.textSecondary,
                 ),
               ),
               const SizedBox(height: SpeakabooTheme.spacingSm),
@@ -151,12 +152,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               const SizedBox(height: SpeakabooTheme.spacingLg),
 
               // Primary goal
-              const Text(
+              Text(
                 'Your primary goal:',
                 style: TextStyle(
                   fontSize: SpeakabooTheme.captionSize,
                   fontWeight: FontWeight.bold,
-                  color: SpeakabooTheme.textSecondary,
+                  color: colors.textSecondary,
                 ),
               ),
               const SizedBox(height: SpeakabooTheme.spacingSm),
@@ -167,12 +168,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     'Select English level:',
                     style: TextStyle(
                       fontSize: SpeakabooTheme.captionSize,
                       fontWeight: FontWeight.bold,
-                      color: SpeakabooTheme.textSecondary,
+                      color: colors.textSecondary,
                     ),
                   ),
                   TextButton.icon(
@@ -206,9 +207,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               const SizedBox(height: SpeakabooTheme.spacingSm),
               TextButton(
                 onPressed: widget.onFinish,
-                child: const Text(
+                child: Text(
                   'Skip diagnostic, start speaking right away!',
-                  style: TextStyle(color: SpeakabooTheme.textSecondary, fontSize: 13),
+                  style: TextStyle(color: colors.textSecondary, fontSize: 13),
                 ),
               ),
             ],
@@ -219,6 +220,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildAgeBandSelector() {
+    final colors = context.colors;
     final bands = [
       {'id': 'kid', 'label': 'Child (6-12)', 'icon': Icons.child_care},
       {'id': 'teen', 'label': 'Teen (13-17)', 'icon': Icons.school},
@@ -235,16 +237,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               margin: const EdgeInsets.symmetric(horizontal: 4),
               padding: const EdgeInsets.symmetric(vertical: 10),
               decoration: BoxDecoration(
-                color: isSelected ? SpeakabooTheme.accent.withValues(alpha: 0.1) : SpeakabooTheme.surface,
+                color: isSelected ? colors.accent.withValues(alpha: 0.1) : colors.surface,
                 borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm),
                 border: Border.all(
-                  color: isSelected ? SpeakabooTheme.accent : Colors.transparent,
+                  color: isSelected ? colors.accent : Colors.transparent,
                   width: 2,
                 ),
               ),
               child: Column(
                 children: [
-                  Icon(band['icon'] as IconData, size: 22, color: isSelected ? SpeakabooTheme.accent : SpeakabooTheme.textSecondary),
+                  Icon(band['icon'] as IconData, size: 22, color: isSelected ? colors.accent : colors.textSecondary),
                   const SizedBox(height: 4),
                   Text(
                     band['label'] as String,
@@ -252,7 +254,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      color: isSelected ? SpeakabooTheme.accent : SpeakabooTheme.textPrimary,
+                      color: isSelected ? colors.accent : colors.textPrimary,
                     ),
                   ),
                 ],
@@ -265,6 +267,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildGoalSelector() {
+    final colors = context.colors;
     final goals = [
       'Daily Conversation',
       'IELTS & Exams',
@@ -281,9 +284,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           label: Text(goal),
           selected: isSelected,
           onSelected: (_) => setState(() => _selectedGoal = goal),
-          selectedColor: SpeakabooTheme.accent.withValues(alpha: 0.15),
+          selectedColor: colors.accent.withValues(alpha: 0.15),
           labelStyle: TextStyle(
-            color: isSelected ? SpeakabooTheme.accent : SpeakabooTheme.textPrimary,
+            color: isSelected ? colors.accent : colors.textPrimary,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
           ),
         );
@@ -292,6 +295,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildLevelSelector() {
+    final colors = context.colors;
     final levels = [
       {'id': 'beginner', 'label': 'Beginner (A1-A2)', 'desc': 'Simple words & short everyday phrases'},
       {'id': 'intermediate', 'label': 'Intermediate (B1)', 'desc': 'Conversational fluency & opinions'},
@@ -311,15 +315,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             margin: const EdgeInsets.only(bottom: SpeakabooTheme.spacingSm),
             padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
             decoration: BoxDecoration(
-              color: SpeakabooTheme.surface,
+              color: colors.surface,
               borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
-              border: isSelected ? Border.all(color: SpeakabooTheme.accent, width: 2) : null,
+              border: isSelected ? Border.all(color: colors.accent, width: 2) : null,
             ),
             child: Row(
               children: [
                 Icon(
                   isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
-                  color: isSelected ? SpeakabooTheme.accent : SpeakabooTheme.textSecondary,
+                  color: isSelected ? colors.accent : colors.textSecondary,
                 ),
                 const SizedBox(width: SpeakabooTheme.spacingMd),
                 Expanded(
@@ -328,17 +332,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     children: [
                       Text(
                         lvl['label']!,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: SpeakabooTheme.baseFontSize,
                           fontWeight: FontWeight.bold,
-                          color: SpeakabooTheme.textPrimary,
+                          color: colors.textPrimary,
                         ),
                       ),
                       Text(
                         lvl['desc']!,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: SpeakabooTheme.captionSize,
-                          color: SpeakabooTheme.textSecondary,
+                          color: colors.textSecondary,
                         ),
                       ),
                     ],
@@ -388,7 +392,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 isQuickIcebreaker
                     ? 'Friendly Icebreaker Prompt:\n"Say hello to your coach and tell them your favorite food, animal, or hobby!"'
                     : 'Full Assessment Prompt:\n"Tell us about your hometown, what you enjoy doing in your free time, and why you want to learn English."',
-                style: const TextStyle(fontSize: 13, color: SpeakabooTheme.textSecondary, height: 1.4),
+                style: TextStyle(fontSize: 13, color: context.colors.textSecondary, height: 1.4),
               ),
               const SizedBox(height: 12),
               TextField(

@@ -97,7 +97,9 @@ class _TalkScreenState extends State<TalkScreen> {
   }
 
   Widget _buildHeader(ConversationProvider conv) {
+    final colors = context.colors;
     final isFluency = conv.practiceMode == 'fluency';
+    final isDark = context.isDarkMode;
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: SpeakabooTheme.spacingMd,
@@ -109,10 +111,10 @@ class _TalkScreenState extends State<TalkScreen> {
             onLongPress: () => DevServerDialog.show(context),
             child: Text(
               conv.characterName ?? 'Speakaboo',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: SpeakabooTheme.headingSize,
                 fontWeight: FontWeight.bold,
-                color: SpeakabooTheme.textPrimary,
+                color: colors.textPrimary,
               ),
             ),
           ),
@@ -123,23 +125,23 @@ class _TalkScreenState extends State<TalkScreen> {
               key: const Key('trial_countdown_badge'),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: SpeakabooTheme.warning.withValues(alpha: 0.15),
+                color: colors.warning.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm),
                 border: Border.all(
-                  color: SpeakabooTheme.warning.withValues(alpha: 0.4),
+                  color: colors.warning.withValues(alpha: 0.4),
                 ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.hourglass_top, size: 14, color: SpeakabooTheme.warning),
+                  Icon(Icons.hourglass_top, size: 14, color: colors.warning),
                   const SizedBox(width: 4),
                   Text(
                     '${(conv.trialSecondsRemaining! ~/ 60)}:${(conv.trialSecondsRemaining! % 60).toString().padLeft(2, '0')} trial',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: SpeakabooTheme.smallSize,
                       fontWeight: FontWeight.bold,
-                      color: SpeakabooTheme.warning,
+                      color: colors.warning,
                     ),
                   ),
                 ],
@@ -157,10 +159,14 @@ class _TalkScreenState extends State<TalkScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: isFluency ? Colors.teal.shade50 : Colors.amber.shade50,
+                color: isDark
+                    ? (isFluency ? Colors.teal.withValues(alpha: 0.25) : Colors.amber.withValues(alpha: 0.25))
+                    : (isFluency ? Colors.teal.shade50 : Colors.amber.shade50),
                 borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm),
                 border: Border.all(
-                  color: isFluency ? Colors.teal.shade300 : Colors.amber.shade300,
+                  color: isDark
+                      ? (isFluency ? Colors.teal.shade400 : Colors.amber.shade400)
+                      : (isFluency ? Colors.teal.shade300 : Colors.amber.shade300),
                 ),
               ),
               child: Text(
@@ -168,14 +174,16 @@ class _TalkScreenState extends State<TalkScreen> {
                 style: TextStyle(
                   fontSize: SpeakabooTheme.smallSize,
                   fontWeight: FontWeight.w600,
-                  color: isFluency ? Colors.teal.shade800 : Colors.brown,
+                  color: isDark
+                      ? (isFluency ? Colors.teal.shade200 : Colors.amber.shade200)
+                      : (isFluency ? Colors.teal.shade800 : Colors.brown),
                 ),
               ),
             ),
           ),
           const SizedBox(width: 4),
           IconButton(
-            icon: const Icon(Icons.flag_outlined, size: 20, color: SpeakabooTheme.accent),
+            icon: Icon(Icons.flag_outlined, size: 20, color: colors.accent),
             tooltip: 'Finish & Summary',
             onPressed: () async {
               final summary = await conv.fetchSummary();
@@ -195,15 +203,15 @@ class _TalkScreenState extends State<TalkScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: SpeakabooTheme.surface,
+              color: colors.surface,
               borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm),
             ),
             child: Text(
               conv.level.toUpperCase(),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: SpeakabooTheme.smallSize,
                 fontWeight: FontWeight.w600,
-                color: SpeakabooTheme.textSecondary,
+                color: colors.textSecondary,
               ),
             ),
           ),
@@ -213,12 +221,13 @@ class _TalkScreenState extends State<TalkScreen> {
   }
 
   Widget _buildChatArea(ConversationProvider conv) {
+    final colors = context.colors;
     if (conv.messages.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           'Press and hold the button to speak',
           style: TextStyle(
-            color: SpeakabooTheme.textSecondary,
+            color: colors.textSecondary,
             fontSize: SpeakabooTheme.baseFontSize,
           ),
         ),
@@ -239,6 +248,7 @@ class _TalkScreenState extends State<TalkScreen> {
   }
 
   Widget _buildMessageBubble(ChatMessage message) {
+    final colors = context.colors;
     final isUser = message.isUser;
     return Padding(
       padding: const EdgeInsets.only(bottom: SpeakabooTheme.spacingSm),
@@ -258,15 +268,15 @@ class _TalkScreenState extends State<TalkScreen> {
               ),
               decoration: BoxDecoration(
                 color: isUser
-                    ? SpeakabooTheme.accent
-                    : SpeakabooTheme.surface,
+                    ? colors.accent
+                    : colors.surface,
                 borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
               ),
               child: Text(
                 message.text,
                 style: TextStyle(
                   fontSize: SpeakabooTheme.baseFontSize,
-                  color: isUser ? Colors.white : SpeakabooTheme.textPrimary,
+                  color: isUser ? Colors.white : colors.textPrimary,
                 ),
               ),
             ),
@@ -288,12 +298,13 @@ class _TalkScreenState extends State<TalkScreen> {
                     return Chip(
                       label: Text(
                         word,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: SpeakabooTheme.smallSize,
-                          color: SpeakabooTheme.textPrimary,
+                          color: colors.textPrimary,
                         ),
                       ),
-                      backgroundColor: SpeakabooTheme.surface,
+                      backgroundColor: colors.surface,
+                      side: BorderSide(color: colors.surface),
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       visualDensity: VisualDensity.compact,
                     );
@@ -307,6 +318,7 @@ class _TalkScreenState extends State<TalkScreen> {
   }
 
   Widget _buildErrorBanner(ConversationProvider conv) {
+    final colors = context.colors;
     final isBusy = conv.status == ConversationStatus.busy;
     return Container(
       width: double.infinity,
@@ -316,15 +328,15 @@ class _TalkScreenState extends State<TalkScreen> {
       ),
       decoration: BoxDecoration(
         color: isBusy
-            ? SpeakabooTheme.warning.withValues(alpha: 0.1)
-            : SpeakabooTheme.error.withValues(alpha: 0.1),
+            ? colors.warning.withValues(alpha: 0.15)
+            : colors.error.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm),
       ),
       child: Row(
         children: [
           Icon(
             isBusy ? Icons.hourglass_top : Icons.error_outline,
-            color: isBusy ? SpeakabooTheme.warning : SpeakabooTheme.error,
+            color: isBusy ? colors.warning : colors.error,
             size: 20,
           ),
           const SizedBox(width: SpeakabooTheme.spacingSm),
@@ -333,7 +345,7 @@ class _TalkScreenState extends State<TalkScreen> {
               conv.errorMessage ?? 'Something went wrong',
               style: TextStyle(
                 fontSize: SpeakabooTheme.captionSize,
-                color: isBusy ? SpeakabooTheme.warning : SpeakabooTheme.error,
+                color: isBusy ? colors.warning : colors.error,
               ),
             ),
           ),
@@ -342,7 +354,7 @@ class _TalkScreenState extends State<TalkScreen> {
             child: Text(
               isBusy ? 'OK' : 'Retry',
               style: TextStyle(
-                color: isBusy ? SpeakabooTheme.warning : SpeakabooTheme.error,
+                color: isBusy ? colors.warning : colors.error,
               ),
             ),
           ),
@@ -352,6 +364,7 @@ class _TalkScreenState extends State<TalkScreen> {
   }
 
   Widget _buildRecordArea(ConversationProvider conv) {
+    final colors = context.colors;
     final isReady = conv.status == ConversationStatus.ready;
     final isRecording = conv.status == ConversationStatus.recording;
     final isProcessing = conv.status == ConversationStatus.processing;
@@ -384,19 +397,19 @@ class _TalkScreenState extends State<TalkScreen> {
                   HintSheet.show(context, hint);
                 }
               },
-              icon: const Icon(Icons.lightbulb_outline, size: 18, color: SpeakabooTheme.accent),
-              label: const Text(
+              icon: Icon(Icons.lightbulb_outline, size: 18, color: colors.accent),
+              label: Text(
                 'Help me say it',
                 style: TextStyle(
                   fontSize: SpeakabooTheme.captionSize,
                   fontWeight: FontWeight.bold,
-                  color: SpeakabooTheme.accent,
+                  color: colors.accent,
                 ),
               ),
               style: TextButton.styleFrom(
                 visualDensity: VisualDensity.compact,
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                backgroundColor: SpeakabooTheme.accent.withValues(alpha: 0.08),
+                backgroundColor: colors.accent.withValues(alpha: context.isDarkMode ? 0.2 : 0.08),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
                 ),
@@ -411,8 +424,8 @@ class _TalkScreenState extends State<TalkScreen> {
               style: TextStyle(
                 fontSize: SpeakabooTheme.captionSize,
                 color: isRecording
-                    ? SpeakabooTheme.error
-                    : SpeakabooTheme.textSecondary,
+                    ? colors.error
+                    : colors.textSecondary,
                 fontWeight:
                     isRecording ? FontWeight.w600 : FontWeight.normal,
               ),
@@ -427,15 +440,15 @@ class _TalkScreenState extends State<TalkScreen> {
             height: isRecording ? 80 : 72,
             decoration: BoxDecoration(
               color: isRecording
-                  ? SpeakabooTheme.error
+                  ? colors.error
                   : (isReady
-                      ? SpeakabooTheme.accent
-                      : SpeakabooTheme.surface),
+                      ? colors.accent
+                      : colors.surface),
               shape: BoxShape.circle,
               boxShadow: isRecording
                   ? [
                       BoxShadow(
-                        color: SpeakabooTheme.error.withValues(alpha: 0.3),
+                        color: colors.error.withValues(alpha: 0.3),
                         blurRadius: 20,
                         spreadRadius: 5,
                       ),
@@ -450,7 +463,7 @@ class _TalkScreenState extends State<TalkScreen> {
                       : Icons.mic_none),
               color: (isReady || isRecording)
                   ? Colors.white
-                  : SpeakabooTheme.textSecondary,
+                  : colors.textSecondary,
               size: 32,
             ),
           ),

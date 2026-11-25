@@ -5,6 +5,7 @@ Single source of truth for character companions: list, detail, personality trait
 sample lines, pricing, and audio voice preview generation.
 """
 
+import os
 import logging
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Response
@@ -91,30 +92,25 @@ async def get_character_preview_audio(character_id: str):
         return Response(content=_preview_cache[character_id], media_type="audio/wav")
 
     settings = load_settings()
-    if settings.tts.provider == "groq" and settings.tts.api_key:
+    is_test_mode = os.environ.get("TEST_MODE", "").lower() in ("true", "1", "yes") or settings.server.test_mode or settings.tts.provider == "mock"
+    if is_test_mode:
+        tts = MockTtsProvider()
+    elif settings.tts.provider == "groq" and settings.tts.api_key:
         tts = GroqTtsProvider(
             api_key=settings.tts.api_key,
             model=settings.tts.model,
             default_voice=c.voice_id or settings.tts.voice,
         )
     else:
-        tts = MockTtsProvider()
+        logger.error(f"TTS provider '{settings.tts.provider}' not configured with valid API key for preview")
+        raise HTTPException(status_code=500, detail="TTS provider not configured")
 
     try:
         # Synthesize character's initial greeting
         res = await tts.synthesize(text=c.greeting, voice_id=c.voice_id)
-        _preview_cache[character_id] = res.audio
+        if res.audio:
+            _preview_cache[character_id] = res.audio
         return Response(content=res.audio, media_type="audio/wav")
     except Exception as e:
-        logger.warning(
-            f"Primary TTS preview synthesis failed for '{character_id}' ({e}). "
-            f"Falling back to local synthesizer to guarantee valid audio preview."
-        )
-        try:
-            fallback_tts = MockTtsProvider()
-            res = await fallback_tts.synthesize(text=c.greeting, voice_id=c.voice_id)
-            _preview_cache[character_id] = res.audio
-            return Response(content=res.audio, media_type="audio/wav")
-        except Exception as fallback_err:
-            logger.error(f"Fallback synthesizer also failed for '{character_id}': {fallback_err}")
-            raise HTTPException(status_code=500, detail="Preview audio not available")
+        logger.error(f"TTS preview synthesis failed for '{character_id}': {e}")
+        raise HTTPException(status_code=502, detail=f"Preview audio not available: {e}")

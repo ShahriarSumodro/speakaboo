@@ -57,7 +57,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen> {
             content: const Text('Voice preview temporarily unavailable. Please try again.'),
             action: SnackBarAction(
               label: 'Retry',
-              textColor: SpeakabooTheme.warning,
+              textColor: context.colors.warning,
               onPressed: _playVoicePreview,
             ),
           ),
@@ -110,7 +110,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Purchases restored: ${restored.length} item(s) found.'),
-            backgroundColor: SpeakabooTheme.success,
+            backgroundColor: context.colors.success,
           ),
         );
       }
@@ -148,7 +148,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('${widget.character.name} unlocked successfully!'),
-            backgroundColor: SpeakabooTheme.success,
+            backgroundColor: context.colors.success,
           ),
         );
         _startSpeaking(context);
@@ -167,11 +167,13 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen> {
     final c = widget.character;
     final conv = context.watch<ConversationProvider>();
     final isCurrent = conv.currentCharacterId == c.id;
+    final colors = context.colors;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(c.name),
-        backgroundColor: SpeakabooTheme.background,
+        backgroundColor: colors.background,
+        foregroundColor: colors.textPrimary,
         elevation: 0,
       ),
       body: ListView(
@@ -183,30 +185,30 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen> {
               width: 100,
               height: 100,
               decoration: BoxDecoration(
-                color: SpeakabooTheme.surface,
+                color: colors.surface,
                 shape: BoxShape.circle,
-                border: Border.all(color: SpeakabooTheme.accent, width: 3),
+                border: Border.all(color: colors.accent, width: 3),
               ),
-              child: const Icon(Icons.face, size: 64, color: SpeakabooTheme.accent),
+              child: Icon(Icons.face, size: 64, color: colors.accent),
             ),
           ),
           const SizedBox(height: SpeakabooTheme.spacingMd),
           Center(
             child: Text(
               c.name,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: SpeakabooTheme.headingSize,
                 fontWeight: FontWeight.bold,
-                color: SpeakabooTheme.textPrimary,
+                color: colors.textPrimary,
               ),
             ),
           ),
           Center(
             child: Text(
               c.tagline,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: SpeakabooTheme.baseFontSize,
-                color: SpeakabooTheme.textSecondary,
+                color: colors.textSecondary,
               ),
             ),
           ),
@@ -219,12 +221,12 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen> {
                 OutlinedButton.icon(
                   onPressed: _isLoadingPreview ? null : _playVoicePreview,
                   icon: _isLoadingPreview
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: colors.accent))
                       : Icon(_isPlayingPreview ? Icons.volume_up : Icons.play_arrow),
                   label: Text(_isPlayingPreview ? 'Playing Sample...' : 'Hear their voice'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: SpeakabooTheme.accent,
-                    side: const BorderSide(color: SpeakabooTheme.accent),
+                    foregroundColor: colors.accent,
+                    side: BorderSide(color: colors.accent),
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   ),
                 ),
@@ -233,15 +235,15 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text(
+                      Text(
                         'Voice preview temporarily unavailable.',
-                        style: TextStyle(fontSize: 12, color: SpeakabooTheme.error),
+                        style: TextStyle(fontSize: 12, color: colors.error),
                       ),
                       const SizedBox(width: 6),
                       TextButton.icon(
                         key: const Key('retry_preview_btn'),
-                        icon: const Icon(Icons.refresh, size: 14),
-                        label: const Text('Retry'),
+                        icon: Icon(Icons.refresh, size: 14, color: colors.accent),
+                        label: Text('Retry', style: TextStyle(color: colors.accent)),
                         onPressed: _playVoicePreview,
                       ),
                     ],
@@ -254,12 +256,12 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen> {
           const SizedBox(height: SpeakabooTheme.spacingLg),
 
           // Personality Traits
-          const Text(
+          Text(
             'Personality & Teaching Style',
             style: TextStyle(
               fontSize: SpeakabooTheme.baseFontSize + 1,
               fontWeight: FontWeight.bold,
-              color: SpeakabooTheme.textPrimary,
+              color: colors.textPrimary,
             ),
           ),
           const SizedBox(height: SpeakabooTheme.spacingSm),
@@ -269,8 +271,9 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen> {
             children: c.personalityTraits.map((trait) {
               return Chip(
                 label: Text(trait),
-                backgroundColor: SpeakabooTheme.surface,
-                labelStyle: const TextStyle(fontSize: 13, color: SpeakabooTheme.textPrimary),
+                backgroundColor: colors.surface,
+                side: BorderSide(color: colors.surface),
+                labelStyle: TextStyle(fontSize: 13, color: colors.textPrimary),
               );
             }).toList(),
           ),
@@ -281,17 +284,38 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen> {
           Container(
             padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
             decoration: BoxDecoration(
-              color: SpeakabooTheme.surface,
+              color: colors.surface,
               borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Best For: ${c.bestFor}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                Text(
+                  'Best For: ${c.bestFor}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: colors.textPrimary,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text('Speaking Style: ${c.speakingStyle}', style: const TextStyle(fontSize: 13, color: SpeakabooTheme.textSecondary)),
-                const SizedBox(height: 4),
-                Text('Vocabulary Focus: ${c.vocabularyFocus}', style: const TextStyle(fontSize: 13, color: SpeakabooTheme.textSecondary)),
+                Text(
+                  'Speaking Style: ${c.speakingStyle}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: colors.textSecondary,
+                  ),
+                ),
+                if (c.vocabularyFocus.trim().isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Vocabulary Focus: ${c.vocabularyFocus}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: colors.textSecondary,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -300,12 +324,12 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen> {
 
           // Sample Dialogue
           if (c.sampleLines.isNotEmpty) ...[
-            const Text(
+            Text(
               'Sample Phrases',
               style: TextStyle(
                 fontSize: SpeakabooTheme.baseFontSize + 1,
                 fontWeight: FontWeight.bold,
-                color: SpeakabooTheme.textPrimary,
+                color: colors.textPrimary,
               ),
             ),
             const SizedBox(height: SpeakabooTheme.spacingSm),
@@ -318,9 +342,9 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen> {
                       Expanded(
                         child: Text(
                           '"$line"',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontStyle: FontStyle.italic,
-                            color: SpeakabooTheme.textSecondary,
+                            color: colors.textSecondary,
                             fontSize: 13,
                           ),
                         ),
@@ -346,7 +370,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen> {
                   }
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: SpeakabooTheme.accent,
+                  backgroundColor: colors.accent,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd)),
                 ),

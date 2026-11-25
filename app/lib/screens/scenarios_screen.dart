@@ -95,16 +95,18 @@ class _ScenariosScreenState extends State<ScenariosScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Speaking Scenarios'),
-        backgroundColor: SpeakabooTheme.background,
+        title: Text('Speaking Scenarios', style: TextStyle(color: colors.textPrimary)),
+        backgroundColor: colors.background,
+        foregroundColor: colors.textPrimary,
         elevation: 0,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _scenarios.isEmpty
-              ? const Center(child: Text('No scenarios found.'))
+              ? Center(child: Text('No scenarios found.', style: TextStyle(color: colors.textSecondary)))
               : ListView.builder(
                   padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
                   itemCount: _scenarios.length,
@@ -112,7 +114,7 @@ class _ScenariosScreenState extends State<ScenariosScreen> {
                     final s = _scenarios[index];
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
-                      color: SpeakabooTheme.surface,
+                      color: colors.surface,
                       elevation: 0,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd)),
                       child: Padding(
@@ -125,29 +127,30 @@ class _ScenariosScreenState extends State<ScenariosScreen> {
                                 Expanded(
                                   child: Text(
                                     s.title,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: colors.textPrimary),
                                   ),
                                 ),
                                 Chip(
                                   label: Text(s.difficulty.toUpperCase(), style: const TextStyle(fontSize: 10, color: Colors.white)),
-                                  backgroundColor: SpeakabooTheme.accent,
+                                  backgroundColor: colors.accent,
+                                  side: BorderSide(color: colors.accent),
                                   visualDensity: VisualDensity.compact,
                                 ),
                               ],
                             ),
                             const SizedBox(height: 6),
-                            Text(s.description, style: const TextStyle(color: SpeakabooTheme.textSecondary, fontSize: 13)),
+                            Text(s.description, style: TextStyle(color: colors.textSecondary, fontSize: 13)),
                             const SizedBox(height: 10),
                             if (s.goals.isNotEmpty) ...[
-                              const Text('Goals:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                              Text('Goals:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: colors.textPrimary)),
                               const SizedBox(height: 4),
                               ...s.goals.map((g) => Padding(
                                     padding: const EdgeInsets.only(bottom: 2),
                                     child: Row(
                                       children: [
-                                        const Icon(Icons.check_circle_outline, size: 14, color: SpeakabooTheme.accent),
+                                        Icon(Icons.check_circle_outline, size: 14, color: colors.accent),
                                         const SizedBox(width: 6),
-                                        Expanded(child: Text(g, style: const TextStyle(fontSize: 12))),
+                                        Expanded(child: Text(g, style: TextStyle(fontSize: 12, color: colors.textSecondary))),
                                       ],
                                     ),
                                   )),
@@ -213,13 +216,14 @@ class _PreTaskScaffoldSheetState extends State<_PreTaskScaffoldSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final s = widget.scenario;
     final primaryGoal = s.goals.isNotEmpty ? s.goals.first : 'Complete the task comfortably';
     return Container(
       padding: const EdgeInsets.all(SpeakabooTheme.spacingLg),
-      decoration: const BoxDecoration(
-        color: SpeakabooTheme.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(SpeakabooTheme.radiusLg)),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(SpeakabooTheme.radiusLg)),
       ),
       child: SafeArea(
         top: false,
@@ -232,10 +236,10 @@ class _PreTaskScaffoldSheetState extends State<_PreTaskScaffoldSheet> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: SpeakabooTheme.accent.withValues(alpha: 0.15),
+                    color: colors.accent.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.timer_outlined, color: SpeakabooTheme.accent, size: 24),
+                  child: Icon(Icons.timer_outlined, color: colors.accent, size: 24),
                 ),
                 const SizedBox(width: SpeakabooTheme.spacingMd),
                 Expanded(
@@ -244,17 +248,18 @@ class _PreTaskScaffoldSheetState extends State<_PreTaskScaffoldSheet> {
                     children: [
                       Text(
                         'Pre-Task Prep: ${s.title}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: SpeakabooTheme.headingSize,
                           fontWeight: FontWeight.bold,
+                          color: colors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 2),
-                      const Text(
+                      Text(
                         'Take 45s to plan your thoughts before speaking (Ellis 2005)',
                         style: TextStyle(
                           fontSize: 12,
-                          color: SpeakabooTheme.textSecondary,
+                          color: colors.textSecondary,
                         ),
                       ),
                     ],
@@ -314,25 +319,26 @@ class _PreTaskScaffoldSheetState extends State<_PreTaskScaffoldSheet> {
   }
 
   Widget _buildScaffoldCard({required IconData icon, required String title, required String body}) {
+    final colors = context.colors;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: SpeakabooTheme.background,
+        color: colors.background,
         borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm),
-        border: Border.all(color: SpeakabooTheme.accent.withValues(alpha: 0.2)),
+        border: Border.all(color: colors.accent.withValues(alpha: 0.2)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: SpeakabooTheme.accent),
+          Icon(icon, size: 20, color: colors.accent),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: colors.textPrimary)),
                 const SizedBox(height: 2),
-                Text(body, style: const TextStyle(fontSize: 12, color: SpeakabooTheme.textSecondary)),
+                Text(body, style: TextStyle(fontSize: 12, color: colors.textSecondary)),
               ],
             ),
           ),

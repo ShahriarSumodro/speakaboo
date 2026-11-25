@@ -44,7 +44,8 @@ def get_engine() -> ConversationEngine:
     global _engine
     if _engine is None:
         settings = load_settings()
-        if settings.server.test_mode or settings.stt.provider == "mock":
+        is_test = os.environ.get("TEST_MODE", "").lower() in ("true", "1", "yes") or settings.server.test_mode or settings.stt.provider == "mock"
+        if is_test:
             _engine = ConversationEngine(
                 stt=MockSttProvider(),
                 llm=MockLlmProvider(),
@@ -88,6 +89,7 @@ class StartConversationResponse(BaseModel):
     greeting: str
     is_trial: bool = False
     trial_seconds_remaining: Optional[int] = None
+    tts_error: Optional[str] = None
 
 
 class HintRequest(BaseModel):
@@ -125,6 +127,7 @@ class TurnResponseModel(BaseModel):
     safety_blocked: bool = False
     is_trial: bool = False
     trial_seconds_remaining: Optional[int] = None
+    tts_error: Optional[str] = None
 
 
 def _categorize_error(original: str, better: str, reason: str) -> str:
@@ -386,6 +389,7 @@ async def process_turn(
         safety_blocked=result.safety_blocked,
         is_trial=is_trial,
         trial_seconds_remaining=trial_seconds_remaining,
+        tts_error=result.tts_error,
     )
 
 
@@ -424,7 +428,9 @@ async def process_stream_turn(
                 audio_format=audio_format,
             ):
                 event_name = ev.get("event", "message")
-                event_data = json.dumps(ev.get("data", {}))
+                payload = dict(ev.get("data", {}))
+                payload.setdefault("type", event_name)
+                event_data = json.dumps(payload)
                 yield f"event: {event_name}\ndata: {event_data}\n\n"
 
                 # When turn complete is reached, record metrics in repository

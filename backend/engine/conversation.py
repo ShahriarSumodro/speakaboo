@@ -9,6 +9,7 @@ import logging
 import time
 import uuid
 import base64
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Optional, AsyncGenerator
 
@@ -16,13 +17,25 @@ from backend.providers.base import (
     SttProvider, LlmProvider, TtsProvider,
     Message, ProviderError, RateLimitError, SafetyError,
 )
-from backend.providers.mock import MockTtsProvider
 from backend.engine.characters import Character, build_system_prompt
 from backend.engine.correction import parse_turn_response, TurnResponse
 from backend.engine.safety import check_content_safety, get_redirect_message
 from backend.engine.level import estimate_level
 
 logger = logging.getLogger("speakaboo.engine.conversation")
+
+# Recent turn diagnostics ring buffer (last 20 turns)
+_last_turns: deque[dict] = deque(maxlen=20)
+
+
+def get_last_turns() -> list[dict]:
+    """Retrieve the last 20 turn records for diagnostics."""
+    return list(_last_turns)
+
+
+def record_turn_log(record: dict) -> None:
+    """Record a turn diagnostics entry."""
+    _last_turns.append(record)
 
 # Token budget for conversation history (approximate)
 MAX_HISTORY_TOKENS = 2000  # ~8000 chars
@@ -47,6 +60,9 @@ class TurnResult:
     cost_usd: float = 0.0
     safety_blocked: bool = False
     safety_redirect: str = ""
+    tts_error: Optional[str] = None
+    stt_error: Optional[str] = None
+    llm_error: Optional[str] = None
 
 
 @dataclass
@@ -136,11 +152,48 @@ class ConversationEngine:
         if not state:
             raise ValueError(f"Conversation not found: {conversation_id}")
 
+        audio_size = len(audio)
+        logger.info(
+            f"Turn {turn_id} request received: cid={conversation_id}, audio_bytes={audio_size}, format={audio_format}"
+        )
+
         # --- Step 1: STT ---
-        stt_result = await self._stt.transcribe(audio, format=audio_format)
-        user_text = stt_result.text.strip()
+        stt_t0 = time.time()
+        stt_error = None
+        try:
+            stt_result = await self._stt.transcribe(audio, format=audio_format)
+            user_text = stt_result.text.strip()
+            stt_ms = (time.time() - stt_t0) * 1000
+            logger.info(
+                f"Turn {turn_id} STT: provider={getattr(self._stt, 'name', 'stt')}, "
+                f"duration={stt_ms:.1f}ms, audio_duration={stt_result.duration_seconds:.2f}s, "
+                f"transcript_len={len(user_text)}, text='{user_text[:80]}'"
+            )
+        except Exception as e:
+            stt_ms = (time.time() - stt_t0) * 1000
+            stt_error = str(e)
+            user_text = ""
+            stt_result = type("DummySTT", (), {"duration_seconds": 0.0, "text": ""})()
+            logger.error(f"Turn {turn_id} STT failed ({stt_ms:.1f}ms): {e}")
 
         if not user_text:
+            latency_ms = (time.time() - start_time) * 1000
+            record_turn_log({
+                "turn_id": turn_id,
+                "conversation_id": conversation_id,
+                "character_id": character.id,
+                "timestamp": time.time(),
+                "audio_bytes": audio_size,
+                "stt": {
+                    "provider": getattr(self._stt, "name", "stt"),
+                    "ms": round(stt_ms, 1),
+                    "transcript_len": 0,
+                    "status": "error" if stt_error else "empty",
+                    "error": stt_error,
+                },
+                "status": "failed_stt",
+                "total_latency_ms": round(latency_ms, 1),
+            })
             return TurnResult(
                 conversation_id=conversation_id,
                 turn_id=turn_id,
@@ -149,16 +202,31 @@ class ConversationEngine:
                 audio_chunks=[],
                 level="beginner",
                 stt_seconds=stt_result.duration_seconds,
-                latency_ms=(time.time() - start_time) * 1000,
+                latency_ms=latency_ms,
+                stt_error=stt_error,
             )
-
-        logger.info(f"STT: {user_text[:80]}... ({stt_result.duration_seconds:.1f}s audio)")
 
         # --- Step 2: Safety check on user message ---
         blocked_category = check_content_safety(user_text, is_user_message=True, age_band=state.age_band)
         if blocked_category:
             redirect = get_redirect_message(blocked_category, character_id=character.id)
-            redirect_audio = await self._synthesize_chunks(redirect, character.voice_id)
+            redirect_audio = []
+            try:
+                redirect_audio = await self._synthesize_chunks(redirect, character.voice_id)
+            except Exception as e:
+                logger.error(f"Turn {turn_id} safety redirect TTS error: {e}")
+            latency_ms = (time.time() - start_time) * 1000
+            record_turn_log({
+                "turn_id": turn_id,
+                "conversation_id": conversation_id,
+                "character_id": character.id,
+                "timestamp": time.time(),
+                "audio_bytes": audio_size,
+                "stt": {"provider": getattr(self._stt, "name", "stt"), "ms": round(stt_ms, 1), "transcript_len": len(user_text), "status": "ok"},
+                "safety_blocked": True,
+                "total_latency_ms": round(latency_ms, 1),
+                "status": "safety_blocked",
+            })
             return TurnResult(
                 conversation_id=conversation_id,
                 turn_id=turn_id,
@@ -167,7 +235,7 @@ class ConversationEngine:
                 audio_chunks=redirect_audio,
                 level=estimate_level(state.user_transcripts),
                 stt_seconds=stt_result.duration_seconds,
-                latency_ms=(time.time() - start_time) * 1000,
+                latency_ms=latency_ms,
                 safety_blocked=True,
                 safety_redirect=redirect,
             )
@@ -192,27 +260,40 @@ class ConversationEngine:
         response: Optional[TurnResponse] = None
         llm_tokens_in = 0
         llm_tokens_out = 0
+        llm_error = None
+        llm_t0 = time.time()
 
         for attempt in range(max_llm_retries):
-            llm_result = await self._llm.chat(
-                messages=messages,
-                json_mode=True,
-            )
-            llm_tokens_in = llm_result.tokens_in
-            llm_tokens_out = llm_result.tokens_out
-
             try:
-                response = parse_turn_response(llm_result.content)
-                break
-            except ValueError as e:
-                logger.warning(f"LLM JSON parse failed (attempt {attempt + 1}): {e}")
-                if attempt < max_llm_retries - 1:
-                    messages.append(Message(role="assistant", content=llm_result.content))
-                    messages.append(Message(role="user", content="Please respond with VALID JSON only, following the exact format specified."))
+                llm_result = await self._llm.chat(
+                    messages=messages,
+                    json_mode=True,
+                )
+                llm_tokens_in = llm_result.tokens_in
+                llm_tokens_out = llm_result.tokens_out
+
+                try:
+                    response = parse_turn_response(llm_result.content)
+                    break
+                except ValueError as e:
+                    logger.warning(f"Turn {turn_id} LLM JSON parse failed (attempt {attempt + 1}): {e}")
+                    if attempt < max_llm_retries - 1:
+                        messages.append(Message(role="assistant", content=llm_result.content))
+                        messages.append(Message(role="user", content="Please respond with VALID JSON only, following the exact format specified."))
+            except Exception as e:
+                llm_error = str(e)
+                logger.error(f"Turn {turn_id} LLM attempt {attempt + 1} error: {e}")
+
+        llm_ms = (time.time() - llm_t0) * 1000
 
         if response is None:
-            logger.error("All LLM JSON parse attempts failed, using fallback")
+            logger.error(f"Turn {turn_id} all LLM attempts failed ({llm_ms:.1f}ms), using fallback response")
             response = TurnResponse(reply="Good try! Let's keep practicing.")
+
+        logger.info(
+            f"Turn {turn_id} LLM: provider={getattr(self._llm, 'name', 'llm')}, duration={llm_ms:.1f}ms, "
+            f"tokens_in={llm_tokens_in}, tokens_out={llm_tokens_out}, reply_len={len(response.reply)}"
+        )
 
         # --- Step 6: Safety check on AI reply ---
         try:
@@ -222,7 +303,25 @@ class ConversationEngine:
             response = TurnResponse(reply="Let's keep practicing! What else would you like to talk about?")
 
         # --- Step 7: TTS ---
-        audio_chunks = await self._synthesize_chunks(response.reply, character.voice_id)
+        tts_t0 = time.time()
+        audio_chunks = []
+        tts_error = None
+        try:
+            audio_chunks = await self._synthesize_chunks(response.reply, character.voice_id)
+            tts_ms = (time.time() - tts_t0) * 1000
+            total_audio_bytes = sum(len(c) for c in audio_chunks)
+            logger.info(
+                f"Turn {turn_id} TTS: provider={getattr(self._tts, 'name', 'tts')}, voice='{character.voice_id}', "
+                f"duration={tts_ms:.1f}ms, chunks={len(audio_chunks)}, bytes={total_audio_bytes}, status=ok"
+            )
+        except Exception as e:
+            tts_ms = (time.time() - tts_t0) * 1000
+            total_audio_bytes = 0
+            tts_error = str(e)
+            logger.error(
+                f"Turn {turn_id} TTS failed for voice '{character.voice_id}' ({tts_ms:.1f}ms): {e}"
+            )
+
         tts_chars = len(response.reply)
 
         # --- Step 8: Update conversation state ---
@@ -249,12 +348,67 @@ class ConversationEngine:
         cost_usd = round(stt_cost + llm_cost + tts_cost, 6)
 
         logger.info(
-            f"Turn complete: {latency_ms:.0f}ms, "
+            f"Turn {turn_id} complete: {latency_ms:.0f}ms, "
             f"STT={stt_result.duration_seconds:.1f}s, "
             f"LLM={llm_tokens_in}+{llm_tokens_out} tokens, "
             f"TTS={tts_chars} chars, "
             f"Cost=${cost_usd:.5f}, "
-            f"level={level}"
+            f"level={level}, "
+            f"tts_status={'ok' if not tts_error else 'error'}"
+        )
+
+        record_turn_log({
+            "turn_id": turn_id,
+            "conversation_id": conversation_id,
+            "character_id": character.id,
+            "timestamp": time.time(),
+            "audio_bytes": audio_size,
+            "stt": {
+                "provider": getattr(self._stt, "name", "stt"),
+                "ms": round(stt_ms, 1),
+                "transcript_len": len(user_text),
+                "status": "ok" if not stt_error else "error",
+                "error": stt_error,
+            },
+            "llm": {
+                "provider": getattr(self._llm, "name", "llm"),
+                "ms": round(llm_ms, 1),
+                "tokens_in": llm_tokens_in,
+                "tokens_out": llm_tokens_out,
+                "reply_len": len(response.reply),
+                "status": "ok" if not llm_error else "error",
+                "error": llm_error,
+            },
+            "tts": {
+                "provider": getattr(self._tts, "name", "tts"),
+                "voice_id": character.voice_id,
+                "ms": round(tts_ms, 1),
+                "bytes": total_audio_bytes,
+                "chunks": len(audio_chunks),
+                "status": "ok" if not tts_error else "error",
+                "error": tts_error,
+            },
+            "total_latency_ms": round(latency_ms, 1),
+            "cost_usd": cost_usd,
+            "status": "ok" if not (stt_error or llm_error or tts_error) else "degraded",
+        })
+
+        return TurnResult(
+            conversation_id=conversation_id,
+            turn_id=turn_id,
+            user_transcript=user_text,
+            response=response,
+            audio_chunks=audio_chunks,
+            level=level,
+            stt_seconds=stt_result.duration_seconds,
+            tts_chars=tts_chars,
+            llm_tokens_in=llm_tokens_in,
+            llm_tokens_out=llm_tokens_out,
+            latency_ms=latency_ms,
+            cost_usd=cost_usd,
+            tts_error=tts_error,
+            stt_error=stt_error,
+            llm_error=llm_error,
         )
 
         return TurnResult(
@@ -409,9 +563,13 @@ class ConversationEngine:
         # 5. Synthesize & stream chunks
         chunks = self._split_text(response.reply, max_chars=200)
         audio_b64_list = []
+        tts_error = None
+        tts_t0 = time.time()
+        total_audio_bytes = 0
 
         for idx, chunk in enumerate(chunks):
             cache_key = f"{character.voice_id}:{chunk}"
+            audio_bytes = None
             if cache_key in self._tts_cache:
                 audio_bytes = self._tts_cache[cache_key]
             else:
@@ -420,22 +578,33 @@ class ConversationEngine:
                     audio_bytes = synth_res.audio
                     self._tts_cache[cache_key] = audio_bytes
                 except Exception as e:
-                    logger.warning(f"Streaming TTS error ({e}). Falling back to local synthesizer.")
-                    fallback = MockTtsProvider()
-                    synth_res = await fallback.synthesize(chunk, character.voice_id)
-                    audio_bytes = synth_res.audio
+                    tts_error = str(e)
+                    logger.error(f"Turn {turn_id} streaming TTS error for '{character.voice_id}' chunk {idx}: {e}")
+                    yield {
+                        "event": "tts_error",
+                        "data": {
+                            "index": idx,
+                            "stage": "tts",
+                            "error": "I could not make my voice. Tap to retry.",
+                            "detail": str(e),
+                        },
+                    }
 
-            b64_str = base64.b64encode(audio_bytes).decode()
-            audio_b64_list.append(b64_str)
+            if audio_bytes:
+                total_audio_bytes += len(audio_bytes)
+                b64_str = base64.b64encode(audio_bytes).decode()
+                audio_b64_list.append(b64_str)
 
-            yield {
-                "event": "audio_chunk",
-                "data": {
-                    "index": idx,
-                    "text": chunk,
-                    "audio_base64": b64_str,
-                },
-            }
+                yield {
+                    "event": "audio_chunk",
+                    "data": {
+                        "index": idx,
+                        "text": chunk,
+                        "audio_base64": b64_str,
+                    },
+                }
+
+        tts_ms = (time.time() - tts_t0) * 1000
 
         # 6. Update State
         state.history.append(Message(role="user", content=user_text))
@@ -459,6 +628,20 @@ class ConversationEngine:
         tts_cost = (tts_chars / 1000.0) * 0.015
         cost_usd = round(stt_cost + llm_cost + tts_cost, 6)
 
+        record_turn_log({
+            "turn_id": turn_id,
+            "conversation_id": conversation_id,
+            "character_id": character.id,
+            "timestamp": time.time(),
+            "streaming": True,
+            "stt": {"ms": (time.time() - start_time) * 1000, "text_len": len(user_text), "status": "ok"},
+            "llm": {"tokens_in": llm_tokens_in, "tokens_out": llm_tokens_out, "reply_len": len(response.reply), "status": "ok"},
+            "tts": {"voice_id": character.voice_id, "ms": round(tts_ms, 1), "chunks": len(audio_b64_list), "bytes": total_audio_bytes, "status": "ok" if not tts_error else "error", "error": tts_error},
+            "total_latency_ms": round(latency_ms, 1),
+            "cost_usd": cost_usd,
+            "status": "ok" if not tts_error else "degraded",
+        })
+
         yield {
             "event": "turn_complete",
             "data": {
@@ -472,6 +655,7 @@ class ConversationEngine:
                 "cost_usd": cost_usd,
                 "safety_blocked": False,
                 "stt_seconds": stt_result.duration_seconds,
+                "tts_error": "I could not make my voice. Tap to retry." if tts_error else None,
             },
         }
 
@@ -491,10 +675,8 @@ class ConversationEngine:
                 self._tts_cache[cache_key] = result.audio
                 audio_chunks.append(result.audio)
             except Exception as e:
-                logger.warning(f"TTS synthesis error ({e}). Falling back to local synthesizer.")
-                fallback = MockTtsProvider()
-                result = await fallback.synthesize(chunk, voice_id)
-                audio_chunks.append(result.audio)
+                logger.error(f"TTS synthesis error for voice '{voice_id}': {e}")
+                raise
 
         return audio_chunks
 

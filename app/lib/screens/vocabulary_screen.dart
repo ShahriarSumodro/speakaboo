@@ -117,27 +117,28 @@ class _VocabularyScreenState extends State<VocabularyScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) {
+          final colors = context.colors;
           return AlertDialog(
-            title: Text(card.word, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
+            title: Text(card.word, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22, color: colors.textPrimary)),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Definition:', style: TextStyle(fontWeight: FontWeight.bold)),
-                Text(card.definition),
+                Text('Definition:', style: TextStyle(fontWeight: FontWeight.bold, color: colors.textPrimary)),
+                Text(card.definition, style: TextStyle(color: colors.textPrimary)),
                 if (card.example.isNotEmpty) ...[
                   const SizedBox(height: 8),
-                  const Text('Example:', style: TextStyle(fontWeight: FontWeight.bold)),
-                  Text('"${card.example}"', style: const TextStyle(fontStyle: FontStyle.italic)),
+                  Text('Example:', style: TextStyle(fontWeight: FontWeight.bold, color: colors.textPrimary)),
+                  Text('"${card.example}"', style: TextStyle(fontStyle: FontStyle.italic, color: colors.textSecondary)),
                 ],
                 const SizedBox(height: 12),
                 // Spoken Recall Practice (CD-011)
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: SpeakabooTheme.background,
+                    color: colors.background,
                     borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm),
-                    border: Border.all(color: SpeakabooTheme.accent.withValues(alpha: 0.2)),
+                    border: Border.all(color: colors.accent.withValues(alpha: 0.2)),
                   ),
                   child: Row(
                     children: [
@@ -145,7 +146,7 @@ class _VocabularyScreenState extends State<VocabularyScreen> {
                         key: const Key('vocab_spoken_recall_btn'),
                         icon: Icon(
                           isRecording ? Icons.stop_circle : Icons.mic,
-                          color: isRecording ? SpeakabooTheme.error : SpeakabooTheme.accent,
+                          color: isRecording ? colors.error : colors.accent,
                           size: 26,
                         ),
                         tooltip: isRecording ? 'Stop & Check' : 'Speak to Test Recall',
@@ -184,12 +185,12 @@ class _VocabularyScreenState extends State<VocabularyScreen> {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
-                                color: isRecording ? SpeakabooTheme.accent : SpeakabooTheme.textPrimary,
+                                color: isRecording ? colors.accent : colors.textPrimary,
                               ),
                             ),
-                            const Text(
+                            Text(
                               'Nation (2001) Spoken Recall Test',
-                              style: TextStyle(fontSize: 10, color: SpeakabooTheme.textSecondary),
+                              style: TextStyle(fontSize: 10, color: colors.textSecondary),
                             ),
                           ],
                         ),
@@ -198,7 +199,7 @@ class _VocabularyScreenState extends State<VocabularyScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                Text('Box ${card.box} • Repetitions: ${card.repetitions}', style: const TextStyle(fontSize: 12, color: SpeakabooTheme.textSecondary)),
+                Text('Box ${card.box} • Repetitions: ${card.repetitions}', style: TextStyle(fontSize: 12, color: colors.textSecondary)),
               ],
             ),
             actions: [
@@ -207,21 +208,21 @@ class _VocabularyScreenState extends State<VocabularyScreen> {
                   countdownTimer?.cancel();
                   _submitReview(card.id, 'again');
                 },
-                child: const Text('Again', style: TextStyle(color: SpeakabooTheme.error)),
+                child: Text('Again', style: TextStyle(color: colors.error)),
               ),
               TextButton(
                 onPressed: () {
                   countdownTimer?.cancel();
                   _submitReview(card.id, 'hard');
                 },
-                child: const Text('Hard', style: TextStyle(color: SpeakabooTheme.warning)),
+                child: Text('Hard', style: TextStyle(color: colors.warning)),
               ),
               TextButton(
                 onPressed: () {
                   countdownTimer?.cancel();
                   _submitReview(card.id, 'good');
                 },
-                child: const Text('Good', style: TextStyle(color: SpeakabooTheme.accent)),
+                child: Text('Good', style: TextStyle(color: colors.accent)),
               ),
               ElevatedButton(
                 onPressed: () {
@@ -259,14 +260,16 @@ class _VocabularyScreenState extends State<VocabularyScreen> {
       final matchesBox = _selectedBoxFilter == 0 || c.box == _selectedBoxFilter;
       return matchesSearch && matchesBox;
     }).toList();
+    final colors = context.colors;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Vocabulary Notebook'),
-        backgroundColor: SpeakabooTheme.background,
+        title: Text('Vocabulary Notebook', style: TextStyle(color: colors.textPrimary)),
+        backgroundColor: colors.background,
+        foregroundColor: colors.textPrimary,
         elevation: 0,
         actions: [
-          IconButton(icon: const Icon(Icons.add), onPressed: _showAddWordDialog, tooltip: 'Add Word'),
+          IconButton(icon: Icon(Icons.add, color: colors.textPrimary), onPressed: _showAddWordDialog, tooltip: 'Add Word'),
         ],
       ),
       body: Column(
@@ -275,11 +278,13 @@ class _VocabularyScreenState extends State<VocabularyScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: SpeakabooTheme.spacingMd, vertical: 8),
             child: TextField(
+              style: TextStyle(color: colors.textPrimary),
               decoration: InputDecoration(
                 hintText: 'Search saved words...',
-                prefixIcon: const Icon(Icons.search),
+                hintStyle: TextStyle(color: colors.textSecondary),
+                prefixIcon: Icon(Icons.search, color: colors.textSecondary),
                 filled: true,
-                fillColor: SpeakabooTheme.surface,
+                fillColor: colors.surface,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd), borderSide: BorderSide.none),
               ),
               onChanged: (val) => setState(() => _searchQuery = val),
@@ -320,7 +325,7 @@ class _VocabularyScreenState extends State<VocabularyScreen> {
                         child: Text(
                           _searchQuery.isNotEmpty ? 'No words matching search.' : 'No vocabulary words saved yet.\nTalk with a companion to discover words!',
                           textAlign: TextAlign.center,
-                          style: const TextStyle(color: SpeakabooTheme.textSecondary),
+                          style: TextStyle(color: colors.textSecondary),
                         ),
                       )
                     : ListView.builder(
@@ -330,23 +335,24 @@ class _VocabularyScreenState extends State<VocabularyScreen> {
                           final card = filtered[index];
                           return Card(
                             margin: const EdgeInsets.only(bottom: 8),
-                            color: SpeakabooTheme.surface,
+                            color: colors.surface,
                             elevation: 0,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm)),
                             child: ListTile(
-                              title: Text(card.word, style: const TextStyle(fontWeight: FontWeight.bold)),
-                              subtitle: Text(card.definition),
+                              title: Text(card.word, style: TextStyle(fontWeight: FontWeight.bold, color: colors.textPrimary)),
+                              subtitle: Text(card.definition, style: TextStyle(color: colors.textSecondary)),
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Chip(
-                                    label: Text('Box ${card.box}'),
+                                    label: Text('Box ${card.box}', style: TextStyle(color: colors.textSecondary, fontSize: 11)),
                                     visualDensity: VisualDensity.compact,
-                                    backgroundColor: SpeakabooTheme.background,
+                                    backgroundColor: colors.background,
+                                    side: BorderSide(color: colors.background),
                                   ),
                                   const SizedBox(width: 4),
                                   IconButton(
-                                    icon: const Icon(Icons.quiz, color: SpeakabooTheme.accent),
+                                    icon: Icon(Icons.quiz, color: colors.accent),
                                     tooltip: 'Review Flashcard',
                                     onPressed: () => _showReviewDialog(card),
                                   ),

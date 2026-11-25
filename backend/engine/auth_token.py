@@ -11,8 +11,11 @@ import json
 import hmac
 import hashlib
 import base64
+import logging
 from typing import Optional
 from fastapi import Header, HTTPException, Depends
+
+logger = logging.getLogger("speakaboo.auth")
 
 AUTH_SECRET_KEY = os.environ.get("AUTH_SECRET_KEY", "speakaboo-secure-device-token-secret-2026")
 TOKEN_VALID_SECONDS = 365 * 24 * 3600  # 1 year validity for device auth
@@ -105,17 +108,23 @@ async def get_current_user_id(authorization: Optional[str] = Header(None)) -> st
         # Check if in test mode without token provided
         if os.environ.get("TEST_MODE", "").lower() in ("true", "1", "yes"):
             return "test-user"
-        raise HTTPException(status_code=401, detail="Authentication token required")
+        reason = "Authentication token required"
+        logger.warning(f"401 Unauthorized: {reason}")
+        raise HTTPException(status_code=401, detail=reason)
 
     scheme, _, token = authorization.partition(" ")
     if scheme.lower() != "bearer" or not token:
-        raise HTTPException(status_code=401, detail="Invalid Authorization header scheme. Expected Bearer <token>")
+        reason = "Invalid Authorization header scheme. Expected Bearer <token>"
+        logger.warning(f"401 Unauthorized: {reason}")
+        raise HTTPException(status_code=401, detail=reason)
 
     try:
         payload = verify_device_token(token.strip())
         return payload["sub"]
     except ValueError as e:
-        raise HTTPException(status_code=401, detail=f"Authentication failed: {e}")
+        reason = f"Authentication failed: {e}"
+        logger.warning(f"401 Unauthorized: {reason}")
+        raise HTTPException(status_code=401, detail=reason)
 
 
 def verify_user_access(current_user: str, target_user: str) -> None:

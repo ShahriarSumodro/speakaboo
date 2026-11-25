@@ -112,21 +112,23 @@ class _ShadowingScreenState extends State<ShadowingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Shadowing Practice'),
-        backgroundColor: SpeakabooTheme.background,
+        title: Text('Shadowing Practice', style: TextStyle(color: colors.textPrimary)),
+        backgroundColor: colors.background,
+        foregroundColor: colors.textPrimary,
         elevation: 0,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _items.isEmpty
-              ? const Center(child: Text('No shadowing exercises available.'))
+              ? Center(child: Text('No shadowing exercises available.', style: TextStyle(color: colors.textSecondary)))
               : ListView(
                   padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
                   children: [
                     // Exercise selector
-                    const Text('Select Passage:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    Text('Select Passage:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: colors.textPrimary)),
                     const SizedBox(height: 6),
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
@@ -154,9 +156,9 @@ class _ShadowingScreenState extends State<ShadowingScreen> {
                       Container(
                         padding: const EdgeInsets.all(SpeakabooTheme.spacingLg),
                         decoration: BoxDecoration(
-                          color: SpeakabooTheme.surface,
+                          color: colors.surface,
                           borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
-                          border: Border.all(color: SpeakabooTheme.accent.withValues(alpha: 0.3)),
+                          border: Border.all(color: colors.accent.withValues(alpha: 0.3)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -174,7 +176,7 @@ class _ShadowingScreenState extends State<ShadowingScreen> {
                                       padding: const EdgeInsets.symmetric(horizontal: 2),
                                       child: ActionChip(
                                         label: Text('${sp}x', style: TextStyle(fontSize: 11, fontWeight: _selectedSpeed == sp ? FontWeight.bold : FontWeight.normal)),
-                                        backgroundColor: _selectedSpeed == sp ? SpeakabooTheme.accent.withValues(alpha: 0.2) : null,
+                                        backgroundColor: _selectedSpeed == sp ? colors.accent.withValues(alpha: 0.2) : null,
                                         visualDensity: VisualDensity.compact,
                                         onPressed: () => setState(() => _selectedSpeed = sp),
                                       ),
@@ -186,7 +188,7 @@ class _ShadowingScreenState extends State<ShadowingScreen> {
                             const SizedBox(height: 12),
                             Text(
                               _selectedItem!.targetText,
-                              style: const TextStyle(fontSize: 17, height: 1.5, fontWeight: FontWeight.w500),
+                              style: TextStyle(fontSize: 17, height: 1.5, fontWeight: FontWeight.w500, color: colors.textPrimary),
                             ),
                           ],
                         ),
@@ -204,7 +206,7 @@ class _ShadowingScreenState extends State<ShadowingScreen> {
                                 width: _isRecording ? 76 : 64,
                                 height: _isRecording ? 76 : 64,
                                 decoration: BoxDecoration(
-                                  color: _isRecording ? SpeakabooTheme.error : SpeakabooTheme.accent,
+                                  color: _isRecording ? colors.error : colors.accent,
                                   shape: BoxShape.circle,
                                   boxShadow: _isRecording
                                       ? [BoxShadow(color: Colors.red.withValues(alpha: 0.4), blurRadius: 16, spreadRadius: 4)]
@@ -221,7 +223,7 @@ class _ShadowingScreenState extends State<ShadowingScreen> {
                             Text(
                               _isRecording ? 'Listening... Tap to evaluate' : 'Tap to repeat after companion',
                               style: TextStyle(
-                                color: _isRecording ? SpeakabooTheme.error : SpeakabooTheme.textSecondary,
+                                color: _isRecording ? colors.error : colors.textSecondary,
                                 fontSize: 13,
                               ),
                             ),
@@ -237,13 +239,13 @@ class _ShadowingScreenState extends State<ShadowingScreen> {
                         Container(
                           padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
                           decoration: BoxDecoration(
-                            color: SpeakabooTheme.surface,
+                            color: colors.surface,
                             borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Attempt Feedback', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                              Text('Attempt Feedback', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: colors.textPrimary)),
                               const SizedBox(height: 8),
                               Row(
                                 children: [
@@ -266,7 +268,7 @@ class _ShadowingScreenState extends State<ShadowingScreen> {
                                 const SizedBox(height: 8),
                                 Text(
                                   _lastEvaluation!['feedback'],
-                                  style: const TextStyle(fontSize: 13, color: SpeakabooTheme.textSecondary),
+                                  style: TextStyle(fontSize: 13, color: colors.textSecondary),
                                 ),
                               ],
                               _buildWordAlignment(
@@ -284,6 +286,7 @@ class _ShadowingScreenState extends State<ShadowingScreen> {
   }
 
   Widget _buildWordAlignment(String targetText, String spokenText) {
+    final colors = context.colors;
     final targetWords = targetText.split(RegExp(r'\s+'));
     final spokenWords = spokenText
         .toLowerCase()
@@ -295,9 +298,9 @@ class _ShadowingScreenState extends State<ShadowingScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 12),
-        const Text(
+        Text(
           'Target Word Match & Rhythm Alignment (Approximate):',
-          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: colors.textPrimary),
         ),
         const SizedBox(height: 6),
         Wrap(
@@ -310,13 +313,13 @@ class _ShadowingScreenState extends State<ShadowingScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: matched
-                    ? SpeakabooTheme.success.withValues(alpha: 0.15)
-                    : SpeakabooTheme.warning.withValues(alpha: 0.15),
+                    ? colors.success.withValues(alpha: 0.15)
+                    : colors.warning.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
                   color: matched
-                      ? SpeakabooTheme.success.withValues(alpha: 0.5)
-                      : SpeakabooTheme.warning.withValues(alpha: 0.5),
+                      ? colors.success.withValues(alpha: 0.5)
+                      : colors.warning.withValues(alpha: 0.5),
                 ),
               ),
               child: Text(
@@ -324,7 +327,7 @@ class _ShadowingScreenState extends State<ShadowingScreen> {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  color: matched ? SpeakabooTheme.success : SpeakabooTheme.warning,
+                  color: matched ? colors.success : colors.warning,
                 ),
               ),
             );
@@ -335,17 +338,18 @@ class _ShadowingScreenState extends State<ShadowingScreen> {
   }
 
   Widget _buildMetricTile(String value, String label) {
+    final colors = context.colors;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: SpeakabooTheme.background,
+        color: colors.background,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         children: [
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: SpeakabooTheme.accent)),
+          Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: colors.accent)),
           const SizedBox(height: 2),
-          Text(label, style: const TextStyle(fontSize: 11, color: SpeakabooTheme.textSecondary)),
+          Text(label, style: TextStyle(fontSize: 11, color: colors.textSecondary)),
         ],
       ),
     );

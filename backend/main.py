@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from backend.config import load_settings, validate_providers
-from backend.routes import health, auth, characters, conversation, usage, learning, parent, payment, privacy
+from backend.routes import health, auth, characters, conversation, usage, learning, parent, payment, privacy, debug
 from backend.engine.telemetry import telemetry
 
 # Load settings
@@ -151,3 +151,4 @@ app.include_router(learning.router)
 app.include_router(parent.router)
 app.include_router(payment.router)
 app.include_router(privacy.router)
+app.include_router(debug.router)

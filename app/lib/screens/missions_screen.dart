@@ -90,7 +90,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(res['message'] ?? 'Streak repaired! Welcome back!'),
-            backgroundColor: SpeakabooTheme.success,
+            backgroundColor: context.colors.success,
           ),
         );
       }
@@ -100,7 +100,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Streak repair: $e'),
-            backgroundColor: SpeakabooTheme.error,
+            backgroundColor: context.colors.error,
           ),
         );
       }
@@ -119,7 +119,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Claimed +${res['xp_awarded'] ?? m.xpReward} XP!'),
-            backgroundColor: SpeakabooTheme.success,
+            backgroundColor: context.colors.success,
           ),
         );
       }
@@ -150,23 +150,30 @@ class _MissionsScreenState extends State<MissionsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: SpeakabooTheme.background,
+        backgroundColor: colors.background,
+        foregroundColor: colors.textPrimary,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'Daily Missions',
           style: TextStyle(
             fontSize: SpeakabooTheme.headingSize,
             fontWeight: FontWeight.bold,
-            color: SpeakabooTheme.textPrimary,
+            color: colors.textPrimary,
           ),
         ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _missionsData == null
-              ? const Center(child: Text('Could not load missions. Check connection.'))
+              ? Center(
+                  child: Text(
+                    'Could not load missions. Check connection.',
+                    style: TextStyle(color: colors.textSecondary),
+                  ),
+                )
               : RefreshIndicator(
                   onRefresh: _loadMissions,
                   child: ListView(
@@ -183,19 +190,24 @@ class _MissionsScreenState extends State<MissionsScreen> {
                         _buildWordOfTheDayCard(_wordOfTheDay!),
                       ],
                       const SizedBox(height: SpeakabooTheme.spacingLg),
-                      const Text(
+                      Text(
                         "Today's Goals",
                         style: TextStyle(
                           fontSize: SpeakabooTheme.headingSize - 4,
                           fontWeight: FontWeight.bold,
-                          color: SpeakabooTheme.textPrimary,
+                          color: colors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: SpeakabooTheme.spacingSm),
                       if (_missionsData!.missions.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 24),
-                          child: Center(child: Text('All missions completed for today!')),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 24),
+                          child: Center(
+                            child: Text(
+                              'All missions completed for today!',
+                              style: TextStyle(color: colors.textSecondary),
+                            ),
+                          ),
                         )
                       else
                         ..._missionsData!.missions.map(_buildMissionCard),
@@ -206,10 +218,11 @@ class _MissionsScreenState extends State<MissionsScreen> {
   }
 
   Widget _buildStreakCard(int streakDays, int streakFreezes) {
+    final colors = context.colors;
     return Container(
       padding: const EdgeInsets.all(SpeakabooTheme.spacingLg),
       decoration: BoxDecoration(
-        color: SpeakabooTheme.surface,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
       ),
       child: Row(
@@ -218,12 +231,12 @@ class _MissionsScreenState extends State<MissionsScreen> {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: SpeakabooTheme.accent.withValues(alpha: 0.15),
+              color: colors.accent.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.local_fire_department,
-              color: SpeakabooTheme.accent,
+              color: colors.accent,
               size: 32,
             ),
           ),
@@ -234,18 +247,18 @@ class _MissionsScreenState extends State<MissionsScreen> {
               children: [
                 Text(
                   '$streakDays Day Streak!',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: SpeakabooTheme.headingSize - 4,
                     fontWeight: FontWeight.bold,
-                    color: SpeakabooTheme.textPrimary,
+                    color: colors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 2),
-                const Text(
+                Text(
                   'Practice today to keep it going (Asia/Dhaka)',
                   style: TextStyle(
                     fontSize: SpeakabooTheme.captionSize,
-                    color: SpeakabooTheme.textSecondary,
+                    color: colors.textSecondary,
                   ),
                 ),
               ],
@@ -257,9 +270,9 @@ class _MissionsScreenState extends State<MissionsScreen> {
               const SizedBox(height: 2),
               Text(
                 '$streakFreezes freeze',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: SpeakabooTheme.smallSize,
-                  color: SpeakabooTheme.textSecondary,
+                  color: colors.textSecondary,
                 ),
               ),
             ],
@@ -270,13 +283,14 @@ class _MissionsScreenState extends State<MissionsScreen> {
   }
 
   Widget _buildMissionCard(Mission m) {
+    final colors = context.colors;
     final double progress = (m.progress / (m.target > 0 ? m.target : 1)).clamp(0.0, 1.0);
 
     return Container(
       margin: const EdgeInsets.only(bottom: SpeakabooTheme.spacingMd),
       padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
       decoration: BoxDecoration(
-        color: SpeakabooTheme.surface,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
       ),
       child: Column(
@@ -287,25 +301,25 @@ class _MissionsScreenState extends State<MissionsScreen> {
               Expanded(
                 child: Text(
                   m.title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: SpeakabooTheme.baseFontSize,
                     fontWeight: FontWeight.bold,
-                    color: SpeakabooTheme.textPrimary,
+                    color: colors.textPrimary,
                   ),
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: SpeakabooTheme.background,
+                  color: colors.background,
                   borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm),
                 ),
                 child: Text(
                   '+${m.xpReward} XP',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: SpeakabooTheme.captionSize,
                     fontWeight: FontWeight.bold,
-                    color: SpeakabooTheme.accent,
+                    color: colors.accent,
                   ),
                 ),
               ),
@@ -314,9 +328,9 @@ class _MissionsScreenState extends State<MissionsScreen> {
           const SizedBox(height: 4),
           Text(
             m.description,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: SpeakabooTheme.captionSize,
-              color: SpeakabooTheme.textSecondary,
+              color: colors.textSecondary,
             ),
           ),
           const SizedBox(height: SpeakabooTheme.spacingSm),
@@ -324,8 +338,8 @@ class _MissionsScreenState extends State<MissionsScreen> {
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: progress,
-              backgroundColor: SpeakabooTheme.background,
-              valueColor: const AlwaysStoppedAnimation<Color>(SpeakabooTheme.accent),
+              backgroundColor: colors.background,
+              valueColor: AlwaysStoppedAnimation<Color>(colors.accent),
               minHeight: 8,
             ),
           ),
@@ -335,18 +349,18 @@ class _MissionsScreenState extends State<MissionsScreen> {
             children: [
               Text(
                 '${m.progress} / ${m.target}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: SpeakabooTheme.smallSize,
-                  color: SpeakabooTheme.textSecondary,
+                  color: colors.textSecondary,
                 ),
               ),
               if (m.claimed)
-                const Text(
+                Text(
                   'Claimed ✓',
                   style: TextStyle(
                     fontSize: SpeakabooTheme.captionSize,
                     fontWeight: FontWeight.bold,
-                    color: SpeakabooTheme.success,
+                    color: colors.success,
                   ),
                 )
               else if (m.completed)
@@ -381,35 +395,36 @@ class _MissionsScreenState extends State<MissionsScreen> {
   }
 
   Widget _buildStreakRecoveryBanner() {
+    final colors = context.colors;
     return Container(
       padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
       decoration: BoxDecoration(
-        color: SpeakabooTheme.accent.withValues(alpha: 0.12),
+        color: colors.accent.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
-        border: Border.all(color: SpeakabooTheme.accent.withValues(alpha: 0.3)),
+        border: Border.all(color: colors.accent.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.healing, color: SpeakabooTheme.accent, size: 28),
+          Icon(Icons.healing, color: colors.accent, size: 28),
           const SizedBox(width: SpeakabooTheme.spacingMd),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Text(
                   'Restore Your Streak',
                   style: TextStyle(
                     fontSize: SpeakabooTheme.baseFontSize,
                     fontWeight: FontWeight.bold,
-                    color: SpeakabooTheme.textPrimary,
+                    color: colors.textPrimary,
                   ),
                 ),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(
                   'Missed a day? No guilt! Tap below to repair your habit streak.',
                   style: TextStyle(
                     fontSize: SpeakabooTheme.captionSize,
-                    color: SpeakabooTheme.textSecondary,
+                    color: colors.textSecondary,
                   ),
                 ),
               ],
@@ -430,10 +445,11 @@ class _MissionsScreenState extends State<MissionsScreen> {
   }
 
   Widget _buildWordOfTheDayCard(WordOfTheDay wotd) {
+    final colors = context.colors;
     return Container(
       padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
       decoration: BoxDecoration(
-        color: SpeakabooTheme.surface,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
       ),
       child: Column(
@@ -441,24 +457,24 @@ class _MissionsScreenState extends State<MissionsScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.lightbulb_outline, color: SpeakabooTheme.accent, size: 20),
+              Icon(Icons.lightbulb_outline, color: colors.accent, size: 20),
               const SizedBox(width: 6),
-              const Text(
+              Text(
                 'Word of the Day',
                 style: TextStyle(
                   fontSize: SpeakabooTheme.captionSize,
                   fontWeight: FontWeight.bold,
-                  color: SpeakabooTheme.accent,
+                  color: colors.accent,
                   letterSpacing: 0.5,
                 ),
               ),
               const Spacer(),
               Text(
                 wotd.level.toUpperCase(),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: SpeakabooTheme.smallSize,
                   fontStyle: FontStyle.italic,
-                  color: SpeakabooTheme.textSecondary,
+                  color: colors.textSecondary,
                 ),
               ),
             ],
@@ -470,14 +486,14 @@ class _MissionsScreenState extends State<MissionsScreen> {
             children: [
               Text(
                 wotd.word,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: SpeakabooTheme.headingSize - 2,
                   fontWeight: FontWeight.bold,
-                  color: SpeakabooTheme.textPrimary,
+                  color: colors.textPrimary,
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.volume_up, size: 20, color: SpeakabooTheme.accent),
+                icon: Icon(Icons.volume_up, size: 20, color: colors.accent),
                 tooltip: 'Listen to pronunciation',
                 visualDensity: VisualDensity.compact,
                 onPressed: () {
@@ -492,18 +508,18 @@ class _MissionsScreenState extends State<MissionsScreen> {
               const SizedBox(width: 4),
               Text(
                 wotd.pronunciation,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: SpeakabooTheme.captionSize,
-                  color: SpeakabooTheme.textSecondary,
+                  color: colors.textSecondary,
                 ),
               ),
               const Spacer(),
               Text(
                 wotd.bengaliMeaning,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: SpeakabooTheme.baseFontSize,
                   fontWeight: FontWeight.w600,
-                  color: SpeakabooTheme.accent,
+                  color: colors.accent,
                 ),
               ),
             ],
@@ -511,29 +527,29 @@ class _MissionsScreenState extends State<MissionsScreen> {
           const SizedBox(height: 6),
           Text(
             wotd.definition,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: SpeakabooTheme.captionSize,
-              color: SpeakabooTheme.textSecondary,
+              color: colors.textSecondary,
             ),
           ),
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: SpeakabooTheme.background,
+              color: colors.background,
               borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm),
             ),
             child: Row(
               children: [
-                const Icon(Icons.format_quote, size: 16, color: SpeakabooTheme.textSecondary),
+                Icon(Icons.format_quote, size: 16, color: colors.textSecondary),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     wotd.example,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: SpeakabooTheme.smallSize,
                       fontStyle: FontStyle.italic,
-                      color: SpeakabooTheme.textPrimary,
+                      color: colors.textPrimary,
                     ),
                   ),
                 ),
@@ -556,8 +572,8 @@ class _MissionsScreenState extends State<MissionsScreen> {
               },
               style: OutlinedButton.styleFrom(
                 visualDensity: VisualDensity.compact,
-                foregroundColor: SpeakabooTheme.accent,
-                side: BorderSide(color: SpeakabooTheme.accent.withValues(alpha: 0.5)),
+                foregroundColor: colors.accent,
+                side: BorderSide(color: colors.accent.withValues(alpha: 0.5)),
               ),
             ),
           ),

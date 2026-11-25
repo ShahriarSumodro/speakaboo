@@ -113,7 +113,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 }
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: SpeakabooTheme.error),
+            style: ElevatedButton.styleFrom(backgroundColor: context.colors.error),
             child: const Text('Erase Everything', style: TextStyle(color: Colors.white)),
           ),
         ],
@@ -124,11 +124,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final colors = context.colors;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings'),
-        backgroundColor: SpeakabooTheme.background,
+        title: Text('Settings', style: TextStyle(color: colors.textPrimary)),
+        backgroundColor: colors.background,
+        foregroundColor: colors.textPrimary,
         elevation: 0,
       ),
       body: ListView(
@@ -136,10 +138,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           // Theme Section
           ListTile(
-            tileColor: SpeakabooTheme.surface,
+            tileColor: colors.surface,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm)),
-            title: const Text('App Theme'),
-            subtitle: Text('Current: ${_themeSelection.toUpperCase()}'),
+            title: Text('App Theme', style: TextStyle(color: colors.textPrimary)),
+            subtitle: Text('Current: ${_themeSelection.toUpperCase()}', style: TextStyle(color: colors.textSecondary)),
             trailing: DropdownButton<String>(
               value: _themeSelection,
               underline: const SizedBox(),
@@ -160,12 +162,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           // Developer Server URL
           ListTile(
-            tileColor: SpeakabooTheme.surface,
+            tileColor: colors.surface,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm)),
-            leading: const Icon(Icons.settings_ethernet, color: SpeakabooTheme.accent),
-            title: const Text('Server Connection (Dev)'),
-            subtitle: Text(AppConfig.backendUrl),
-            trailing: const Icon(Icons.chevron_right),
+            leading: Icon(Icons.settings_ethernet, color: colors.accent),
+            title: Text('Server Connection (Dev)', style: TextStyle(color: colors.textPrimary)),
+            subtitle: Text(AppConfig.backendUrl, style: TextStyle(color: colors.textSecondary)),
+            trailing: Icon(Icons.chevron_right, color: colors.textSecondary),
             onTap: () {
               DevServerDialog.show(context, onSaved: () {
                 setState(() {});
@@ -178,14 +180,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Teaching Engine Experiment Variant (CD-012)
           ListTile(
             key: const Key('experiment_variant_tile'),
-            tileColor: SpeakabooTheme.surface,
+            tileColor: colors.surface,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm)),
-            leading: const Icon(Icons.science_outlined, color: SpeakabooTheme.accent),
-            title: const Text('Teaching Engine Variant'),
-            subtitle: const Text('EXP001: Balanced Recast (Ellis 2005) • EXP003: Active'),
+            leading: Icon(Icons.science_outlined, color: colors.accent),
+            title: Text('Teaching Engine Variant', style: TextStyle(color: colors.textPrimary)),
+            subtitle: Text('EXP001: Balanced Recast (Ellis 2005) • EXP003: Active', style: TextStyle(color: colors.textSecondary)),
             trailing: Chip(
               label: const Text('ACTIVE', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
-              backgroundColor: SpeakabooTheme.accent,
+              backgroundColor: colors.accent,
+              side: BorderSide(color: colors.accent),
               visualDensity: VisualDensity.compact,
             ),
           ),
@@ -193,11 +196,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           // Daily Practice Reminders
           SwitchListTile(
-            tileColor: SpeakabooTheme.surface,
+            tileColor: colors.surface,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm)),
-            secondary: const Icon(Icons.notifications_active_outlined, color: SpeakabooTheme.accent),
-            title: const Text('Daily Practice Reminder'),
-            subtitle: Text(_remindersEnabled ? 'Scheduled for $_reminderTime' : 'Disabled'),
+            secondary: Icon(Icons.notifications_active_outlined, color: colors.accent),
+            title: Text('Daily Practice Reminder', style: TextStyle(color: colors.textPrimary)),
+            subtitle: Text(_remindersEnabled ? 'Scheduled for $_reminderTime' : 'Disabled', style: TextStyle(color: colors.textSecondary)),
             value: _remindersEnabled,
             onChanged: (val) async {
               await NotificationService.setEnabled(val);
@@ -207,12 +210,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (_remindersEnabled) ...[
             const SizedBox(height: 8),
             ListTile(
-              tileColor: SpeakabooTheme.surface,
+              tileColor: colors.surface,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm)),
-              leading: const Icon(Icons.access_time, color: SpeakabooTheme.accent),
-              title: const Text('Reminder Time'),
-              subtitle: Text('Current time: $_reminderTime (Asia/Dhaka)'),
-              trailing: const Icon(Icons.chevron_right),
+              leading: Icon(Icons.access_time, color: colors.accent),
+              title: Text('Reminder Time', style: TextStyle(color: colors.textPrimary)),
+              subtitle: Text('Current time: $_reminderTime (Asia/Dhaka)', style: TextStyle(color: colors.textSecondary)),
+              trailing: Icon(Icons.chevron_right, color: colors.textSecondary),
               onTap: _selectReminderTime,
             ),
           ],
@@ -220,23 +223,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           // Privacy Policy
           ListTile(
-            tileColor: SpeakabooTheme.surface,
+            tileColor: colors.surface,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm)),
-            leading: const Icon(Icons.privacy_tip_outlined, color: SpeakabooTheme.accent),
-            title: const Text('Privacy Policy'),
-            subtitle: const Text('Kid safety, zero raw audio storage, data rights'),
-            trailing: const Icon(Icons.chevron_right),
+            leading: Icon(Icons.privacy_tip_outlined, color: colors.accent),
+            title: Text('Privacy Policy', style: TextStyle(color: colors.textPrimary)),
+            subtitle: Text('Kid safety, zero raw audio storage, data rights', style: TextStyle(color: colors.textSecondary)),
+            trailing: Icon(Icons.chevron_right, color: colors.textSecondary),
             onTap: _showPrivacyPolicy,
           ),
           const SizedBox(height: 8),
 
           // Delete Account / Right to be Forgotten
           ListTile(
-            tileColor: SpeakabooTheme.surface,
+            tileColor: colors.surface,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm)),
-            leading: const Icon(Icons.delete_forever, color: SpeakabooTheme.error),
-            title: const Text('Delete My Data', style: TextStyle(color: SpeakabooTheme.error)),
-            subtitle: const Text('Permanently erase account and history'),
+            leading: Icon(Icons.delete_forever, color: colors.error),
+            title: Text('Delete My Data', style: TextStyle(color: colors.error)),
+            subtitle: Text('Permanently erase account and history', style: TextStyle(color: colors.textSecondary)),
             onTap: _confirmDeleteData,
           ),
         ],

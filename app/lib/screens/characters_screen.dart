@@ -57,24 +57,31 @@ class _CharactersScreenState extends State<CharactersScreen> {
   Widget build(BuildContext context) {
     final conv = context.watch<ConversationProvider>();
     final currentId = conv.currentCharacterId ?? (conv.conversationId != null ? 'rule_farmer' : '');
+    final colors = context.colors;
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: SpeakabooTheme.background,
+        backgroundColor: colors.background,
+        foregroundColor: colors.textPrimary,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'Speaking Companions',
           style: TextStyle(
             fontSize: SpeakabooTheme.headingSize,
             fontWeight: FontWeight.bold,
-            color: SpeakabooTheme.textPrimary,
+            color: colors.textPrimary,
           ),
         ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _characters.isEmpty
-              ? const Center(child: Text('No companions found. Connect to backend.'))
+              ? Center(
+                  child: Text(
+                    'No companions found. Connect to backend.',
+                    style: TextStyle(color: colors.textSecondary),
+                  ),
+                )
               : RefreshIndicator(
                   onRefresh: _loadCharacters,
                   child: ListView.builder(
@@ -88,10 +95,10 @@ class _CharactersScreenState extends State<CharactersScreen> {
                       return Container(
                         margin: const EdgeInsets.only(bottom: SpeakabooTheme.spacingMd),
                         decoration: BoxDecoration(
-                          color: SpeakabooTheme.surface,
+                          color: colors.surface,
                           borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
                           border: isCurrent
-                              ? Border.all(color: SpeakabooTheme.accent, width: 2)
+                              ? Border.all(color: colors.accent, width: 2)
                               : null,
                         ),
                         child: InkWell(
@@ -112,12 +119,12 @@ class _CharactersScreenState extends State<CharactersScreen> {
                                   width: 56,
                                   height: 56,
                                   decoration: BoxDecoration(
-                                    color: SpeakabooTheme.background,
+                                    color: colors.background,
                                     borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
                                   ),
                                   child: Icon(
                                     isLocked ? Icons.lock_outline : Icons.face,
-                                    color: isLocked ? SpeakabooTheme.textSecondary : SpeakabooTheme.accent,
+                                    color: isLocked ? colors.textSecondary : colors.accent,
                                     size: 32,
                                   ),
                                 ),
@@ -128,36 +135,37 @@ class _CharactersScreenState extends State<CharactersScreen> {
                                     children: [
                                       Text(
                                         c.name,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: SpeakabooTheme.baseFontSize,
                                           fontWeight: FontWeight.bold,
-                                          color: SpeakabooTheme.textPrimary,
+                                          color: colors.textPrimary,
                                         ),
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
                                         c.tagline,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: SpeakabooTheme.captionSize,
-                                          color: SpeakabooTheme.textSecondary,
+                                          color: colors.textSecondary,
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
                                 if (isCurrent)
-                                  const Chip(
-                                    label: Text('Active', style: TextStyle(color: Colors.white, fontSize: 11)),
-                                    backgroundColor: SpeakabooTheme.accent,
+                                  Chip(
+                                    label: const Text('Active', style: TextStyle(color: Colors.white, fontSize: 11)),
+                                    backgroundColor: colors.accent,
+                                    side: BorderSide(color: colors.accent),
                                     visualDensity: VisualDensity.compact,
                                   )
                                 else if (isLocked)
                                   Text(
                                     '${c.priceBdt} BDT',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: SpeakabooTheme.captionSize,
                                       fontWeight: FontWeight.bold,
-                                      color: SpeakabooTheme.accent,
+                                      color: colors.accent,
                                     ),
                                   ),
                               ],

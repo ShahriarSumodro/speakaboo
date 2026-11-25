@@ -43,12 +43,13 @@ class _UnlockSheetState extends State<UnlockSheet> {
   @override
   Widget build(BuildContext context) {
     final isPlay = AppConfig.isPlayFlavor;
+    final colors = context.colors;
 
     return Container(
       padding: const EdgeInsets.all(SpeakabooTheme.spacingLg),
-      decoration: const BoxDecoration(
-        color: SpeakabooTheme.surface,
-        borderRadius: BorderRadius.vertical(
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: const BorderRadius.vertical(
           top: Radius.circular(SpeakabooTheme.radiusLg),
         ),
       ),
@@ -63,7 +64,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: SpeakabooTheme.textSecondary.withValues(alpha: 0.3),
+                    color: colors.textSecondary.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -71,18 +72,18 @@ class _UnlockSheetState extends State<UnlockSheet> {
               const SizedBox(height: SpeakabooTheme.spacingMd),
               Text(
                 'Unlock ${widget.title}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: SpeakabooTheme.headingSize,
                   fontWeight: FontWeight.bold,
-                  color: SpeakabooTheme.textPrimary,
+                  color: colors.textPrimary,
                 ),
               ),
               const SizedBox(height: SpeakabooTheme.spacingXs),
               Text(
                 'Practice unlimited spoken English (${widget.priceText})',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: SpeakabooTheme.baseFontSize,
-                  color: SpeakabooTheme.textSecondary,
+                  color: colors.textSecondary,
                 ),
               ),
               const SizedBox(height: SpeakabooTheme.spacingLg),
@@ -159,15 +160,15 @@ class _UnlockSheetState extends State<UnlockSheet> {
                         Icon(
                           _showManualTrx ? Icons.expand_less : Icons.expand_more,
                           size: 20,
-                          color: SpeakabooTheme.textSecondary,
+                          color: colors.textSecondary,
                         ),
                         const SizedBox(width: 4),
-                        const Text(
+                        Text(
                           'Paid via bKash/Nagad USSD (*247# / *167#)?',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: SpeakabooTheme.textSecondary,
+                            color: colors.textSecondary,
                           ),
                         ),
                       ],
@@ -179,15 +180,15 @@ class _UnlockSheetState extends State<UnlockSheet> {
                     margin: const EdgeInsets.only(top: 8, bottom: 8),
                     padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
                     decoration: BoxDecoration(
-                      color: SpeakabooTheme.background,
+                      color: colors.background,
                       borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Send Money to Merchant: 01700-000000, then paste your Transaction ID below:',
-                          style: TextStyle(fontSize: 11, color: SpeakabooTheme.textSecondary),
+                          style: TextStyle(fontSize: 11, color: colors.textSecondary),
                         ),
                         const SizedBox(height: 8),
                         Row(
