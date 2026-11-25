@@ -92,9 +92,11 @@ class AuthProvider extends ChangeNotifier {
         final deviceId = await AuthStorage.getDeviceId();
         final authRes = await _api.deviceAuth(deviceId: deviceId);
         _userId = authRes['user_id'] as String;
-        _authToken = authRes['auth_token'] as String;
-        await AuthStorage.saveAuth(userId: _userId!, authToken: _authToken!);
-        _api.setAuthToken(_authToken);
+        _authToken = (authRes['auth_token'] ?? authRes['token']) as String?;
+        if (_userId != null && _authToken != null) {
+          await AuthStorage.saveAuth(userId: _userId!, authToken: _authToken!);
+          _api.setAuthToken(_authToken);
+        }
       }
 
       // Load profile (try cache first for speed, then refresh from network)

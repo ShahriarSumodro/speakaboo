@@ -103,12 +103,16 @@ class LearningProgress {
   });
 
   factory LearningProgress.fromJson(Map<String, dynamic> json) {
+    final rawLevel = json['level'];
+    final levelStr = rawLevel is int
+        ? 'Level $rawLevel'
+        : (rawLevel?.toString() ?? 'beginner');
     return LearningProgress(
       userId: json['user_id'] ?? '',
-      level: json['level'] ?? 'beginner',
+      level: levelStr,
       xp: json['xp'] ?? 0,
       totalWordsSpoken: json['total_words_spoken'] ?? 0,
-      streakDays: json['streak_days'] ?? 0,
+      streakDays: json['streak_days'] ?? json['current_streak'] ?? 0,
       weeklyMinutes: (json['weekly_minutes'] ?? 0).toDouble(),
       accuracyScore: (json['accuracy_score'] ?? 0).toDouble(),
     );
@@ -231,14 +235,14 @@ class VocabCard {
   factory VocabCard.fromJson(Map<String, dynamic> json) {
     return VocabCard(
       id: json['id'] ?? '',
-      word: json['word'] ?? '',
-      definition: json['definition'] ?? '',
-      example: json['example'] ?? '',
+      word: json['word'] ?? json['word_or_phrase'] ?? '',
+      definition: json['definition'] ?? json['correction_notes'] ?? '',
+      example: json['example'] ?? json['context_sentence'] ?? '',
       box: json['box'] ?? 1,
-      nextReview: json['next_review'] ?? '',
+      nextReview: json['next_review'] ?? json['next_review_date'] ?? '',
       mastered: json['mastered'] ?? false,
       easeFactor: (json['ease_factor'] ?? 2.5).toDouble(),
-      repetitions: json['repetitions'] ?? 0,
+      repetitions: json['repetitions'] ?? json['times_reviewed'] ?? 0,
     );
   }
 }

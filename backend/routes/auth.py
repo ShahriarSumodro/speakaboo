@@ -38,6 +38,7 @@ class ProfileResponse(BaseModel):
 class DeviceAuthResponse(BaseModel):
     user_id: str
     token: str
+    auth_token: Optional[str] = None
     is_new: bool
     plan: str
     display_name: str
@@ -113,6 +114,7 @@ async def device_auth(request: DeviceAuthRequest):
     return DeviceAuthResponse(
         user_id=user.id,
         token=token,
+        auth_token=token,
         is_new=is_new,
         plan=user.plan.value,
         display_name=profile.display_name,

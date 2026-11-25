@@ -12,6 +12,7 @@ import '../models/learning_models.dart';
 import '../models/parent_summary.dart';
 import '../models/usage_info.dart';
 import '../models/payment_models.dart';
+import 'auth_storage.dart';
 
 /// Result of a conversation turn from the backend.
 class TurnResult {
@@ -174,6 +175,63 @@ class ApiService {
 
   // ================= AUTH & PROFILE =================
 
+  /// Ensure we have an active auth token, loading from storage or re-registering device.
+  Future<void> _ensureAuthToken() async {
+    if (_authToken != null && _authToken!.isNotEmpty) return;
+    try {
+      final token = await AuthStorage.getAuthToken();
+      if (token != null && token.isNotEmpty) {
+        _authToken = token;
+        return;
+      }
+      await _refreshDeviceAuth();
+    } catch (e) {
+      debugPrint('[ApiService] _ensureAuthToken error: $e');
+    }
+  }
+
+  /// Re-authenticate device with backend and persist token.
+  Future<bool> _refreshDeviceAuth() async {
+    try {
+      final deviceId = await AuthStorage.getDeviceId();
+      final res = await deviceAuth(deviceId: deviceId);
+      final newToken = (res['auth_token'] ?? res['token']) as String?;
+      final userId = res['user_id'] as String?;
+      if (newToken != null && newToken.isNotEmpty) {
+        setAuthToken(newToken);
+        if (userId != null) {
+          await AuthStorage.saveAuth(userId: userId, authToken: newToken);
+        }
+        return true;
+      }
+    } catch (e) {
+      debugPrint('[ApiService] _refreshDeviceAuth failed: $e');
+    }
+    return false;
+  }
+
+  /// Execute an HTTP request with automatic token check and retry on 401 Unauthorized.
+  Future<http.Response> _sendWithAuthRetry(
+    Future<http.Response> Function() requestFn, {
+    bool requireAuth = true,
+  }) async {
+    if (requireAuth) {
+      await _ensureAuthToken();
+    }
+
+    var response = await requestFn().timeout(AppConfig.requestTimeout);
+
+    if (requireAuth && response.statusCode == 401) {
+      debugPrint('[ApiService] 401 Unauthorized received, refreshing device token...');
+      final refreshed = await _refreshDeviceAuth();
+      if (refreshed) {
+        response = await requestFn().timeout(AppConfig.requestTimeout);
+      }
+    }
+
+    return response;
+  }
+
   /// Authenticate device and obtain signed JWT/HMAC token.
   Future<Map<String, dynamic>> deviceAuth({
     required String deviceId,
@@ -182,7 +240,10 @@ class ApiService {
     final response = await _client
         .post(
           Uri.parse('$baseUrl/api/auth/device'),
-          headers: _headers(),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
           body: jsonEncode({
             'device_id': deviceId,
             if (displayName != null) 'display_name': displayName,
@@ -194,20 +255,21 @@ class ApiService {
       throw ApiException('Device authentication failed', response.statusCode);
     }
     final data = jsonDecode(response.body) as Map<String, dynamic>;
-    if (data['auth_token'] != null) {
-      setAuthToken(data['auth_token']);
+    final token = (data['auth_token'] ?? data['token']) as String?;
+    if (token != null && token.isNotEmpty) {
+      setAuthToken(token);
     }
     return data;
   }
 
   /// Get current user profile.
   Future<UserProfile> getProfile() async {
-    final response = await _client
-        .get(
-          Uri.parse('$baseUrl/api/auth/profile'),
-          headers: _headers(),
-        )
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.get(
+        Uri.parse('$baseUrl/api/auth/profile'),
+        headers: _headers(),
+      ),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to load profile', response.statusCode);
@@ -217,13 +279,13 @@ class ApiService {
 
   /// Update current user profile.
   Future<UserProfile> updateProfile(Map<String, dynamic> updates) async {
-    final response = await _client
-        .put(
-          Uri.parse('$baseUrl/api/auth/profile'),
-          headers: _headers(),
-          body: jsonEncode(updates),
-        )
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.put(
+        Uri.parse('$baseUrl/api/auth/profile'),
+        headers: _headers(),
+        body: jsonEncode(updates),
+      ),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to update profile', response.statusCode);
@@ -233,13 +295,13 @@ class ApiService {
 
   /// Set 4-digit parent PIN.
   Future<bool> setParentPin(String pin) async {
-    final response = await _client
-        .post(
-          Uri.parse('$baseUrl/api/auth/set-parent-pin'),
-          headers: _headers(),
-          body: jsonEncode({'pin': pin}),
-        )
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.post(
+        Uri.parse('$baseUrl/api/auth/set-parent-pin'),
+        headers: _headers(),
+        body: jsonEncode({'pin': pin}),
+      ),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to set parent PIN', response.statusCode);
@@ -250,13 +312,13 @@ class ApiService {
 
   /// Verify 4-digit parent PIN.
   Future<bool> verifyParentPin(String pin) async {
-    final response = await _client
-        .post(
-          Uri.parse('$baseUrl/api/auth/verify-parent-pin'),
-          headers: _headers(),
-          body: jsonEncode({'pin': pin}),
-        )
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.post(
+        Uri.parse('$baseUrl/api/auth/verify-parent-pin'),
+        headers: _headers(),
+        body: jsonEncode({'pin': pin}),
+      ),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to verify parent PIN', response.statusCode);
@@ -319,21 +381,21 @@ class ApiService {
     String? coachMode,
     String? ageBand,
   }) async {
-    final response = await _client
-        .post(
-          Uri.parse('$baseUrl/api/conversation/start'),
-          headers: _headers(),
-          body: jsonEncode({
-            'user_id': userId,
-            'character_id': characterId,
-            if (scenarioId != null) 'scenario_id': scenarioId,
-            if (topicId != null) 'topic_id': topicId,
-            if (practiceMode != null) 'practice_mode': practiceMode,
-            if (coachMode != null) 'coach_mode': coachMode,
-            if (ageBand != null) 'age_band': ageBand,
-          }),
-        )
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.post(
+        Uri.parse('$baseUrl/api/conversation/start'),
+        headers: _headers(),
+        body: jsonEncode({
+          'user_id': userId,
+          'character_id': characterId,
+          if (scenarioId != null) 'scenario_id': scenarioId,
+          if (topicId != null) 'topic_id': topicId,
+          if (practiceMode != null) 'practice_mode': practiceMode,
+          if (coachMode != null) 'coach_mode': coachMode,
+          if (ageBand != null) 'age_band': ageBand,
+        }),
+      ),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to start conversation', response.statusCode);
@@ -343,13 +405,13 @@ class ApiService {
 
   /// Get sentence starter, model answer, and vocabulary hint for active conversation.
   Future<ConversationHint> getConversationHint(String conversationId) async {
-    final response = await _client
-        .post(
-          Uri.parse('$baseUrl/api/conversation/hint'),
-          headers: _headers(),
-          body: jsonEncode({'conversation_id': conversationId}),
-        )
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.post(
+        Uri.parse('$baseUrl/api/conversation/hint'),
+        headers: _headers(),
+        body: jsonEncode({'conversation_id': conversationId}),
+      ),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to load hint', response.statusCode);
@@ -359,13 +421,13 @@ class ApiService {
 
   /// Get end-of-session summary, talk-time ratio, clarity indicator, and tomorrow hook.
   Future<SessionSummary> getConversationSummary(String conversationId) async {
-    final response = await _client
-        .post(
-          Uri.parse('$baseUrl/api/conversation/summary'),
-          headers: _headers(),
-          body: jsonEncode({'conversation_id': conversationId}),
-        )
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.post(
+        Uri.parse('$baseUrl/api/conversation/summary'),
+        headers: _headers(),
+        body: jsonEncode({'conversation_id': conversationId}),
+      ),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to load session summary', response.statusCode);
@@ -379,17 +441,17 @@ class ApiService {
     required String spokenText,
     double durationSeconds = 30.0,
   }) async {
-    final response = await _client
-        .post(
-          Uri.parse('$baseUrl/api/conversation/placement'),
-          headers: _headers(),
-          body: jsonEncode({
-            'user_id': userId,
-            'spoken_text': spokenText,
-            'duration_seconds': durationSeconds,
-          }),
-        )
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.post(
+        Uri.parse('$baseUrl/api/conversation/placement'),
+        headers: _headers(),
+        body: jsonEncode({
+          'user_id': userId,
+          'spoken_text': spokenText,
+          'duration_seconds': durationSeconds,
+        }),
+      ),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to submit placement test', response.statusCode);
@@ -399,12 +461,12 @@ class ApiService {
 
   /// Get mistake logs and recurring error categories for learner.
   Future<List<MistakeLogItem>> getMistakeLogs(String userId) async {
-    final response = await _client
-        .get(
-          Uri.parse('$baseUrl/api/conversation/mistakes/$userId'),
-          headers: _headers(),
-        )
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.get(
+        Uri.parse('$baseUrl/api/conversation/mistakes/$userId'),
+        headers: _headers(),
+      ),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to load mistake logs', response.statusCode);
@@ -419,6 +481,7 @@ class ApiService {
     required Uint8List audio,
     String audioFormat = 'wav',
   }) async {
+    await _ensureAuthToken();
     final request = http.MultipartRequest(
       'POST',
       Uri.parse('$baseUrl/api/conversation/turn'),
@@ -471,6 +534,7 @@ class ApiService {
     required Uint8List audio,
     String audioFormat = 'wav',
   }) async* {
+    await _ensureAuthToken();
     final request = http.MultipartRequest(
       'POST',
       Uri.parse('$baseUrl/api/conversation/stream-turn'),
@@ -528,9 +592,9 @@ class ApiService {
 
   /// Get streak status.
   Future<Map<String, dynamic>> getStreak(String userId) async {
-    final response = await _client
-        .get(Uri.parse('$baseUrl/api/learning/streak/$userId'), headers: _headers())
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.get(Uri.parse('$baseUrl/api/learning/streak/$userId'), headers: _headers()),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to load streak', response.statusCode);
@@ -540,9 +604,9 @@ class ApiService {
 
   /// Use streak freeze.
   Future<Map<String, dynamic>> freezeStreak() async {
-    final response = await _client
-        .post(Uri.parse('$baseUrl/api/learning/streak/freeze'), headers: _headers())
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.post(Uri.parse('$baseUrl/api/learning/streak/freeze'), headers: _headers()),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to freeze streak', response.statusCode);
@@ -552,13 +616,13 @@ class ApiService {
 
   /// Repair broken streak after a recovery activity.
   Future<Map<String, dynamic>> repairStreak(String userId) async {
-    final response = await _client
-        .post(
-          Uri.parse('$baseUrl/api/learning/streak/repair'),
-          headers: _headers(),
-          body: jsonEncode({'user_id': userId}),
-        )
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.post(
+        Uri.parse('$baseUrl/api/learning/streak/repair'),
+        headers: _headers(),
+        body: jsonEncode({'user_id': userId}),
+      ),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to repair streak', response.statusCode);
@@ -568,9 +632,10 @@ class ApiService {
 
   /// Get daily word of the day with pronunciation and Bengali meaning.
   Future<WordOfTheDay> getWordOfTheDay() async {
-    final response = await _client
-        .get(Uri.parse('$baseUrl/api/learning/word-of-the-day'), headers: _headers())
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.get(Uri.parse('$baseUrl/api/learning/word-of-the-day'), headers: _headers()),
+      requireAuth: false,
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to load word of the day', response.statusCode);
@@ -580,9 +645,9 @@ class ApiService {
 
   /// Get 7-day speaking minutes, words learned, streak, and milestones.
   Future<WeeklyRecap> getWeeklyRecap(String userId) async {
-    final response = await _client
-        .get(Uri.parse('$baseUrl/api/learning/weekly-recap/$userId'), headers: _headers())
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.get(Uri.parse('$baseUrl/api/learning/weekly-recap/$userId'), headers: _headers()),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to load weekly recap', response.statusCode);
@@ -592,9 +657,9 @@ class ApiService {
 
   /// Get user referral code and reward stats.
   Future<ReferralInfo> getReferralInfo(String userId) async {
-    final response = await _client
-        .get(Uri.parse('$baseUrl/api/learning/referral/$userId'), headers: _headers())
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.get(Uri.parse('$baseUrl/api/learning/referral/$userId'), headers: _headers()),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to load referral info', response.statusCode);
@@ -607,16 +672,16 @@ class ApiService {
     required String refereeUserId,
     required String referralCode,
   }) async {
-    final response = await _client
-        .post(
-          Uri.parse('$baseUrl/api/learning/referral/claim'),
-          headers: _headers(),
-          body: jsonEncode({
-            'referee_user_id': refereeUserId,
-            'referral_code': referralCode,
-          }),
-        )
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.post(
+        Uri.parse('$baseUrl/api/learning/referral/claim'),
+        headers: _headers(),
+        body: jsonEncode({
+          'referee_user_id': refereeUserId,
+          'referral_code': referralCode,
+        }),
+      ),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to claim referral', response.statusCode);
@@ -626,9 +691,9 @@ class ApiService {
 
   /// Get daily missions.
   Future<MissionsResponse> getMissions(String userId) async {
-    final response = await _client
-        .get(Uri.parse('$baseUrl/api/learning/missions/$userId'), headers: _headers())
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.get(Uri.parse('$baseUrl/api/learning/missions/$userId'), headers: _headers()),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to load missions', response.statusCode);
@@ -641,16 +706,16 @@ class ApiService {
     required String userId,
     required String missionId,
   }) async {
-    final response = await _client
-        .post(
-          Uri.parse('$baseUrl/api/learning/missions/claim'),
-          headers: _headers(),
-          body: jsonEncode({
-            'user_id': userId,
-            'mission_id': missionId,
-          }),
-        )
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.post(
+        Uri.parse('$baseUrl/api/learning/missions/claim'),
+        headers: _headers(),
+        body: jsonEncode({
+          'user_id': userId,
+          'mission_id': missionId,
+        }),
+      ),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to claim mission', response.statusCode);
@@ -660,9 +725,9 @@ class ApiService {
 
   /// Get overall progress stats.
   Future<LearningProgress> getProgress(String userId) async {
-    final response = await _client
-        .get(Uri.parse('$baseUrl/api/learning/progress/$userId'), headers: _headers())
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.get(Uri.parse('$baseUrl/api/learning/progress/$userId'), headers: _headers()),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to load progress', response.statusCode);
@@ -672,9 +737,10 @@ class ApiService {
 
   /// Get roleplay scenarios.
   Future<List<ScenarioItem>> getScenarios() async {
-    final response = await _client
-        .get(Uri.parse('$baseUrl/api/learning/scenarios'), headers: _headers())
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.get(Uri.parse('$baseUrl/api/learning/scenarios'), headers: _headers()),
+      requireAuth: false,
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to load scenarios', response.statusCode);
@@ -686,9 +752,10 @@ class ApiService {
 
   /// Get conversation topics.
   Future<List<TopicItem>> getTopics() async {
-    final response = await _client
-        .get(Uri.parse('$baseUrl/api/learning/topics'), headers: _headers())
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.get(Uri.parse('$baseUrl/api/learning/topics'), headers: _headers()),
+      requireAuth: false,
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to load topics', response.statusCode);
@@ -700,15 +767,18 @@ class ApiService {
 
   /// Get shadowing scripts.
   Future<List<ShadowingItem>> getShadowing() async {
-    final response = await _client
-        .get(Uri.parse('$baseUrl/api/learning/shadowing'), headers: _headers())
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.get(Uri.parse('$baseUrl/api/learning/shadowing/scripts'), headers: _headers()),
+      requireAuth: false,
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to load shadowing items', response.statusCode);
     }
     final data = jsonDecode(response.body);
-    final list = data['items'] as List<dynamic>? ?? [];
+    final List<dynamic> list = data is List
+        ? data
+        : (data is Map && data['items'] is List ? data['items'] as List<dynamic> : []);
     return list.map((item) => ShadowingItem.fromJson(item as Map<String, dynamic>)).toList();
   }
 
@@ -717,18 +787,23 @@ class ApiService {
     required String itemId,
     required String transcript,
     required double durationSec,
+    String? userId,
   }) async {
-    final response = await _client
-        .post(
-          Uri.parse('$baseUrl/api/learning/shadowing/evaluate'),
-          headers: _headers(),
-          body: jsonEncode({
-            'item_id': itemId,
-            'transcript': transcript,
-            'duration_sec': durationSec,
-          }),
-        )
-        .timeout(AppConfig.requestTimeout);
+    final effectiveUserId = userId ?? await AuthStorage.getUserId() ?? 'anonymous';
+    final response = await _sendWithAuthRetry(
+      () => _client.post(
+        Uri.parse('$baseUrl/api/learning/shadowing/evaluate'),
+        headers: _headers(),
+        body: jsonEncode({
+          'user_id': effectiveUserId,
+          'script_id': itemId,
+          'item_id': itemId,
+          'transcript': transcript,
+          'duration_seconds': durationSec,
+          'duration_sec': durationSec,
+        }),
+      ),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to evaluate shadowing', response.statusCode);
@@ -738,29 +813,33 @@ class ApiService {
 
   /// Get vocabulary notebook cards.
   Future<List<VocabCard>> getVocabulary(String userId) async {
-    final response = await _client
-        .get(Uri.parse('$baseUrl/api/learning/vocabulary/$userId'), headers: _headers())
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.get(Uri.parse('$baseUrl/api/learning/vocabulary/$userId'), headers: _headers()),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to load vocabulary', response.statusCode);
     }
     final data = jsonDecode(response.body);
-    final list = data['cards'] as List<dynamic>? ?? [];
+    final List<dynamic> list = data is List
+        ? data
+        : (data is Map && data['cards'] is List ? data['cards'] as List<dynamic> : []);
     return list.map((c) => VocabCard.fromJson(c as Map<String, dynamic>)).toList();
   }
 
   /// Get due vocabulary cards for review.
   Future<List<VocabCard>> getDueVocabulary(String userId) async {
-    final response = await _client
-        .get(Uri.parse('$baseUrl/api/learning/vocabulary/$userId/due'), headers: _headers())
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.get(Uri.parse('$baseUrl/api/learning/vocabulary/$userId/due'), headers: _headers()),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to load due vocabulary', response.statusCode);
     }
     final data = jsonDecode(response.body);
-    final list = data['cards'] as List<dynamic>? ?? [];
+    final List<dynamic> list = data is List
+        ? data
+        : (data is Map && data['cards'] is List ? data['cards'] as List<dynamic> : []);
     return list.map((c) => VocabCard.fromJson(c as Map<String, dynamic>)).toList();
   }
 
@@ -771,18 +850,18 @@ class ApiService {
     required String definition,
     String example = '',
   }) async {
-    final response = await _client
-        .post(
-          Uri.parse('$baseUrl/api/learning/vocabulary/add'),
-          headers: _headers(),
-          body: jsonEncode({
-            'user_id': userId,
-            'word': word,
-            'definition': definition,
-            'example': example,
-          }),
-        )
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.post(
+        Uri.parse('$baseUrl/api/learning/vocabulary/add'),
+        headers: _headers(),
+        body: jsonEncode({
+          'user_id': userId,
+          'word': word,
+          'definition': definition,
+          'example': example,
+        }),
+      ),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to add word', response.statusCode);
@@ -795,16 +874,16 @@ class ApiService {
     required String cardId,
     required String rating,
   }) async {
-    final response = await _client
-        .post(
-          Uri.parse('$baseUrl/api/learning/vocabulary/review'),
-          headers: _headers(),
-          body: jsonEncode({
-            'card_id': cardId,
-            'rating': rating,
-          }),
-        )
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.post(
+        Uri.parse('$baseUrl/api/learning/vocabulary/review'),
+        headers: _headers(),
+        body: jsonEncode({
+          'card_id': cardId,
+          'rating': rating,
+        }),
+      ),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to submit review', response.statusCode);
@@ -816,9 +895,9 @@ class ApiService {
 
   /// Get parent dashboard summary.
   Future<ParentSummary> getParentSummary(String userId) async {
-    final response = await _client
-        .get(Uri.parse('$baseUrl/api/parent/summary/$userId'), headers: _headers())
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.get(Uri.parse('$baseUrl/api/parent/summary/$userId'), headers: _headers()),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to load parent summary', response.statusCode);
@@ -828,9 +907,9 @@ class ApiService {
 
   /// Get safety flags for parent review.
   Future<List<SafetyFlag>> getSafetyFlags(String userId) async {
-    final response = await _client
-        .get(Uri.parse('$baseUrl/api/parent/safety-flags/$userId'), headers: _headers())
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.get(Uri.parse('$baseUrl/api/parent/safety-flags/$userId'), headers: _headers()),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to load safety flags', response.statusCode);
@@ -844,9 +923,9 @@ class ApiService {
 
   /// Get daily usage stats and cap status.
   Future<UsageInfo> getUsage(String userId) async {
-    final response = await _client
-        .get(Uri.parse('$baseUrl/api/usage/$userId'), headers: _headers())
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.get(Uri.parse('$baseUrl/api/usage/$userId'), headers: _headers()),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to load usage', response.statusCode);
@@ -873,16 +952,16 @@ class ApiService {
     required String parentEmail,
     required bool accepted,
   }) async {
-    final response = await _client
-        .post(
-          Uri.parse('$baseUrl/api/privacy/consent'),
-          headers: _headers(),
-          body: jsonEncode({
-            'parent_email': parentEmail,
-            'accepted': accepted,
-          }),
-        )
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.post(
+        Uri.parse('$baseUrl/api/privacy/consent'),
+        headers: _headers(),
+        body: jsonEncode({
+          'parent_email': parentEmail,
+          'accepted': accepted,
+        }),
+      ),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to record consent', response.statusCode);
@@ -892,9 +971,9 @@ class ApiService {
 
   /// Delete all user data (Right to be forgotten).
   Future<bool> deleteUserData(String userId) async {
-    final response = await _client
-        .delete(Uri.parse('$baseUrl/api/privacy/user/$userId'), headers: _headers())
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.delete(Uri.parse('$baseUrl/api/privacy/user/$userId'), headers: _headers()),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to delete user data', response.statusCode);
@@ -905,9 +984,9 @@ class ApiService {
 
   /// Export full user learning and privacy archive (GDPR/COPPA data portability).
   Future<Map<String, dynamic>> exportUserData(String userId) async {
-    final response = await _client
-        .get(Uri.parse('$baseUrl/api/privacy/export/$userId'), headers: _headers())
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.get(Uri.parse('$baseUrl/api/privacy/export/$userId'), headers: _headers()),
+    );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to export user data', response.statusCode);
@@ -935,18 +1014,18 @@ class ApiService {
     required String purpose,
     String targetId = '',
   }) async {
-    final response = await _client
-        .post(
-          Uri.parse('$baseUrl/api/payment/checkout'),
-          headers: _headers(),
-          body: jsonEncode({
-            'user_id': userId,
-            'gateway': gateway,
-            'purpose': purpose,
-            'target_id': targetId,
-          }),
-        )
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.post(
+        Uri.parse('$baseUrl/api/payment/checkout'),
+        headers: _headers(),
+        body: jsonEncode({
+          'user_id': userId,
+          'gateway': gateway,
+          'purpose': purpose,
+          'target_id': targetId,
+        }),
+      ),
+    );
     if (response.statusCode != 200) {
       throw ApiException('Checkout failed', response.statusCode);
     }
@@ -959,17 +1038,17 @@ class ApiService {
     required String gateway,
     String verificationToken = '',
   }) async {
-    final response = await _client
-        .post(
-          Uri.parse('$baseUrl/api/payment/verify'),
-          headers: _headers(),
-          body: jsonEncode({
-            'payment_id': paymentId,
-            'gateway': gateway,
-            'verification_token': verificationToken,
-          }),
-        )
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.post(
+        Uri.parse('$baseUrl/api/payment/verify'),
+        headers: _headers(),
+        body: jsonEncode({
+          'payment_id': paymentId,
+          'gateway': gateway,
+          'verification_token': verificationToken,
+        }),
+      ),
+    );
     if (response.statusCode != 200) {
       throw ApiException('Payment verification failed', response.statusCode);
     }
@@ -978,9 +1057,9 @@ class ApiService {
 
   /// Restore purchases for a user.
   Future<List<dynamic>> restorePurchases(String userId) async {
-    final response = await _client
-        .post(Uri.parse('$baseUrl/api/payment/restore/$userId'), headers: _headers())
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.post(Uri.parse('$baseUrl/api/payment/restore/$userId'), headers: _headers()),
+    );
     if (response.statusCode != 200) {
       throw ApiException('Failed to restore purchases', response.statusCode);
     }
@@ -989,9 +1068,9 @@ class ApiService {
 
   /// Get active entitlements for a user.
   Future<List<Entitlement>> getEntitlements(String userId) async {
-    final response = await _client
-        .get(Uri.parse('$baseUrl/api/payment/entitlements/$userId'), headers: _headers())
-        .timeout(AppConfig.requestTimeout);
+    final response = await _sendWithAuthRetry(
+      () => _client.get(Uri.parse('$baseUrl/api/payment/entitlements/$userId'), headers: _headers()),
+    );
     if (response.statusCode != 200) {
       throw ApiException('Failed to fetch entitlements', response.statusCode);
     }
