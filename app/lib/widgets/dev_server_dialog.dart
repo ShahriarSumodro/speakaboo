@@ -4,8 +4,10 @@ library;
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 import '../config/app_config.dart';
 import '../config/theme.dart';
+import '../providers/auth_provider.dart';
 
 class DevServerDialog extends StatefulWidget {
   final VoidCallback? onSaved;
@@ -61,6 +63,11 @@ class _DevServerDialogState extends State<DevServerDialog> {
           _testResult =
               'Connected! (${stopwatch.elapsedMilliseconds}ms) - Status: ${data["status"] ?? "ok"}';
         });
+        if (mounted) {
+          try {
+            context.read<AuthProvider>().setServerConnected(true);
+          } catch (_) {}
+        }
       } else {
         setState(() {
           _testSuccess = false;
@@ -86,6 +93,11 @@ class _DevServerDialogState extends State<DevServerDialog> {
     final cleanUrl = url.trim().replaceAll(RegExp(r'/+$'), '');
     await AppConfig.setBackendUrl(cleanUrl);
     widget.onSaved?.call();
+    if (mounted) {
+      try {
+        context.read<AuthProvider>().checkHealth();
+      } catch (_) {}
+    }
     if (!mounted) return;
     Navigator.of(context).pop();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -99,6 +111,11 @@ class _DevServerDialogState extends State<DevServerDialog> {
   Future<void> _reset() async {
     await AppConfig.resetBackendUrl();
     widget.onSaved?.call();
+    if (mounted) {
+      try {
+        context.read<AuthProvider>().checkHealth();
+      } catch (_) {}
+    }
     if (!mounted) return;
     Navigator.of(context).pop();
     ScaffoldMessenger.of(context).showSnackBar(

@@ -20,7 +20,8 @@ Future<void> main() async {
 }
 
 class SpeakabooApp extends StatefulWidget {
-  const SpeakabooApp({super.key});
+  final ApiService? apiService;
+  const SpeakabooApp({super.key, this.apiService});
 
   @override
   State<SpeakabooApp> createState() => _SpeakabooAppState();
@@ -32,7 +33,7 @@ class _SpeakabooAppState extends State<SpeakabooApp> {
   @override
   void initState() {
     super.initState();
-    _apiService = ApiService();
+    _apiService = widget.apiService ?? ApiService();
   }
 
   @override
@@ -82,8 +83,32 @@ class _SpeakabooAppState extends State<SpeakabooApp> {
   }
 }
 
-class _AppRoot extends StatelessWidget {
+class _AppRoot extends StatefulWidget {
   const _AppRoot();
+
+  @override
+  State<_AppRoot> createState() => _AppRootState();
+}
+
+class _AppRootState extends State<_AppRoot> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      context.read<AuthProvider>().checkHealth();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -98,6 +123,7 @@ class _AppRoot extends StatelessWidget {
             left: 0,
             right: 0,
             child: Material(
+              key: const Key('server_not_ready_banner'),
               color: Colors.red.shade800,
               elevation: 4,
               child: SafeArea(
@@ -119,7 +145,10 @@ class _AppRoot extends StatelessWidget {
                           showDialog(
                             context: context,
                             builder: (_) => DevServerDialog(
-                              onSaved: () => auth.initialize(),
+                              onSaved: () {
+                                auth.initialize();
+                                auth.checkHealth();
+                              },
                             ),
                           );
                         },
@@ -130,9 +159,13 @@ class _AppRoot extends StatelessWidget {
                         child: const Text('Settings', style: TextStyle(decoration: TextDecoration.underline)),
                       ),
                       IconButton(
+                        key: const Key('server_banner_refresh_button'),
                         icon: const Icon(Icons.refresh, color: Colors.white, size: 20),
                         tooltip: 'Retry connection',
-                        onPressed: () => auth.initialize(),
+                        onPressed: () {
+                          auth.checkHealth();
+                          auth.initialize();
+                        },
                       ),
                     ],
                   ),

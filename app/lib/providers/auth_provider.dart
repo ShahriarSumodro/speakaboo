@@ -1,6 +1,7 @@
 /// Authentication and user identity state provider.
 library;
 
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/user_profile.dart';
 import '../services/api_service.dart';
@@ -15,6 +16,7 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = true;
   bool _serverConnected = true;
   String? _errorMessage;
+  Timer? _healthTimer;
 
   AuthProvider({required ApiService api}) : _api = api;
 
@@ -25,6 +27,51 @@ class AuthProvider extends ChangeNotifier {
   bool get serverConnected => _serverConnected;
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _userId != null && _authToken != null;
+
+  /// Check backend health and update connection state.
+  Future<bool> checkHealth() async {
+    try {
+      final res = await _api.healthCheck();
+      final isOk = res['status'] == 'ok' || res['status'] == 'degraded';
+      if (isOk) {
+        setServerConnected(true);
+        if (_profile == null || _userId == null) {
+          initialize();
+        }
+        return true;
+      } else {
+        setServerConnected(false);
+        return false;
+      }
+    } catch (e) {
+      setServerConnected(false);
+      return false;
+    }
+  }
+
+  void setServerConnected(bool connected) {
+    if (_serverConnected != connected) {
+      _serverConnected = connected;
+      notifyListeners();
+    }
+    if (!connected) {
+      _startHealthTimer();
+    } else {
+      _stopHealthTimer();
+    }
+  }
+
+  void _startHealthTimer() {
+    if (_healthTimer != null && _healthTimer!.isActive) return;
+    _healthTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      checkHealth();
+    });
+  }
+
+  void _stopHealthTimer() {
+    _healthTimer?.cancel();
+    _healthTimer = null;
+  }
 
   /// Initialize user identity, obtaining or verifying device credentials.
   Future<void> initialize() async {
@@ -62,16 +109,16 @@ class AuthProvider extends ChangeNotifier {
         final remoteProfile = await _api.getProfile();
         _profile = remoteProfile;
         await CacheService.set('profile_$_userId', remoteProfile.toJson());
-        _serverConnected = true;
+        setServerConnected(true);
       } catch (e) {
-        // If cached profile exists, server error doesn't completely block app
-        if (_profile == null) {
-          _serverConnected = false;
+        // If cached profile exists or network call failed, probe health check
+        final isHealthy = await checkHealth();
+        if (!isHealthy && _profile == null) {
           _errorMessage = 'Could not connect to Speakaboo server';
         }
       }
     } catch (e) {
-      _serverConnected = false;
+      setServerConnected(false);
       _errorMessage = e.toString();
     } finally {
       _isLoading = false;
@@ -137,5 +184,11 @@ class AuthProvider extends ChangeNotifier {
     } catch (_) {
       return false;
     }
+  }
+
+  @override
+  void dispose() {
+    _stopHealthTimer();
+    super.dispose();
   }
 }

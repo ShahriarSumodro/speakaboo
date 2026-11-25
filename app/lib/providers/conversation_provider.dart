@@ -435,10 +435,4 @@ class ConversationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  @override
-  void dispose() {
-    audio.dispose();
-    api.dispose();
-    super.dispose();
-  }
 }
