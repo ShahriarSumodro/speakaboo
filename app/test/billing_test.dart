@@ -2,15 +2,19 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speakaboo/config/app_config.dart';
 import 'package:speakaboo/services/api_service.dart';
 import 'package:speakaboo/services/billing/billing_provider.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('Billing Provider Tests', () {
     late ApiService mockApi;
 
     setUp(() {
+      SharedPreferences.setMockInitialValues({});
       mockApi = ApiService(
         client: MockClient((request) async {
           if (request.url.path.contains('/api/payment/checkout')) {

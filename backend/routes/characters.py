@@ -33,6 +33,7 @@ class CharacterResponse(BaseModel):
     personality_traits: list[str]
     sample_lines: list[str]
     best_for: str
+    vocabulary_focus: str = ""
     voice_id: str
     greeting: str
     locked: bool
@@ -51,6 +52,7 @@ def _to_response(c) -> CharacterResponse:
         personality_traits=c.personality_traits,
         sample_lines=c.sample_lines,
         best_for=c.best_for,
+        vocabulary_focus=c.vocabulary_focus,
         voice_id=c.voice_id,
         greeting=c.greeting,
         locked=c.locked,

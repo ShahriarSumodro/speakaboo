@@ -16,6 +16,13 @@ class TestCharacterLoading:
         assert char.voice_id
         assert not char.locked
         assert char.price_bdt == 0
+        assert char.vocabulary_focus
+        assert "Everyday" in char.vocabulary_focus
+
+    def test_characters_have_vocabulary_focus(self):
+        chars = list_characters()
+        for c in chars:
+            assert c.vocabulary_focus, f"Character {c.id} missing vocabulary_focus"
 
     def test_load_nonexistent_raises(self):
         with pytest.raises(FileNotFoundError):

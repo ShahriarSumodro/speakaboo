@@ -1136,7 +1136,7 @@ void main() {
 
   testWidgets('ShadowingScreen renders shadowing scripts and controls', (WidgetTester tester) async {
     final mockClient = MockClient((request) async {
-      if (request.url.path.endsWith('/api/learning/shadowing')) {
+      if (request.url.path.endsWith('/api/learning/shadowing') || request.url.path.endsWith('/api/learning/shadowing/scripts')) {
         return http.Response(
           jsonEncode({
             'items': [

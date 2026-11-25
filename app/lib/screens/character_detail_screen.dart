@@ -290,29 +290,52 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Best For: ${c.bestFor}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    color: colors.textPrimary,
+                RichText(
+                  text: TextSpan(
+                    style: TextStyle(fontSize: 13, color: colors.textPrimary),
+                    children: [
+                      const TextSpan(
+                        text: 'Best For: ',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      TextSpan(
+                        text: c.bestFor,
+                        style: TextStyle(color: colors.textSecondary),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Speaking Style: ${c.speakingStyle}',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: colors.textSecondary,
+                const SizedBox(height: 6),
+                RichText(
+                  text: TextSpan(
+                    style: TextStyle(fontSize: 13, color: colors.textPrimary),
+                    children: [
+                      const TextSpan(
+                        text: 'Speaking Style: ',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      TextSpan(
+                        text: c.speakingStyle,
+                        style: TextStyle(color: colors.textSecondary),
+                      ),
+                    ],
                   ),
                 ),
                 if (c.vocabularyFocus.trim().isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    'Vocabulary Focus: ${c.vocabularyFocus}',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: colors.textSecondary,
+                  const SizedBox(height: 6),
+                  RichText(
+                    text: TextSpan(
+                      style: TextStyle(fontSize: 13, color: colors.textPrimary),
+                      children: [
+                        const TextSpan(
+                          text: 'Vocabulary Focus: ',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        TextSpan(
+                          text: c.vocabularyFocus,
+                          style: TextStyle(color: colors.textSecondary),
+                        ),
+                      ],
                     ),
                   ),
                 ],

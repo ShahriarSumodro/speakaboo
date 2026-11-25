@@ -30,6 +30,7 @@ class Character:
     personality_traits: list[str] = field(default_factory=list)
     sample_lines: list[str] = field(default_factory=list)
     best_for: str = ""
+    vocabulary_focus: str = ""
     locked: bool = False
     price_bdt: int = 0
     feedback_style: str = ""
@@ -66,6 +67,7 @@ def load_character(character_id: str) -> Character:
         personality_traits=data.get("personality_traits", []),
         sample_lines=data.get("sample_lines", []),
         best_for=data.get("best_for", ""),
+        vocabulary_focus=data.get("vocabulary_focus", ""),
         locked=data.get("locked", False),
         price_bdt=data.get("price_bdt", 0),
         feedback_style=data.get("feedback_style", ""),
