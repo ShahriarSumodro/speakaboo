@@ -75,10 +75,12 @@ class ShadowingScriptResponse(BaseModel):
 
 
 class ShadowingEvaluateRequest(BaseModel):
-    user_id: str
-    script_id: str
+    user_id: Optional[str] = "anonymous"
+    script_id: Optional[str] = None
+    item_id: Optional[str] = None
     transcript: str
-    duration_seconds: float
+    duration_seconds: Optional[float] = None
+    duration_sec: Optional[float] = None
 
 
 class ShadowingEvaluateResponse(BaseModel):
@@ -272,6 +274,7 @@ async def get_topic(topic_id: str):
 
 # --- Shadowing Mode ---
 
+@router.get("/shadowing", response_model=List[ShadowingScriptResponse])
 @router.get("/shadowing/scripts", response_model=List[ShadowingScriptResponse])
 async def list_shadowing_scripts():
     """List original practice scripts for shadowing."""
@@ -292,11 +295,22 @@ async def evaluate_shadowing(
     request: ShadowingEvaluateRequest, repo: BaseRepository = Depends(get_repository)
 ):
     """Evaluate shadowing attempt, score accuracy and pace, award XP."""
+    target_script_id = request.script_id or request.item_id
+    if not target_script_id:
+        raise HTTPException(status_code=400, detail="script_id or item_id is required")
+
+    duration = (
+        request.duration_seconds
+        if request.duration_seconds is not None
+        else (request.duration_sec if request.duration_sec is not None else 1.0)
+    )
+    user_id = request.user_id or "anonymous"
+
     try:
         eval_result = shadowing_engine.evaluate(
-            script_id=request.script_id,
+            script_id=target_script_id,
             transcript=request.transcript,
-            duration_seconds=request.duration_seconds,
+            duration_seconds=duration,
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -306,9 +320,9 @@ async def evaluate_shadowing(
     missions = MissionsEngine(repo)
 
     prog, xp_earned = await gamification.on_shadowing_completed(
-        user_id=request.user_id, accuracy_score=eval_result.accuracy_score
+        user_id=user_id, accuracy_score=eval_result.accuracy_score
     )
-    await missions.track_shadowing_completed(request.user_id)
+    await missions.track_shadowing_completed(user_id)
 
     return ShadowingEvaluateResponse(
         script_id=eval_result.script_id,
