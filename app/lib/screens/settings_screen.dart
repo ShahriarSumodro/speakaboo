@@ -10,6 +10,7 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
 import '../widgets/dev_server_dialog.dart';
+import 'debug_gallery_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -307,6 +308,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: Text('Kid safety, zero raw audio storage, data rights', style: TextStyle(color: colors.textSecondary)),
             trailing: Icon(Icons.chevron_right, color: colors.textSecondary),
             onTap: _showPrivacyPolicy,
+          ),
+          const SizedBox(height: 8),
+
+          // Component Gallery (Design System)
+          ListTile(
+            tileColor: colors.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm)),
+            leading: Icon(Icons.widgets_outlined, color: colors.accent),
+            title: Text('Component Gallery', style: TextStyle(color: colors.textPrimary)),
+            subtitle: Text('Inspect playful buttons, cards, states & moods', style: TextStyle(color: colors.textSecondary)),
+            trailing: Icon(Icons.chevron_right, color: colors.textSecondary),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const DebugGalleryScreen()),
+              );
+            },
           ),
           const SizedBox(height: 8),
 
