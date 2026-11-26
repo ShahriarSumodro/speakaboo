@@ -45,3 +45,9 @@ F-017: P2 swallowed-error — 18 instances of `} catch (_) {}` in `app/lib/` (`a
 F-018: P2 size — 21 files exceed 300 lines (largest: `sqlite_repo.py` 1367, `api_service.dart` 1096, `conversation.py` 859, `profile_screen.dart` 768). [RAN static scan]
 
 F-019: P3 size — 48 Python functions exceed 40 lines (largest: `process_turn` 289, `initialize` 237, `stream_turn` 232). [RAN static scan]
+
+F-020: P2 duplication — `routes/conversation.py:134` defines `_categorize_error()` which duplicates `engine/correction.py:categorize_error()` with the old preposition bug. [READ routes/conversation.py:134-152]
+
+F-021: P1 bug — `routes/usage.py` computes `daily_limit` only from `user.plan`, ignoring active `Entitlement(type="plan")` rows granted by `routes/payment.py:verify_payment`. A paid user sees 10-min limit in `/api/usage/{user_id}/daily` while `_check_entitlements_and_caps` allows 30 min. [FIXED in 214cdde] [READ routes/usage.py:41-46 vs routes/payment.py:224-230]
+
+F-022: P0 bug — `app/lib/services/api_service.dart` had 9 route mismatches against `backend/routes/*.py`: `getStreak`, `freezeStreak`, `claimMission`, `addVocabulary`, `reviewVocabulary`, `getParentSummary`, `getSafetyFlags`, `getUsage`, and dead `recordConsent`. [RAN check_routes.py]
