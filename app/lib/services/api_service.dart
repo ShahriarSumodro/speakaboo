@@ -593,7 +593,7 @@ class ApiService {
   /// Get streak status.
   Future<Map<String, dynamic>> getStreak(String userId) async {
     final response = await _sendWithAuthRetry(
-      () => _client.get(Uri.parse('$baseUrl/api/learning/streak/$userId'), headers: _headers()),
+      () => _client.get(Uri.parse('$baseUrl/api/learning/progress/$userId'), headers: _headers()),
     );
 
     if (response.statusCode != 200) {
@@ -603,9 +603,10 @@ class ApiService {
   }
 
   /// Use streak freeze.
-  Future<Map<String, dynamic>> freezeStreak() async {
+  Future<Map<String, dynamic>> freezeStreak([String? userId]) async {
+    final effectiveUserId = userId ?? await AuthStorage.getUserId() ?? 'anonymous';
     final response = await _sendWithAuthRetry(
-      () => _client.post(Uri.parse('$baseUrl/api/learning/streak/freeze'), headers: _headers()),
+      () => _client.post(Uri.parse('$baseUrl/api/learning/freeze/$effectiveUserId'), headers: _headers()),
     );
 
     if (response.statusCode != 200) {
@@ -708,12 +709,8 @@ class ApiService {
   }) async {
     final response = await _sendWithAuthRetry(
       () => _client.post(
-        Uri.parse('$baseUrl/api/learning/missions/claim'),
+        Uri.parse('$baseUrl/api/learning/missions/$userId/claim/$missionId'),
         headers: _headers(),
-        body: jsonEncode({
-          'user_id': userId,
-          'mission_id': missionId,
-        }),
       ),
     );
 
@@ -852,13 +849,12 @@ class ApiService {
   }) async {
     final response = await _sendWithAuthRetry(
       () => _client.post(
-        Uri.parse('$baseUrl/api/learning/vocabulary/add'),
+        Uri.parse('$baseUrl/api/learning/vocabulary/$userId'),
         headers: _headers(),
         body: jsonEncode({
-          'user_id': userId,
-          'word': word,
-          'definition': definition,
-          'example': example,
+          'word_or_phrase': word,
+          'context_sentence': example,
+          'correction_notes': definition,
         }),
       ),
     );
@@ -873,14 +869,16 @@ class ApiService {
   Future<Map<String, dynamic>> reviewVocabulary({
     required String cardId,
     required String rating,
+    String? userId,
   }) async {
+    final effectiveUserId = userId ?? await AuthStorage.getUserId() ?? 'anonymous';
+    final remembered = rating != 'again';
     final response = await _sendWithAuthRetry(
       () => _client.post(
-        Uri.parse('$baseUrl/api/learning/vocabulary/review'),
+        Uri.parse('$baseUrl/api/learning/vocabulary/$effectiveUserId/review/$cardId'),
         headers: _headers(),
         body: jsonEncode({
-          'card_id': cardId,
-          'rating': rating,
+          'remembered': remembered,
         }),
       ),
     );
@@ -896,7 +894,7 @@ class ApiService {
   /// Get parent dashboard summary.
   Future<ParentSummary> getParentSummary(String userId) async {
     final response = await _sendWithAuthRetry(
-      () => _client.get(Uri.parse('$baseUrl/api/parent/summary/$userId'), headers: _headers()),
+      () => _client.get(Uri.parse('$baseUrl/api/parent/$userId/summary'), headers: _headers()),
     );
 
     if (response.statusCode != 200) {
@@ -908,14 +906,16 @@ class ApiService {
   /// Get safety flags for parent review.
   Future<List<SafetyFlag>> getSafetyFlags(String userId) async {
     final response = await _sendWithAuthRetry(
-      () => _client.get(Uri.parse('$baseUrl/api/parent/safety-flags/$userId'), headers: _headers()),
+      () => _client.get(Uri.parse('$baseUrl/api/parent/$userId/safety-flags'), headers: _headers()),
     );
 
     if (response.statusCode != 200) {
       throw ApiException('Failed to load safety flags', response.statusCode);
     }
     final data = jsonDecode(response.body);
-    final list = data['flags'] as List<dynamic>? ?? [];
+    final List<dynamic> list = data is List
+        ? data
+        : (data is Map ? (data['flags'] ?? data['safety_flags'] ?? []) as List<dynamic> : []);
     return list.map((f) => SafetyFlag.fromJson(f as Map<String, dynamic>)).toList();
   }
 
@@ -924,7 +924,7 @@ class ApiService {
   /// Get daily usage stats and cap status.
   Future<UsageInfo> getUsage(String userId) async {
     final response = await _sendWithAuthRetry(
-      () => _client.get(Uri.parse('$baseUrl/api/usage/$userId'), headers: _headers()),
+      () => _client.get(Uri.parse('$baseUrl/api/usage/$userId/daily'), headers: _headers()),
     );
 
     if (response.statusCode != 200) {
@@ -947,24 +947,14 @@ class ApiService {
     return jsonDecode(response.body);
   }
 
-  /// Record parental consent.
-  Future<Map<String, dynamic>> recordConsent({
-    required String parentEmail,
-    required bool accepted,
-  }) async {
-    final response = await _sendWithAuthRetry(
-      () => _client.post(
-        Uri.parse('$baseUrl/api/privacy/consent'),
-        headers: _headers(),
-        body: jsonEncode({
-          'parent_email': parentEmail,
-          'accepted': accepted,
-        }),
-      ),
-    );
+  /// Get parental consent agreement text.
+  Future<Map<String, dynamic>> getParentalConsent() async {
+    final response = await _client
+        .get(Uri.parse('$baseUrl/api/privacy/parental-consent'), headers: _headers())
+        .timeout(AppConfig.requestTimeout);
 
     if (response.statusCode != 200) {
-      throw ApiException('Failed to record consent', response.statusCode);
+      throw ApiException('Failed to load parental consent', response.statusCode);
     }
     return jsonDecode(response.body);
   }

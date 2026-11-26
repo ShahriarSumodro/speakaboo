@@ -985,7 +985,7 @@ void main() {
 
   testWidgets('VocabularyScreen opens review dialog with spoken recall test and stop target', (WidgetTester tester) async {
     final mockClient = MockClient((request) async {
-      if (request.url.path.contains('/api/learning/vocabulary/review')) {
+      if (request.url.path.contains('/review/')) {
         return http.Response(jsonEncode({'success': true}), 200);
       }
       if (request.url.path.contains('/api/learning/vocabulary/')) {
@@ -1217,7 +1217,7 @@ void main() {
       if (request.url.path.endsWith('/api/auth/set-parent-pin')) {
         return http.Response(jsonEncode({'success': true}), 200);
       }
-      if (request.url.path.contains('/api/parent/summary/')) {
+      if (request.url.path.contains('/api/parent/') && request.url.path.endsWith('/summary')) {
         return http.Response(
           jsonEncode({
             'user_id': 'test_user',
@@ -1233,8 +1233,8 @@ void main() {
           200,
         );
       }
-      if (request.url.path.contains('/api/parent/safety-flags/')) {
-        return http.Response(jsonEncode({'safety_flags': []}), 200);
+      if (request.url.path.contains('/api/parent/') && request.url.path.endsWith('/safety-flags')) {
+        return http.Response(jsonEncode([]), 200);
       }
       return http.Response('Not Found', 404);
     });
