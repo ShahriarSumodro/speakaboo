@@ -249,8 +249,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             trailing: Icon(Icons.chevron_right, color: colors.textSecondary),
             onTap: () {
               DevServerDialog.show(context, onSaved: () {
-                setState(() {});
-                auth.initialize();
+                if (mounted) setState(() {});
               });
             },
           ),

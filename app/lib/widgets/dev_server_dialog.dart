@@ -11,12 +11,13 @@ import '../providers/auth_provider.dart';
 
 class DevServerDialog extends StatefulWidget {
   final VoidCallback? onSaved;
-  const DevServerDialog({super.key, this.onSaved});
+  final http.Client? httpClient;
+  const DevServerDialog({super.key, this.onSaved, this.httpClient});
 
-  static Future<void> show(BuildContext context, {VoidCallback? onSaved}) {
+  static Future<void> show(BuildContext context, {VoidCallback? onSaved, http.Client? httpClient}) {
     return showDialog<void>(
       context: context,
-      builder: (_) => DevServerDialog(onSaved: onSaved),
+      builder: (_) => DevServerDialog(onSaved: onSaved, httpClient: httpClient),
     );
   }
 
@@ -50,39 +51,71 @@ class _DevServerDialogState extends State<DevServerDialog> {
 
     final cleanUrl = url.trim().replaceAll(RegExp(r'/+$'), '');
     final stopwatch = Stopwatch()..start();
+    final ownsClient = widget.httpClient == null;
+    final client = widget.httpClient ?? http.Client();
 
     try {
-      final uri = Uri.parse('$cleanUrl/api/health');
-      final response = await http.get(uri).timeout(const Duration(seconds: 5));
-      stopwatch.stop();
+      final healthRes = await client
+          .get(Uri.parse('$cleanUrl/api/health'))
+          .timeout(const Duration(seconds: 5));
+      if (healthRes.statusCode != 200) {
+        stopwatch.stop();
+        _setTestFailure('Health check failed (HTTP ${healthRes.statusCode}): ${healthRes.body}');
+        return;
+      }
+      final healthData = jsonDecode(healthRes.body) as Map<String, dynamic>;
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        setState(() {
-          _testSuccess = true;
-          _testResult =
-              'Connected! (${stopwatch.elapsedMilliseconds}ms) - Status: ${data["status"] ?? "ok"}';
-        });
-        if (mounted) {
-          try {
-            context.read<AuthProvider>().setServerConnected(true);
-          } catch (e) {
-            debugPrint('[dev_server_dialog] ignored error: $e');
-          }
+      final authRes = await client
+          .post(
+            Uri.parse('$cleanUrl/api/auth/device'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'device_id': 'diag_conn_test'}),
+          )
+          .timeout(const Duration(seconds: 5));
+      if (authRes.statusCode != 200) {
+        stopwatch.stop();
+        _setTestFailure('Device auth failed (HTTP ${authRes.statusCode}): ${authRes.body}');
+        return;
+      }
+      final authData = jsonDecode(authRes.body) as Map<String, dynamic>;
+      final token = (authData['auth_token'] ?? authData['token']) as String?;
+      if (token == null || token.isEmpty) {
+        stopwatch.stop();
+        _setTestFailure('Device auth returned no session token.');
+        return;
+      }
+
+      final profileRes = await client
+          .get(
+            Uri.parse('$cleanUrl/api/auth/profile'),
+            headers: {'Authorization': 'Bearer $token'},
+          )
+          .timeout(const Duration(seconds: 5));
+      stopwatch.stop();
+      if (profileRes.statusCode != 200) {
+        _setTestFailure('Profile check failed (HTTP ${profileRes.statusCode}): ${profileRes.body}');
+        return;
+      }
+
+      setState(() {
+        _testSuccess = true;
+        _testResult =
+            'Connected! (${stopwatch.elapsedMilliseconds}ms) - health + auth + profile ok (${healthData["status"] ?? "ok"})';
+      });
+      if (mounted) {
+        try {
+          context.read<AuthProvider>().setServerConnected(true);
+        } catch (e) {
+          debugPrint('[dev_server_dialog] ignored error: $e');
         }
-      } else {
-        setState(() {
-          _testSuccess = false;
-          _testResult = 'HTTP ${response.statusCode}: ${response.body}';
-        });
       }
     } catch (e) {
       stopwatch.stop();
-      setState(() {
-        _testSuccess = false;
-        _testResult = 'Connection failed: $e';
-      });
+      _setTestFailure('Connection failed: $e');
     } finally {
+      if (ownsClient) {
+        client.close();
+      }
       if (mounted) {
         setState(() {
           _testing = false;
@@ -91,17 +124,25 @@ class _DevServerDialogState extends State<DevServerDialog> {
     }
   }
 
+  void _setTestFailure(String message) {
+    if (!mounted) return;
+    setState(() {
+      _testSuccess = false;
+      _testResult = message;
+    });
+  }
+
   Future<void> _save(String url) async {
     final cleanUrl = url.trim().replaceAll(RegExp(r'/+$'), '');
     await AppConfig.setBackendUrl(cleanUrl);
-    widget.onSaved?.call();
     if (mounted) {
       try {
-        context.read<AuthProvider>().checkHealth();
+        await context.read<AuthProvider>().reauthenticate();
       } catch (e) {
-        debugPrint('[dev_server_dialog] ignored error: $e');
+        debugPrint('[dev_server_dialog] reauthenticate error: $e');
       }
     }
+    widget.onSaved?.call();
     if (!mounted) return;
     Navigator.of(context).pop();
     ScaffoldMessenger.of(context).showSnackBar(
