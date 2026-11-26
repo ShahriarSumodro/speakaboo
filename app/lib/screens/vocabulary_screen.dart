@@ -21,6 +21,7 @@ class VocabularyScreen extends StatefulWidget {
 class _VocabularyScreenState extends State<VocabularyScreen> {
   List<VocabCard> _cards = [];
   bool _isLoading = true;
+  String? _errorMessage;
   String _searchQuery = '';
   int _selectedBoxFilter = 0; // 0 = all, 1-5 = specific box
 
@@ -33,10 +34,16 @@ class _VocabularyScreenState extends State<VocabularyScreen> {
   Future<void> _loadVocabulary() async {
     final auth = context.read<AuthProvider>();
     final api = context.read<ApiService>();
+    if (mounted) {
+      setState(() {
+        if (_cards.isEmpty) _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     // Instant cache retrieval
     final cached = await CacheService.get('vocab_${auth.userId}');
-    if (cached is List) {
+    if (cached is List && _cards.isEmpty && mounted) {
       setState(() {
         _cards = cached.map((c) => VocabCard.fromJson(c as Map<String, dynamic>)).toList();
         _isLoading = false;
@@ -45,9 +52,11 @@ class _VocabularyScreenState extends State<VocabularyScreen> {
 
     try {
       final remoteCards = await api.getVocabulary(auth.userId);
+      if (!mounted) return;
       setState(() {
         _cards = remoteCards;
         _isLoading = false;
+        _errorMessage = null;
       });
       await CacheService.set('vocab_${auth.userId}', remoteCards.map((c) => {
         'id': c.id,
@@ -60,9 +69,18 @@ class _VocabularyScreenState extends State<VocabularyScreen> {
         'ease_factor': c.easeFactor,
         'repetitions': c.repetitions,
       }).toList());
-    } catch (_) {
-      if (_cards.isEmpty) {
-        setState(() => _isLoading = false);
+    } catch (e) {
+      debugPrint('[vocabulary_screen] load failed: $e');
+      final msg = e is ApiException
+          ? e.message
+          : 'Could not load vocabulary. Check your connection.';
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = msg;
+      });
+      if (_cards.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       }
     }
   }
@@ -71,42 +89,94 @@ class _VocabularyScreenState extends State<VocabularyScreen> {
     final wordController = TextEditingController();
     final defController = TextEditingController();
     final exController = TextEditingController();
+    bool saving = false;
+    String? dialogError;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Add Vocabulary Word'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: wordController, decoration: const InputDecoration(labelText: 'Word')),
-            TextField(controller: defController, decoration: const InputDecoration(labelText: 'Definition')),
-            TextField(controller: exController, decoration: const InputDecoration(labelText: 'Example Sentence')),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              if (wordController.text.trim().isEmpty) return;
-              final auth = context.read<AuthProvider>();
-              final api = context.read<ApiService>();
-              Navigator.pop(ctx);
-              try {
-                await api.addVocabulary(
-                  userId: auth.userId,
-                  word: wordController.text.trim(),
-                  definition: defController.text.trim(),
-                  example: exController.text.trim(),
-                );
-                _loadVocabulary();
-              } catch (e) {
-                debugPrint('[vocabulary_screen] ignored error: $e');
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final colors = context.colors;
+          return AlertDialog(
+            title: const Text('Add Vocabulary Word'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(controller: wordController, enabled: !saving, decoration: const InputDecoration(labelText: 'Word')),
+                TextField(controller: defController, enabled: !saving, decoration: const InputDecoration(labelText: 'Definition')),
+                TextField(controller: exController, enabled: !saving, decoration: const InputDecoration(labelText: 'Example Sentence')),
+                if (dialogError != null) ...[
+                  const SizedBox(height: 10),
+                  Text(dialogError!, style: TextStyle(color: colors.error, fontSize: 12)),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: saving ? null : () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: saving
+                    ? null
+                    : () async {
+                        final word = wordController.text.trim();
+                        if (word.isEmpty) {
+                          setDialogState(() => dialogError = 'Please enter a word.');
+                          return;
+                        }
+                        final auth = this.context.read<AuthProvider>();
+                        final api = this.context.read<ApiService>();
+                        setDialogState(() {
+                          saving = true;
+                          dialogError = null;
+                        });
+                        try {
+                          if (auth.userId == 'anonymous' || auth.userId.isEmpty) {
+                            await auth.initialize();
+                          }
+                          await api.addVocabulary(
+                            userId: auth.userId,
+                            word: word,
+                            definition: defController.text.trim(),
+                            example: exController.text.trim(),
+                          );
+                          await _loadVocabulary();
+                          if (ctx.mounted) {
+                            Navigator.pop(ctx);
+                          }
+                          if (mounted) {
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              SnackBar(content: Text('Saved "$word" to your notebook.')),
+                            );
+                          }
+                        } catch (e) {
+                          debugPrint('[vocabulary_screen] add error: $e');
+                          final msg = e is ApiException
+                              ? e.message
+                              : 'Failed to add word: $e';
+                          if (ctx.mounted) {
+                            setDialogState(() {
+                              saving = false;
+                              dialogError = msg;
+                            });
+                          }
+                          if (mounted) {
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              SnackBar(content: Text(msg)),
+                            );
+                          }
+                        }
+                      },
+                child: saving
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Save'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -253,7 +323,11 @@ class _VocabularyScreenState extends State<VocabularyScreen> {
         );
       }
     } catch (e) {
-      debugPrint('[vocabulary_screen] ignored error: $e');
+      debugPrint('[vocabulary_screen] review error: $e');
+      if (mounted) {
+        final msg = e is ApiException ? e.message : 'Could not save review.';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      }
     }
   }
 
@@ -274,6 +348,7 @@ class _VocabularyScreenState extends State<VocabularyScreen> {
         foregroundColor: colors.textPrimary,
         elevation: 0,
         actions: [
+          IconButton(icon: Icon(Icons.refresh_rounded, color: colors.textPrimary), onPressed: _loadVocabulary, tooltip: 'Refresh'),
           IconButton(icon: Icon(Icons.add, color: colors.textPrimary), onPressed: _showAddWordDialog, tooltip: 'Add Word'),
         ],
       ),
@@ -345,16 +420,30 @@ class _VocabularyScreenState extends State<VocabularyScreen> {
                 ? const PlayfulLoadingState(message: 'Opening your notebook...')
                 : filtered.isEmpty
                     ? PlayfulEmptyState(
-                        title: _searchQuery.isNotEmpty ? 'No matching words' : 'Your word jar is ready!',
+                        title: _searchQuery.isNotEmpty
+                            ? 'No matching words'
+                            : (_cards.isEmpty && _errorMessage != null)
+                                ? 'Could not load vocabulary'
+                                : 'Your word jar is ready!',
                         message: _searchQuery.isNotEmpty
                             ? 'Try a different search or clear your filter.'
-                            : 'No vocabulary words saved yet.\nTalk with a companion to discover words!',
-                        actionLabel: _searchQuery.isNotEmpty ? 'Clear Search' : 'Add a Word',
+                            : (_cards.isEmpty && _errorMessage != null)
+                                ? _errorMessage!
+                                : 'No vocabulary words saved yet.\nTalk with a companion to discover words!',
+                        actionLabel: _searchQuery.isNotEmpty
+                            ? 'Clear Search'
+                            : (_cards.isEmpty && _errorMessage != null)
+                                ? 'Retry'
+                                : 'Add a Word',
                         onAction: _searchQuery.isNotEmpty
                             ? () => setState(() => _searchQuery = '')
-                            : _showAddWordDialog,
+                            : (_cards.isEmpty && _errorMessage != null)
+                                ? _loadVocabulary
+                                : _showAddWordDialog,
                       )
-                    : ListView.builder(
+                    : RefreshIndicator(
+                        onRefresh: _loadVocabulary,
+                        child: ListView.builder(
                         padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
                         itemCount: filtered.length,
                         itemBuilder: (context, index) {
@@ -387,6 +476,7 @@ class _VocabularyScreenState extends State<VocabularyScreen> {
                             ),
                           );
                         },
+                      ),
                       ),
           ),
         ],

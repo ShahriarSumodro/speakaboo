@@ -136,6 +136,7 @@ void main() {
 
     final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
     final auth = AuthProvider(api: api);
+    addTearDown(auth.dispose);
     final audio = AudioService();
     final conversation = ConversationProvider(api: api, audio: audio);
 
@@ -230,6 +231,7 @@ void main() {
 
     final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
     final auth = AuthProvider(api: api);
+    addTearDown(auth.dispose);
     final audio = AudioService();
     final conversation = ConversationProvider(api: api, audio: audio);
 
@@ -338,6 +340,7 @@ void main() {
 
     final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
     final auth = AuthProvider(api: api);
+    addTearDown(auth.dispose);
     final audio = AudioService();
     final conv = ConversationProvider(api: api, audio: audio);
 
@@ -403,6 +406,7 @@ void main() {
 
     final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
     final auth = AuthProvider(api: api);
+    addTearDown(auth.dispose);
 
     await tester.pumpWidget(
       MultiProvider(
@@ -478,6 +482,7 @@ void main() {
 
     final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
     final auth = AuthProvider(api: api);
+    addTearDown(auth.dispose);
 
     await tester.pumpWidget(
       MultiProvider(
@@ -511,6 +516,7 @@ void main() {
     final mockClient = MockClient((request) async => http.Response('{}', 200));
     final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
     final auth = AuthProvider(api: api);
+    addTearDown(auth.dispose);
 
     await tester.pumpWidget(
       MultiProvider(
@@ -1085,6 +1091,7 @@ void main() {
 
     final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
     final auth = AuthProvider(api: api);
+    addTearDown(auth.dispose);
 
     await tester.pumpWidget(
       MultiProvider(
@@ -1101,6 +1108,90 @@ void main() {
 
     expect(find.text('Vocabulary Notebook'), findsOneWidget);
     expect(find.byType(TextField), findsOneWidget);
+  });
+
+  testWidgets('W6: VocabularyScreen shows error SnackBar on add failure and awaits save before reload', (WidgetTester tester) async {
+    final cards = <Map<String, dynamic>>[];
+    bool failNextAdd = true;
+    String? addCalledForUser;
+
+    final mockClient = MockClient((request) async {
+      if (request.url.path.endsWith('/api/health') || request.url.path.endsWith('/health')) {
+        return http.Response(jsonEncode({'status': 'ok'}), 200);
+      }
+      if (request.url.path == '/api/auth/device') {
+        return http.Response(jsonEncode({'user_id': 'u_vocab', 'token': 'tok_v'}), 200);
+      }
+      if (request.url.path == '/api/auth/profile') {
+        return http.Response(jsonEncode({'user_id': 'u_vocab', 'display_name': 'Vocab'}), 200);
+      }
+      if (request.url.path.contains('/api/learning/vocabulary/') && request.method == 'POST') {
+        addCalledForUser = request.url.path.split('/').last;
+        if (failNextAdd) {
+          return http.Response(jsonEncode({'detail': 'Could not save word'}), 500);
+        }
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        cards.add({
+          'id': 'v_new',
+          'word': body['word_or_phrase'],
+          'definition': body['definition'] ?? '',
+          'example': body['example'] ?? '',
+          'box': 1,
+          'next_review': '2026-11-28',
+          'mastered': false,
+          'ease_factor': 2.5,
+          'repetitions': 0,
+        });
+        return http.Response(jsonEncode(cards.last), 200);
+      }
+      if (request.url.path.contains('/api/learning/vocabulary/') && request.method == 'GET') {
+        return http.Response(jsonEncode({'cards': cards}), 200);
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
+    final auth = AuthProvider(api: api);
+    addTearDown(auth.dispose);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
+        ],
+        child: const MaterialApp(home: VocabularyScreen()),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    // Open Add Word dialog via AppBar + icon
+    await tester.tap(find.byTooltip('Add Word'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    // Enter word & definition
+    await tester.enterText(find.widgetWithText(TextField, 'Word'), 'Resilient');
+    await tester.enterText(find.widgetWithText(TextField, 'Definition'), 'Able to recover quickly');
+
+    // First attempt fails -> must surface SnackBar error, not silently disappear
+    await tester.tap(find.text('Save'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(addCalledForUser, equals('u_vocab'));
+    expect(find.textContaining('Failed to add word'), findsWidgets);
+
+    // Retry while dialog is still open (saved text is preserved!)
+    failNextAdd = false;
+    await tester.tap(find.text('Save'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Resilient'), findsOneWidget);
   });
 
   testWidgets('VocabularyScreen opens review dialog with spoken recall test and stop target', (WidgetTester tester) async {
@@ -1133,6 +1224,7 @@ void main() {
 
     final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
     final auth = AuthProvider(api: api);
+    addTearDown(auth.dispose);
 
     await tester.pumpWidget(
       MultiProvider(
@@ -1282,6 +1374,7 @@ void main() {
     });
     final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
     final auth = AuthProvider(api: api);
+    addTearDown(auth.dispose);
     final conv = ConversationProvider(api: api, audio: fakeAudio);
 
     await tester.pumpWidget(
@@ -1342,6 +1435,7 @@ void main() {
     final fakeAudio = _FakeSpeakAudioService(spoke, recordedBytes: Uint8List.fromList([1, 2, 3, 4]));
     final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
     final auth = AuthProvider(api: api);
+    addTearDown(auth.dispose);
 
     await tester.pumpWidget(
       MultiProvider(
@@ -1435,6 +1529,7 @@ void main() {
 
     final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
     final auth = AuthProvider(api: api);
+    addTearDown(auth.dispose);
 
     await tester.pumpWidget(
       MultiProvider(
@@ -1496,6 +1591,7 @@ void main() {
 
     final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
     final auth = AuthProvider(api: api);
+    addTearDown(auth.dispose);
 
     final spoke = <String>[];
     final fakeAudio = _FakeSpeakAudioService(spoke);
