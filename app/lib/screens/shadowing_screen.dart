@@ -101,7 +101,9 @@ class _ShadowingScreenState extends State<ShadowingScreen> {
           setState(() {
             _lastEvaluation = eval;
           });
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('[shadowing_screen] ignored error: $e');
+        }
       }
 
       setState(() {

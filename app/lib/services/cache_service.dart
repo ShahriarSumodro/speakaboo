@@ -2,6 +2,7 @@
 library;
 
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class CacheService {
@@ -13,7 +14,9 @@ class CacheService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('cache_$key', jsonEncode(data));
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[cache_service] ignored error: $e');
+    }
   }
 
   /// Get cached data from memory first, then disk.
@@ -29,7 +32,9 @@ class CacheService {
         _memoryCache[key] = decoded;
         return decoded;
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[cache_service] ignored error: $e');
+    }
     return null;
   }
 
@@ -39,7 +44,9 @@ class CacheService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('cache_$key');
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[cache_service] ignored error: $e');
+    }
   }
 
   /// Invalidate all caches.
@@ -51,6 +58,8 @@ class CacheService {
       for (final k in keys) {
         await prefs.remove(k);
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[cache_service] ignored error: $e');
+    }
   }
 }

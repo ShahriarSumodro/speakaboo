@@ -518,7 +518,9 @@ class ApiService {
         if (body is Map && body['detail'] != null) {
           detailMsg = body['detail'].toString();
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[api_service] ignored error: $e');
+      }
       throw ApiException(
         detailMsg,
         response.statusCode,

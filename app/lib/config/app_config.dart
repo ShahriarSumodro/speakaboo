@@ -3,6 +3,7 @@
 /// Centralized configuration constants and runtime settings.
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 enum AppFlavor {
@@ -66,7 +67,9 @@ class AppConfig {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_storageKey, cleaned);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[app_config] ignored error: $e');
+    }
   }
 
   /// Reset to compile-time default URL
@@ -75,7 +78,9 @@ class AppConfig {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_storageKey);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[app_config] ignored error: $e');
+    }
   }
 
   /// App name

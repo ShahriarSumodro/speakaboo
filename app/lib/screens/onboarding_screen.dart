@@ -196,7 +196,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       'age_band': _selectedAgeBand,
                       'goal': _selectedGoal,
                     });
-                  } catch (_) {}
+                  } catch (e) {
+                    debugPrint('[onboarding_screen] ignored error: $e');
+                  }
                   widget.onFinish();
                 },
                 style: FilledButton.styleFrom(

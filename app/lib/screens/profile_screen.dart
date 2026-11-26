@@ -55,7 +55,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ReferralInfo? ref;
       try {
         ref = await api.getReferralInfo(auth.userId);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[profile_screen] ignored error: $e');
+      }
 
       setState(() {
         _progress = prog;

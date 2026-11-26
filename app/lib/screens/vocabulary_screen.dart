@@ -99,7 +99,9 @@ class _VocabularyScreenState extends State<VocabularyScreen> {
                   example: exController.text.trim(),
                 );
                 _loadVocabulary();
-              } catch (_) {}
+              } catch (e) {
+                debugPrint('[vocabulary_screen] ignored error: $e');
+              }
             },
             child: const Text('Save'),
           ),
@@ -249,7 +251,9 @@ class _VocabularyScreenState extends State<VocabularyScreen> {
           SnackBar(content: Text('Card scheduled in Leitner box!')),
         );
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[vocabulary_screen] ignored error: $e');
+    }
   }
 
   @override

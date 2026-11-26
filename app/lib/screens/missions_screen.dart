@@ -49,7 +49,9 @@ class _MissionsScreenState extends State<MissionsScreen> {
       WordOfTheDay? wotd;
       try {
         wotd = await api.getWordOfTheDay();
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[missions_screen] ignored error: $e');
+      }
 
       setState(() {
         _missionsData = remote;

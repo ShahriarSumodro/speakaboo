@@ -104,7 +104,9 @@ class AuthProvider extends ChangeNotifier {
       if (cached != null) {
         try {
           _profile = UserProfile.fromJson(cached);
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('[auth_provider] ignored error: $e');
+        }
       }
 
       try {

@@ -66,7 +66,9 @@ class _DevServerDialogState extends State<DevServerDialog> {
         if (mounted) {
           try {
             context.read<AuthProvider>().setServerConnected(true);
-          } catch (_) {}
+          } catch (e) {
+            debugPrint('[dev_server_dialog] ignored error: $e');
+          }
         }
       } else {
         setState(() {
@@ -96,7 +98,9 @@ class _DevServerDialogState extends State<DevServerDialog> {
     if (mounted) {
       try {
         context.read<AuthProvider>().checkHealth();
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[dev_server_dialog] ignored error: $e');
+      }
     }
     if (!mounted) return;
     Navigator.of(context).pop();
@@ -114,7 +118,9 @@ class _DevServerDialogState extends State<DevServerDialog> {
     if (mounted) {
       try {
         context.read<AuthProvider>().checkHealth();
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[dev_server_dialog] ignored error: $e');
+      }
     }
     if (!mounted) return;
     Navigator.of(context).pop();

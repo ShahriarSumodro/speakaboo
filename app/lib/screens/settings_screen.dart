@@ -82,7 +82,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
         ),
       );
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[settings_screen] ignored error: $e');
+    }
   }
 
   void _confirmDeleteData() {
