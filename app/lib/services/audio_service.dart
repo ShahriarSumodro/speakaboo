@@ -157,13 +157,13 @@ class AudioService extends ChangeNotifier {
       notifyListeners();
       final tts = _getTts();
       if (!_ttsInitialized) {
-        await tts.setLanguage('en-US');
-        await tts.awaitSpeakCompletion(true);
+        await tts.setLanguage('en-US').timeout(const Duration(seconds: 2));
+        await tts.awaitSpeakCompletion(true).timeout(const Duration(seconds: 2));
         _ttsInitialized = true;
       }
       final clampedRate = (speed * 0.5).clamp(0.25, 0.9);
-      await tts.setSpeechRate(clampedRate);
-      await tts.speak(text);
+      await tts.setSpeechRate(clampedRate).timeout(const Duration(seconds: 2));
+      await tts.speak(text).timeout(const Duration(seconds: 25));
       _state = AudioState.idle;
       notifyListeners();
       return true;

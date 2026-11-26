@@ -38,6 +38,17 @@ import 'package:speakaboo/screens/settings_screen.dart';
 import 'package:speakaboo/screens/diagnostics_screen.dart';
 import 'package:speakaboo/screens/parent_dashboard_screen.dart';
 
+class _FakeSpeakAudioService extends AudioService {
+  final List<String> spoke;
+  _FakeSpeakAudioService(this.spoke);
+
+  @override
+  Future<bool> speakOnDevice(String text, {double speed = 1.0}) async {
+    spoke.add(text);
+    return true;
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -1122,6 +1133,7 @@ void main() {
 
     await tester.tap(find.text('Hear their voice'));
     await tester.pump();
+    await tester.pump(const Duration(seconds: 3));
     await tester.pump(const Duration(milliseconds: 100));
 
     // Verify friendly message and Retry button appear, not raw exception
@@ -1134,6 +1146,55 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     expect(previewAttempts, 2);
+  });
+
+  testWidgets('W2: CharacterDetailScreen uses on-device voice fallback when preview-audio returns 502', (WidgetTester tester) async {
+    final spoke = <String>[];
+    final fakeAudio = _FakeSpeakAudioService(spoke);
+    final character = Character(
+      id: 'rule_farmer',
+      name: 'Farmer Reggie',
+      tagline: 'Warm grammar helper',
+      voiceId: 'austin',
+      personalityPrompt: 'Kind farmer',
+      speakingStyle: 'Warm',
+      vocabularyFocus: 'Daily life',
+      isFree: true,
+      priceBdt: 0,
+      avatarUrl: '',
+      personalityTraits: ['Patient'],
+      sampleLines: ['Welcome to the farm!'],
+      bestFor: 'Beginners',
+    );
+    final mockClient = MockClient((request) async {
+      if (request.url.path.contains('/preview-audio')) {
+        return http.Response(jsonEncode({'detail': 'model_terms_required'}), 502);
+      }
+      return http.Response('Not Found', 404);
+    });
+    final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
+    final auth = AuthProvider(api: api);
+    final conv = ConversationProvider(api: api, audio: fakeAudio);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
+          ChangeNotifierProvider<AudioService>.value(value: fakeAudio),
+          ChangeNotifierProvider<ConversationProvider>.value(value: conv),
+        ],
+        child: MaterialApp(home: CharacterDetailScreen(character: character)),
+      ),
+    );
+
+    await tester.tap(find.text('Hear their voice'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(spoke, isNotEmpty);
+    expect(find.text('Voice preview temporarily unavailable.'), findsNothing);
   });
 
   testWidgets('ShadowingScreen renders shadowing scripts and controls', (WidgetTester tester) async {

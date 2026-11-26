@@ -48,21 +48,40 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen> {
       });
 
       await audio.playChunks([_previewAudioBytes!]);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[CharacterDetail] server preview unavailable: $e');
+      final sampleText = widget.character.sampleLines.isNotEmpty
+          ? widget.character.sampleLines.first
+          : 'Hello! Let us practice English with ${widget.character.name}.';
       if (mounted) {
         setState(() {
-          _previewFailed = true;
+          _isLoadingPreview = false;
+          _isPlayingPreview = true;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Voice preview temporarily unavailable. Please try again.'),
-            action: SnackBarAction(
-              label: 'Retry',
-              textColor: context.colors.warning,
-              onPressed: _playVoicePreview,
+      }
+      final spokeFallback = await audio.speakOnDevice(sampleText);
+      if (mounted) {
+        if (spokeFallback) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Using device voice preview (accept Groq Orpheus terms for studio voice).'),
             ),
-          ),
-        );
+          );
+        } else {
+          setState(() {
+            _previewFailed = true;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Voice preview temporarily unavailable. Please try again.'),
+              action: SnackBarAction(
+                label: 'Retry',
+                textColor: context.colors.warning,
+                onPressed: _playVoicePreview,
+              ),
+            ),
+          );
+        }
       }
     } finally {
       if (mounted) {
