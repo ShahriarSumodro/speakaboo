@@ -6,16 +6,25 @@ Implements tight CORS, request size enforcement, rate limiting, and structured l
 
 import logging
 import time
-from collections import defaultdict
+from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from backend.config import load_settings, validate_providers
 from backend.routes import health, auth, characters, conversation, usage, learning, parent, payment, privacy, debug
 from backend.engine.telemetry import telemetry
+
+# Ring buffer of last 30 HTTP requests for /api/debug/last_requests
+_last_requests: deque[dict] = deque(maxlen=30)
+
+
+def get_last_requests() -> list[dict]:
+    """Return the last 30 HTTP request diagnostic records."""
+    return list(_last_requests)
 
 # Load settings
 settings = load_settings()
@@ -110,14 +119,39 @@ async def security_and_rate_limit_middleware(request: Request, call_next):
         timestamps.append(now)
         _rate_limits[client_ip] = timestamps
 
-    # 3. Log request timing
+    # 3. Log request timing and capture to ring buffer
     start = time.time()
     response = await call_next(request)
     duration_ms = (time.time() - start) * 1000
+    _last_requests.append({
+        "timestamp": time.time(),
+        "method": request.method,
+        "path": request.url.path,
+        "status_code": response.status_code,
+        "duration_ms": round(duration_ms, 1),
+        "content_length": int(content_length) if content_length and content_length.isdigit() else 0,
+    })
     logger.info(
         f"{request.method} {request.url.path} → {response.status_code} ({duration_ms:.0f}ms)"
     )
+    if response.status_code in (401, 404, 422):
+        logger.warning(f"HTTP {response.status_code} on {request.method} {request.url.path}")
     return response
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Log exact 422 validation errors (without secrets) before returning FastAPI 422."""
+    logger.warning(f"422 ValidationError on {request.method} {request.url.path}: {exc.errors()}")
+    return JSONResponse(status_code=422, content={"detail": exc.errors()})
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Log 401/404/etc HTTPExceptions with reason."""
+    if exc.status_code in (401, 403, 404):
+        logger.warning(f"HTTP {exc.status_code} on {request.method} {request.url.path}: {exc.detail}")
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail}, headers=exc.headers)
 
 
 @app.exception_handler(Exception)

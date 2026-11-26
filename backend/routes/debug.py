@@ -34,3 +34,24 @@ async def get_debug_last_turns():
         "count": len(turns),
         "turns": turns,
     }
+
+
+@router.get("/last_requests")
+async def get_debug_last_requests():
+    """Return the last 30 HTTP request diagnostic records (only when DEBUG=true)."""
+    settings = load_settings()
+    if not settings.server.debug:
+        logger.warning("Attempted access to /api/debug/last_requests while DEBUG is disabled")
+        raise HTTPException(
+            status_code=403,
+            detail="Debug endpoint disabled. Set DEBUG=true in .env to enable.",
+        )
+
+    from backend.main import get_last_requests
+
+    requests = get_last_requests()
+    return {
+        "status": "ok",
+        "count": len(requests),
+        "requests": requests,
+    }

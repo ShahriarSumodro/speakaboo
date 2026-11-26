@@ -32,3 +32,18 @@ def test_debug_endpoint_enabled(monkeypatch):
     assert data["status"] == "ok"
     assert data["count"] >= 1
     assert any(t.get("turn_id") == "test-debug-123" for t in data["turns"])
+
+
+def test_debug_last_requests_endpoint(monkeypatch):
+    client = TestClient(app)
+    monkeypatch.setenv("DEBUG", "false")
+    assert client.get("/api/debug/last_requests").status_code == 403
+
+    monkeypatch.setenv("DEBUG", "true")
+    client.get("/health")
+    res = client.get("/api/debug/last_requests")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "ok"
+    assert data["count"] >= 1
+    assert any(r.get("path") == "/health" for r in data["requests"])
