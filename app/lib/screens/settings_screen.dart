@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../config/app_config.dart';
 import '../config/theme.dart';
+import '../theme/theme_controller.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
@@ -138,27 +139,101 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
         children: [
-          // Theme Section
-          ListTile(
-            tileColor: colors.surface,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm)),
-            title: Text('App Theme', style: TextStyle(color: colors.textPrimary)),
-            subtitle: Text('Current: ${_themeSelection.toUpperCase()}', style: TextStyle(color: colors.textSecondary)),
-            trailing: DropdownButton<String>(
-              value: _themeSelection,
-              underline: const SizedBox(),
-              items: const [
-                DropdownMenuItem(value: 'system', child: Text('System')),
-                DropdownMenuItem(value: 'light', child: Text('Light')),
-                DropdownMenuItem(value: 'dark', child: Text('Dark')),
-              ],
-              onChanged: (val) {
-                if (val != null) {
-                  setState(() => _themeSelection = val);
-                  auth.updateProfile({'theme': val});
-                }
-              },
-            ),
+          // Theme Section — Three-way pill switch (Light / Dark / System)
+          Builder(
+            builder: (context) {
+              final themeCtrl = context.watch<ThemeController?>();
+              final current = themeCtrl?.selection ?? _themeSelection;
+              return Container(
+                padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
+                decoration: BoxDecoration(
+                  color: colors.surface,
+                  borderRadius: BorderRadius.circular(SpeakabooTheme.radiusCard),
+                  border: Border.all(color: colors.borderSubtle),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.palette_outlined, color: colors.primary),
+                        const SizedBox(width: SpeakabooTheme.spacingSm),
+                        Text(
+                          'App Theme',
+                          style: SpeakabooTheme.displayStyle(
+                            color: colors.textPrimary,
+                            size: SpeakabooTheme.subheadingSize,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: SpeakabooTheme.spacing12),
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: colors.surfaceWarm,
+                        borderRadius: BorderRadius.circular(SpeakabooTheme.radiusFull),
+                      ),
+                      child: Row(
+                        children: [
+                          for (final option in const [
+                            ('light', 'Light', Icons.wb_sunny_rounded),
+                            ('dark', 'Dark', Icons.nightlight_round),
+                            ('system', 'System', Icons.smartphone_rounded),
+                          ])
+                            Expanded(
+                              child: GestureDetector(
+                                key: Key('theme_option_${option.$1}'),
+                                onTap: () {
+                                  setState(() => _themeSelection = option.$1);
+                                  themeCtrl?.setTheme(option.$1);
+                                  auth.updateProfile({'theme': option.$1});
+                                },
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 220),
+                                  curve: Curves.easeOutCubic,
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: current == option.$1
+                                        ? colors.primary
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(
+                                      SpeakabooTheme.radiusFull,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        option.$3,
+                                        size: 16,
+                                        color: current == option.$1
+                                            ? colors.onPrimary
+                                            : colors.textSecondary,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        option.$2,
+                                        style: SpeakabooTheme.bodyStyle(
+                                          color: current == option.$1
+                                              ? colors.onPrimary
+                                              : colors.textSecondary,
+                                          size: SpeakabooTheme.captionSize,
+                                          weight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
           const SizedBox(height: 8),
 

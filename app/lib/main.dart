@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'config/app_config.dart';
-import 'config/theme.dart';
+import 'theme/speakaboo_theme.dart';
+import 'theme/theme_controller.dart';
 import 'providers/auth_provider.dart';
 import 'providers/conversation_provider.dart';
 import 'services/api_service.dart';
@@ -47,6 +48,9 @@ class _SpeakabooAppState extends State<SpeakabooApp> {
     return MultiProvider(
       providers: [
         Provider<ApiService>.value(value: _apiService),
+        ChangeNotifierProvider<ThemeController>(
+          create: (_) => ThemeController()..load(),
+        ),
         ChangeNotifierProvider<AuthProvider>(
           create: (_) => AuthProvider(api: _apiService)..initialize(),
         ),
@@ -60,14 +64,11 @@ class _SpeakabooAppState extends State<SpeakabooApp> {
               previous ?? ConversationProvider(api: _apiService, audio: audio),
         ),
       ],
-      child: Consumer<AuthProvider>(
-        builder: (context, auth, _) {
-          ThemeMode mode = ThemeMode.system;
-          if (auth.profile?.theme == 'dark') {
-            mode = ThemeMode.dark;
-          } else if (auth.profile?.theme == 'light') {
-            mode = ThemeMode.light;
-          }
+      child: Consumer2<AuthProvider, ThemeController>(
+        builder: (context, auth, themeCtrl, _) {
+          final mode = auth.profile != null && themeCtrl.selection == 'system' && auth.profile!.theme != 'system'
+              ? (auth.profile!.theme == 'dark' ? ThemeMode.dark : ThemeMode.light)
+              : themeCtrl.themeMode;
 
           return MaterialApp(
             title: 'Speakaboo',
@@ -75,6 +76,8 @@ class _SpeakabooAppState extends State<SpeakabooApp> {
             theme: SpeakabooTheme.theme,
             darkTheme: SpeakabooTheme.darkTheme,
             themeMode: mode,
+            themeAnimationDuration: const Duration(milliseconds: 280),
+            themeAnimationCurve: Curves.easeOutCubic,
             home: const _AppRoot(),
           );
         },
@@ -129,15 +132,26 @@ class _AppRootState extends State<_AppRoot> with WidgetsBindingObserver {
               child: SafeArea(
                 bottom: false,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   child: Row(
                     children: [
-                      const Icon(Icons.cloud_off, color: Colors.white, size: 20),
+                      const Icon(
+                        Icons.cloud_off,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                       const SizedBox(width: 8),
                       const Expanded(
                         child: Text(
                           'Server not ready. Connect USB or check backend.',
-                          style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                       TextButton(
@@ -156,11 +170,20 @@ class _AppRootState extends State<_AppRoot> with WidgetsBindingObserver {
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                         ),
-                        child: const Text('Settings', style: TextStyle(decoration: TextDecoration.underline)),
+                        child: const Text(
+                          'Settings',
+                          style: TextStyle(
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
                       ),
                       IconButton(
                         key: const Key('server_banner_refresh_button'),
-                        icon: const Icon(Icons.refresh, color: Colors.white, size: 20),
+                        icon: const Icon(
+                          Icons.refresh,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                         tooltip: 'Retry connection',
                         onPressed: () {
                           auth.checkHealth();

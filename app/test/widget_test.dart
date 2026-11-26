@@ -756,22 +756,22 @@ void main() {
   });
 
   test('Theme has correct colors', () {
-    expect(SpeakabooTheme.background, const Color(0xFFFBF8F5));
-    expect(SpeakabooTheme.surface, const Color(0xFFF1E9E1));
-    expect(SpeakabooTheme.accent, const Color(0xFFF26B21));
-    expect(SpeakabooTheme.textPrimary, const Color(0xFF2A211B));
+    expect(SpeakabooTheme.background, const Color(0xFFFFF8F0));
+    expect(SpeakabooTheme.surface, const Color(0xFFFFFFFF));
+    expect(SpeakabooTheme.accent, const Color(0xFF6C4DF6));
+    expect(SpeakabooTheme.textPrimary, const Color(0xFF2B2140));
   });
 
   test('Dark Theme (Phase 8) has correct 60-30-10 tokens and contrast >= 4.5:1', () {
-    // 60-30-10 tokens
-    expect(SpeakabooTheme.darkBackground, const Color(0xFF1B1613));
-    expect(SpeakabooTheme.darkSurface, const Color(0xFF2A221D));
-    expect(SpeakabooTheme.darkAccent, const Color(0xFFFF7A33));
-    expect(SpeakabooTheme.darkTextPrimary, const Color(0xFFF5EDE6));
-    expect(SpeakabooTheme.darkTextSecondary, const Color(0xFFC4B8B0));
+    // Playful Dark tokens
+    expect(SpeakabooTheme.darkBackground, const Color(0xFF17132A));
+    expect(SpeakabooTheme.darkSurface, const Color(0xFF241E3D));
+    expect(SpeakabooTheme.darkAccent, const Color(0xFFA18CFF));
+    expect(SpeakabooTheme.darkTextPrimary, const Color(0xFFF6F2FF));
+    expect(SpeakabooTheme.darkTextSecondary, const Color(0xFFB8B0D4));
 
-    // Tap target minimum 44px
-    expect(SpeakabooTheme.minTapTarget, greaterThanOrEqualTo(44.0));
+    // Tap target minimum 48px
+    expect(SpeakabooTheme.minTapTarget, greaterThanOrEqualTo(48.0));
 
     // ThemeExtension registered
     final colors = SpeakabooTheme.darkTheme.extension<SpeakabooColors>();
@@ -1206,9 +1206,13 @@ void main() {
 
     expect(find.text('Settings'), findsOneWidget);
     expect(find.text('App Theme'), findsOneWidget);
+    expect(find.byKey(const Key('theme_option_light')), findsOneWidget);
+    expect(find.byKey(const Key('theme_option_dark')), findsOneWidget);
+    expect(find.byKey(const Key('theme_option_system')), findsOneWidget);
     expect(find.text('Server Connection (Dev)'), findsOneWidget);
     expect(find.text('Teaching Engine Variant'), findsOneWidget);
     expect(find.byKey(const Key('experiment_variant_tile')), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Delete My Data'), 200);
     expect(find.text('Delete My Data'), findsOneWidget);
   });
 

@@ -107,18 +107,22 @@ class _TalkScreenState extends State<TalkScreen> {
       ),
       child: Row(
         children: [
-          GestureDetector(
-            onLongPress: () => DevServerDialog.show(context),
-            child: Text(
-              conv.characterName ?? 'Speakaboo',
-              style: TextStyle(
-                fontSize: SpeakabooTheme.headingSize,
-                fontWeight: FontWeight.bold,
-                color: colors.textPrimary,
+          Expanded(
+            child: GestureDetector(
+              onLongPress: () => DevServerDialog.show(context),
+              child: Text(
+                conv.characterName ?? 'Speakaboo',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: SpeakabooTheme.headingSize,
+                  fontWeight: FontWeight.bold,
+                  color: colors.textPrimary,
+                ),
               ),
             ),
           ),
-          const Spacer(),
+          const SizedBox(width: 8),
           // Trial countdown badge (CD-008)
           if (conv.isTrial && conv.trialSecondsRemaining != null) ...[
             Container(
