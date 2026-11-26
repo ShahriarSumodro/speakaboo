@@ -8,6 +8,7 @@ import '../models/learning_models.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
+import '../widgets/playful/playful.dart';
 import 'scenarios_screen.dart';
 import 'shadowing_screen.dart';
 import 'vocabulary_screen.dart';
@@ -168,16 +169,16 @@ class _MissionsScreenState extends State<MissionsScreen> {
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const PlayfulLoadingState(message: 'Loading your daily missions...')
           : _missionsData == null
-              ? Center(
-                  child: Text(
-                    'Could not load missions. Check connection.',
-                    style: TextStyle(color: colors.textSecondary),
-                  ),
+              ? PlayfulErrorState(
+                  title: 'Missions are resting!',
+                  message: 'Could not load missions right now. Check your connection and try again.',
+                  onRetry: _loadMissions,
                 )
               : RefreshIndicator(
                   onRefresh: _loadMissions,
+                  color: colors.primary,
                   child: ListView(
                     padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
                     children: [
@@ -194,22 +195,16 @@ class _MissionsScreenState extends State<MissionsScreen> {
                       const SizedBox(height: SpeakabooTheme.spacingLg),
                       Text(
                         "Today's Goals",
-                        style: TextStyle(
-                          fontSize: SpeakabooTheme.headingSize - 4,
-                          fontWeight: FontWeight.bold,
+                        style: SpeakabooTheme.displayStyle(
                           color: colors.textPrimary,
+                          size: SpeakabooTheme.headingSize - 2,
                         ),
                       ),
                       const SizedBox(height: SpeakabooTheme.spacingSm),
                       if (_missionsData!.missions.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 24),
-                          child: Center(
-                            child: Text(
-                              'All missions completed for today!',
-                              style: TextStyle(color: colors.textSecondary),
-                            ),
-                          ),
+                        const PlayfulEmptyState(
+                          title: 'All done for today!',
+                          message: 'Every mission is complete. Come back tomorrow for fresh goals.',
                         )
                       else
                         ..._missionsData!.missions.map(_buildMissionCard),

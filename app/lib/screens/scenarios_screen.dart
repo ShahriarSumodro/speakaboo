@@ -10,6 +10,7 @@ import '../providers/auth_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
+import '../widgets/playful/playful.dart';
 
 class ScenariosScreen extends StatefulWidget {
   const ScenariosScreen({super.key});
@@ -104,9 +105,14 @@ class _ScenariosScreenState extends State<ScenariosScreen> {
         elevation: 0,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const PlayfulLoadingState(message: 'Setting the stage...')
           : _scenarios.isEmpty
-              ? Center(child: Text('No scenarios found.', style: TextStyle(color: colors.textSecondary)))
+              ? PlayfulEmptyState(
+                  title: 'Scenarios are being stocked!',
+                  message: 'Connect to the backend or refresh to unlock real-life role-play scenes.',
+                  actionLabel: 'Refresh',
+                  onAction: _loadScenarios,
+                )
               : ListView.builder(
                   padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
                   itemCount: _scenarios.length,

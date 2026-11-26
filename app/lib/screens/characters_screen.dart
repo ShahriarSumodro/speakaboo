@@ -8,6 +8,7 @@ import '../models/character.dart';
 import '../providers/conversation_provider.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
+import '../widgets/playful/playful.dart';
 import 'character_detail_screen.dart';
 
 class CharactersScreen extends StatefulWidget {
@@ -74,16 +75,17 @@ class _CharactersScreenState extends State<CharactersScreen> {
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const PlayfulLoadingState(message: 'Calling your companions...')
           : _characters.isEmpty
-              ? Center(
-                  child: Text(
-                    'No companions found. Connect to backend.',
-                    style: TextStyle(color: colors.textSecondary),
-                  ),
+              ? PlayfulEmptyState(
+                  title: 'Companions are on the way!',
+                  message: 'Connect to the backend or pull down to refresh your speaking friends.',
+                  actionLabel: 'Refresh',
+                  onAction: _loadCharacters,
                 )
               : RefreshIndicator(
                   onRefresh: _loadCharacters,
+                  color: colors.primary,
                   child: ListView.builder(
                     padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
                     itemCount: _characters.length,
@@ -91,18 +93,21 @@ class _CharactersScreenState extends State<CharactersScreen> {
                       final c = _characters[index];
                       final isCurrent = c.id == currentId;
                       final isLocked = !c.isFree;
+                      final washes = [
+                        colors.pastelMint,
+                        colors.pastelSky,
+                        colors.pastelLavender,
+                        colors.pastelPink,
+                      ];
+                      final cardBg = washes[index % washes.length];
 
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: SpeakabooTheme.spacingMd),
-                        decoration: BoxDecoration(
-                          color: colors.surface,
-                          borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: SpeakabooTheme.spacingMd),
+                        child: PlayfulCard(
+                          backgroundColor: cardBg,
                           border: isCurrent
-                              ? Border.all(color: colors.accent, width: 2)
+                              ? Border.all(color: colors.primary, width: 2.5)
                               : null,
-                        ),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
                           onTap: () {
                             Navigator.push(
                               context,
@@ -111,65 +116,80 @@ class _CharactersScreenState extends State<CharactersScreen> {
                               ),
                             );
                           },
-                          child: Padding(
-                            padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 56,
-                                  height: 56,
-                                  decoration: BoxDecoration(
-                                    color: colors.background,
-                                    borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
-                                  ),
-                                  child: Icon(
-                                    isLocked ? Icons.lock_outline : Icons.face,
-                                    color: isLocked ? colors.textSecondary : colors.accent,
-                                    size: 32,
-                                  ),
-                                ),
-                                const SizedBox(width: SpeakabooTheme.spacingMd),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        c.name,
-                                        style: TextStyle(
-                                          fontSize: SpeakabooTheme.baseFontSize,
-                                          fontWeight: FontWeight.bold,
-                                          color: colors.textPrimary,
-                                        ),
+                          child: Row(
+                            children: [
+                              PlayfulCharacter(
+                                characterId: c.id,
+                                mood: isCurrent ? CharacterMood.celebrating : CharacterMood.idle,
+                                size: 64,
+                              ),
+                              const SizedBox(width: SpeakabooTheme.spacingMd),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      c.name,
+                                      style: SpeakabooTheme.displayStyle(
+                                        color: colors.textPrimary,
+                                        size: SpeakabooTheme.subheadingSize,
                                       ),
-                                      const SizedBox(height: 2),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      c.tagline,
+                                      style: SpeakabooTheme.bodyStyle(
+                                        color: colors.textSecondary,
+                                        size: SpeakabooTheme.captionSize,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: SpeakabooTheme.spacingSm),
+                              if (isCurrent)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: colors.primary,
+                                    borderRadius: BorderRadius.circular(SpeakabooTheme.radiusFull),
+                                  ),
+                                  child: Text(
+                                    'Active',
+                                    style: SpeakabooTheme.bodyStyle(
+                                      color: colors.onPrimary,
+                                      size: 12,
+                                      weight: FontWeight.w800,
+                                    ),
+                                  ),
+                                )
+                              else if (isLocked)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: colors.surface,
+                                    borderRadius: BorderRadius.circular(SpeakabooTheme.radiusFull),
+                                    border: Border.all(color: colors.borderSubtle),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.lock_outline_rounded, size: 14, color: colors.textSecondary),
+                                      const SizedBox(width: 4),
                                       Text(
-                                        c.tagline,
-                                        style: TextStyle(
-                                          fontSize: SpeakabooTheme.captionSize,
-                                          color: colors.textSecondary,
+                                        '${c.priceBdt} BDT',
+                                        style: SpeakabooTheme.bodyStyle(
+                                          color: colors.textPrimary,
+                                          size: 12,
+                                          weight: FontWeight.w800,
                                         ),
                                       ),
                                     ],
                                   ),
-                                ),
-                                if (isCurrent)
-                                  Chip(
-                                    label: const Text('Active', style: TextStyle(color: Colors.white, fontSize: 11)),
-                                    backgroundColor: colors.accent,
-                                    side: BorderSide(color: colors.accent),
-                                    visualDensity: VisualDensity.compact,
-                                  )
-                                else if (isLocked)
-                                  Text(
-                                    '${c.priceBdt} BDT',
-                                    style: TextStyle(
-                                      fontSize: SpeakabooTheme.captionSize,
-                                      fontWeight: FontWeight.bold,
-                                      color: colors.accent,
-                                    ),
-                                  ),
-                              ],
-                            ),
+                                )
+                              else
+                                Icon(Icons.chevron_right_rounded, color: colors.textSecondary),
+                            ],
                           ),
                         ),
                       );

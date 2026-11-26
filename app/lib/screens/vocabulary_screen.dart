@@ -9,6 +9,7 @@ import '../models/learning_models.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
+import '../widgets/playful/playful.dart';
 
 class VocabularyScreen extends StatefulWidget {
   const VocabularyScreen({super.key});
@@ -302,15 +303,33 @@ class _VocabularyScreenState extends State<VocabularyScreen> {
             child: Row(
               children: [
                 FilterChip(
-                  label: const Text('All'),
+                  label: Text(
+                    'All',
+                    style: TextStyle(
+                      color: _selectedBoxFilter == 0 ? colors.onPrimary : colors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                   selected: _selectedBoxFilter == 0,
+                  selectedColor: colors.primary,
+                  checkmarkColor: colors.onPrimary,
+                  backgroundColor: colors.surfaceWarm,
                   onSelected: (_) => setState(() => _selectedBoxFilter = 0),
                 ),
                 const SizedBox(width: 6),
                 for (int b = 1; b <= 5; b++) ...[
                   FilterChip(
-                    label: Text('Box $b'),
+                    label: Text(
+                      'Box $b',
+                      style: TextStyle(
+                        color: _selectedBoxFilter == b ? colors.onPrimary : colors.textPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     selected: _selectedBoxFilter == b,
+                    selectedColor: colors.primary,
+                    checkmarkColor: colors.onPrimary,
+                    backgroundColor: colors.surfaceWarm,
                     onSelected: (_) => setState(() => _selectedBoxFilter = b),
                   ),
                   const SizedBox(width: 6),
@@ -323,14 +342,17 @@ class _VocabularyScreenState extends State<VocabularyScreen> {
           // Content List
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const PlayfulLoadingState(message: 'Opening your notebook...')
                 : filtered.isEmpty
-                    ? Center(
-                        child: Text(
-                          _searchQuery.isNotEmpty ? 'No words matching search.' : 'No vocabulary words saved yet.\nTalk with a companion to discover words!',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: colors.textSecondary),
-                        ),
+                    ? PlayfulEmptyState(
+                        title: _searchQuery.isNotEmpty ? 'No matching words' : 'Your word jar is ready!',
+                        message: _searchQuery.isNotEmpty
+                            ? 'Try a different search or clear your filter.'
+                            : 'No vocabulary words saved yet.\nTalk with a companion to discover words!',
+                        actionLabel: _searchQuery.isNotEmpty ? 'Clear Search' : 'Add a Word',
+                        onAction: _searchQuery.isNotEmpty
+                            ? () => setState(() => _searchQuery = '')
+                            : _showAddWordDialog,
                       )
                     : ListView.builder(
                         padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),

@@ -23,6 +23,7 @@ class PlayfulGreetingHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Flexible(
           child: Container(

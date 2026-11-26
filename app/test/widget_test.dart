@@ -502,7 +502,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Welcome to Speakaboo!'), findsOneWidget);
+    expect(find.textContaining('Welcome to'), findsOneWidget);
     expect(find.text('Child (6-12)'), findsOneWidget);
     expect(find.text('Daily Conversation'), findsOneWidget);
     expect(find.textContaining('Beginner'), findsOneWidget);
@@ -510,7 +510,7 @@ void main() {
     expect(find.textContaining('Advanced'), findsOneWidget);
 
     await tester.ensureVisible(find.text('Start Speaking Practice'));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 200));
     await tester.tap(find.text('Start Speaking Practice'));
     expect(finished, isTrue);
   });
@@ -1089,6 +1089,7 @@ void main() {
     expect(find.text('Professor Anika'), findsWidgets);
     expect(find.text('Science & Nature Conversations'), findsOneWidget);
     expect(find.text('Hear their voice'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('"Every observation matters."'), 200);
     expect(find.text('"Every observation matters."'), findsOneWidget);
 
     // Test voice preview failure shows friendly message and Retry button

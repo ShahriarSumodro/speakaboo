@@ -42,10 +42,11 @@ class SessionSummarySheet extends StatelessWidget {
       minChildSize: 0.5,
       maxChildSize: 0.95,
       builder: (context, scrollController) {
+        final colors = context.colors;
         return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(SpeakabooTheme.radiusLg)),
+          decoration: BoxDecoration(
+            color: colors.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(SpeakabooTheme.radiusCard)),
           ),
           child: ListView(
             controller: scrollController,
@@ -54,12 +55,12 @@ class SessionSummarySheet extends StatelessWidget {
               // Drag handle
               Center(
                 child: Container(
-                  width: 40,
-                  height: 4,
+                  width: 44,
+                  height: 5,
                   margin: const EdgeInsets.only(bottom: SpeakabooTheme.spacingMd),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
+                    color: colors.borderSubtle,
+                    borderRadius: BorderRadius.circular(SpeakabooTheme.radiusFull),
                   ),
                 ),
               ),
@@ -70,22 +71,21 @@ class SessionSummarySheet extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: SpeakabooTheme.success.withValues(alpha: 0.15),
+                      color: colors.pastelMint,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.stars, color: SpeakabooTheme.success, size: 28),
+                    child: Icon(Icons.stars_rounded, color: colors.mintEdge, size: 28),
                   ),
                   const SizedBox(width: SpeakabooTheme.spacingMd),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           'Speaking Session Summary',
-                          style: TextStyle(
-                            fontSize: SpeakabooTheme.headingSize,
-                            fontWeight: FontWeight.bold,
-                            color: SpeakabooTheme.textPrimary,
+                          style: SpeakabooTheme.displayStyle(
+                            color: colors.textPrimary,
+                            size: SpeakabooTheme.headingSize,
                           ),
                         ),
                         Text(

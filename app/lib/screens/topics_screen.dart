@@ -9,6 +9,7 @@ import '../providers/auth_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
+import '../widgets/playful/playful.dart';
 
 class TopicsScreen extends StatefulWidget {
   const TopicsScreen({super.key});
@@ -86,50 +87,93 @@ class _TopicsScreenState extends State<TopicsScreen> {
         elevation: 0,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const PlayfulLoadingState(message: 'Gathering fun topics...')
           : _topics.isEmpty
-              ? Center(child: Text('No topics available.', style: TextStyle(color: colors.textSecondary)))
+              ? PlayfulEmptyState(
+                  title: 'Topics are being stocked!',
+                  message: 'Connect to the backend or pull to refresh for fresh conversation ideas.',
+                  actionLabel: 'Refresh',
+                  onAction: _loadTopics,
+                )
               : ListView.builder(
                   padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
                   itemCount: _topics.length,
                   itemBuilder: (context, index) {
                     final t = _topics[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      color: colors.surface,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd)),
-                      child: ExpansionTile(
-                        title: Text(t.title, style: TextStyle(fontWeight: FontWeight.bold, color: colors.textPrimary)),
-                        subtitle: Text('${t.category} • ${t.difficulty.toUpperCase()}', style: TextStyle(color: colors.textSecondary)),
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Discussion Starters:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: colors.textPrimary)),
-                                const SizedBox(height: 6),
-                                ...t.starters.map((starter) => Padding(
-                                      padding: const EdgeInsets.only(bottom: 4),
-                                      child: Text('• "$starter"', style: TextStyle(fontStyle: FontStyle.italic, fontSize: 13, color: colors.textSecondary)),
-                                    )),
-                                const SizedBox(height: 10),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton(
-                                    onPressed: () => _startTopic(t),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: colors.accent,
-                                      foregroundColor: Colors.white,
-                                    ),
-                                    child: const Text('Practice This Topic'),
-                                  ),
-                                ),
-                              ],
+                    final washes = [
+                      colors.pastelMint,
+                      colors.pastelYellow,
+                      colors.pastelSky,
+                      colors.pastelLavender,
+                      colors.pastelPink,
+                    ];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: SpeakabooTheme.spacing12),
+                      child: PlayfulCard(
+                        backgroundColor: washes[index % washes.length],
+                        padding: EdgeInsets.zero,
+                        child: Material(
+                          type: MaterialType.transparency,
+                          child: Theme(
+                            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                            child: ExpansionTile(
+                            tilePadding: const EdgeInsets.symmetric(
+                              horizontal: SpeakabooTheme.spacingMd,
+                              vertical: 4,
                             ),
+                            title: Text(
+                              t.title,
+                              style: SpeakabooTheme.displayStyle(
+                                color: colors.textPrimary,
+                                size: SpeakabooTheme.subheadingSize,
+                              ),
+                            ),
+                            subtitle: Text(
+                              '${t.category} • ${t.difficulty.toUpperCase()}',
+                              style: SpeakabooTheme.bodyStyle(
+                                color: colors.textSecondary,
+                                size: SpeakabooTheme.captionSize,
+                              ),
+                            ),
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Discussion Starters:',
+                                      style: SpeakabooTheme.bodyStyle(
+                                        color: colors.textPrimary,
+                                        size: SpeakabooTheme.captionSize,
+                                        weight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    ...t.starters.map((starter) => Padding(
+                                          padding: const EdgeInsets.only(bottom: 4),
+                                          child: Text(
+                                            '• "$starter"',
+                                            style: SpeakabooTheme.bodyStyle(
+                                              color: colors.textSecondary,
+                                              size: SpeakabooTheme.captionSize,
+                                            ),
+                                          ),
+                                        )),
+                                    const SizedBox(height: 12),
+                                    PlayfulButton(
+                                      label: 'Practice This Topic',
+                                      icon: Icons.mic_rounded,
+                                      fullWidth: true,
+                                      onPressed: () => _startTopic(t),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
+                        ),
                       ),
                     );
                   },

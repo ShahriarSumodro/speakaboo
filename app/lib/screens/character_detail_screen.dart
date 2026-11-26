@@ -10,6 +10,7 @@ import '../providers/auth_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../services/api_service.dart';
 import '../services/audio_service.dart';
+import '../widgets/playful/playful.dart';
 import '../widgets/unlock_sheet.dart';
 
 class CharacterDetailScreen extends StatefulWidget {
@@ -181,34 +182,31 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen> {
         children: [
           // Avatar & Header
           Center(
-            child: Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: colors.surface,
-                shape: BoxShape.circle,
-                border: Border.all(color: colors.accent, width: 3),
-              ),
-              child: Icon(Icons.face, size: 64, color: colors.accent),
+            child: PlayfulCharacter(
+              characterId: c.id,
+              mood: _isPlayingPreview
+                  ? CharacterMood.speaking
+                  : (_isLoadingPreview ? CharacterMood.thinking : CharacterMood.idle),
+              size: 124,
             ),
           ),
           const SizedBox(height: SpeakabooTheme.spacingMd),
           Center(
             child: Text(
               c.name,
-              style: TextStyle(
-                fontSize: SpeakabooTheme.headingSize,
-                fontWeight: FontWeight.bold,
+              style: SpeakabooTheme.displayStyle(
                 color: colors.textPrimary,
+                size: SpeakabooTheme.headingSize,
               ),
             ),
           ),
           Center(
             child: Text(
               c.tagline,
-              style: TextStyle(
-                fontSize: SpeakabooTheme.baseFontSize,
+              textAlign: TextAlign.center,
+              style: SpeakabooTheme.bodyStyle(
                 color: colors.textSecondary,
+                size: SpeakabooTheme.baseFontSize,
               ),
             ),
           ),
@@ -218,17 +216,13 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen> {
           Center(
             child: Column(
               children: [
-                OutlinedButton.icon(
+                PlayfulButton(
+                  label: _isPlayingPreview
+                      ? 'Playing Sample...'
+                      : (_isLoadingPreview ? 'Loading Voice...' : 'Hear their voice'),
+                  icon: _isPlayingPreview ? Icons.volume_up_rounded : Icons.play_arrow_rounded,
+                  variant: PlayfulButtonVariant.sunny,
                   onPressed: _isLoadingPreview ? null : _playVoicePreview,
-                  icon: _isLoadingPreview
-                      ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: colors.accent))
-                      : Icon(_isPlayingPreview ? Icons.volume_up : Icons.play_arrow),
-                  label: Text(_isPlayingPreview ? 'Playing Sample...' : 'Hear their voice'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: colors.accent,
-                    side: BorderSide(color: colors.accent),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  ),
                 ),
                 if (_previewFailed) ...[
                   const SizedBox(height: 8),

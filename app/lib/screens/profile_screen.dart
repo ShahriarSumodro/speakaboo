@@ -9,6 +9,7 @@ import '../models/usage_info.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
+import '../widgets/playful/playful.dart';
 import '../widgets/share_progress_card.dart';
 import 'parent_dashboard_screen.dart';
 import 'scenarios_screen.dart';
@@ -715,29 +716,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildMetricTile(String value, String label, IconData icon) {
     final colors = context.colors;
-    return Container(
-      padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
-      ),
+    final wash = icon == Icons.local_fire_department
+        ? colors.pastelPink
+        : (icon == Icons.stars ? colors.pastelYellow : colors.pastelLavender);
+    final iconColor = icon == Icons.local_fire_department
+        ? colors.coral
+        : (icon == Icons.stars ? colors.sunnyEdge : colors.primary);
+    return PlayfulCard(
+      backgroundColor: wash,
+      padding: const EdgeInsets.all(SpeakabooTheme.spacing12),
       child: Column(
         children: [
-          Icon(icon, color: colors.accent, size: 24),
+          Icon(icon, color: iconColor, size: 24),
           const SizedBox(height: 6),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: SpeakabooTheme.displayStyle(
               color: colors.textPrimary,
+              size: SpeakabooTheme.baseFontSize,
             ),
           ),
           Text(
             label,
-            style: TextStyle(
-              fontSize: 10,
+            style: SpeakabooTheme.bodyStyle(
               color: colors.textSecondary,
+              size: 11,
             ),
             textAlign: TextAlign.center,
           ),
@@ -748,22 +753,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildActionTile({required String title, required IconData icon, required VoidCallback onTap}) {
     final colors = context.colors;
-    return InkWell(
-      borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm),
+    return PlayfulCard(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-        decoration: BoxDecoration(
-          color: colors.surface,
-          borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: colors.accent, size: 22),
-            const SizedBox(height: 4),
-            Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colors.textPrimary)),
-          ],
-        ),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+      child: Column(
+        children: [
+          Icon(icon, color: colors.primary, size: 24),
+          const SizedBox(height: 6),
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: SpeakabooTheme.displayStyle(
+              color: colors.textPrimary,
+              size: SpeakabooTheme.captionSize,
+            ),
+          ),
+        ],
       ),
     );
   }

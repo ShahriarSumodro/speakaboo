@@ -81,9 +81,37 @@ class _UnlockSheetState extends State<UnlockSheet> {
               const SizedBox(height: SpeakabooTheme.spacingXs),
               Text(
                 'Practice unlimited spoken English (${widget.priceText})',
-                style: TextStyle(
-                  fontSize: SpeakabooTheme.baseFontSize,
+                style: SpeakabooTheme.bodyStyle(
                   color: colors.textSecondary,
+                  size: SpeakabooTheme.baseFontSize,
+                ),
+              ),
+              const SizedBox(height: SpeakabooTheme.spacingMd),
+              // Trust strip (Paywall only, true statements only)
+              Container(
+                padding: const EdgeInsets.all(SpeakabooTheme.spacing12),
+                decoration: BoxDecoration(
+                  color: colors.pastelMint,
+                  borderRadius: BorderRadius.circular(SpeakabooTheme.radiusMd),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _TrustBadge(
+                        icon: Icons.lock_outline_rounded,
+                        label: 'Zero raw audio stored',
+                        color: colors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _TrustBadge(
+                        icon: Icons.restore_rounded,
+                        label: 'Restore anytime',
+                        color: colors.textPrimary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: SpeakabooTheme.spacingLg),
@@ -256,6 +284,38 @@ class _UnlockSheetState extends State<UnlockSheet> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _TrustBadge extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _TrustBadge({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            label,
+            style: SpeakabooTheme.bodyStyle(
+              color: color,
+              size: 12,
+              weight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

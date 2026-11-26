@@ -36,6 +36,7 @@ class _HomeScreenState extends State<HomeScreen>
   List<Mission> _missions = const [];
   List<Character> _characters = const [];
   bool _loading = true;
+  CharacterMood _heroMood = CharacterMood.idle;
   late final AnimationController _floatCtrl;
 
   static const _headlines = [
@@ -208,10 +209,19 @@ class _HomeScreenState extends State<HomeScreen>
                             child: Stack(
                               alignment: Alignment.center,
                               children: [
-                                PlayfulCharacter(
-                                  characterId: conv.currentCharacterId ?? 'rule_farmer',
-                                  mood: CharacterMood.idle,
-                                  size: 98,
+                                GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _heroMood = _heroMood == CharacterMood.idle
+                                          ? CharacterMood.celebrating
+                                          : CharacterMood.idle;
+                                    });
+                                  },
+                                  child: PlayfulCharacter(
+                                    characterId: conv.currentCharacterId ?? 'rule_farmer',
+                                    mood: _heroMood,
+                                    size: 98,
+                                  ),
                                 ),
                                 _FloatingBadge(
                                   controller: _floatCtrl,
@@ -220,6 +230,7 @@ class _HomeScreenState extends State<HomeScreen>
                                   alignment: Alignment.topRight,
                                   emoji: '🌱',
                                   bg: c.pastelMint,
+                                  onTap: () => setState(() => _heroMood = CharacterMood.encouraging),
                                 ),
                                 _FloatingBadge(
                                   controller: _floatCtrl,
@@ -228,6 +239,7 @@ class _HomeScreenState extends State<HomeScreen>
                                   alignment: Alignment.bottomLeft,
                                   emoji: '✨',
                                   bg: c.pastelYellow,
+                                  onTap: () => setState(() => _heroMood = CharacterMood.celebrating),
                                 ),
                               ],
                             ),
@@ -500,6 +512,7 @@ class _FloatingBadge extends StatelessWidget {
   final Alignment alignment;
   final String emoji;
   final Color bg;
+  final VoidCallback? onTap;
 
   const _FloatingBadge({
     required this.controller,
@@ -508,28 +521,32 @@ class _FloatingBadge extends StatelessWidget {
     required this.alignment,
     required this.emoji,
     required this.bg,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return Align(
       alignment: alignment,
-      child: AnimatedBuilder(
-        animation: controller,
-        builder: (context, child) {
-          final raw = (controller.value + phaseOffset) % 1.0;
-          final wave = raw < 0.5 ? raw * 2 : (1.0 - raw) * 2;
-          final dy = reduceMotion ? 0.0 : (wave - 0.5) * 8.0;
-          return Transform.translate(offset: Offset(0, dy), child: child);
-        },
-        child: Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: bg,
-            shape: BoxShape.circle,
-            border: Border.all(color: context.colors.borderSubtle),
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedBuilder(
+          animation: controller,
+          builder: (context, child) {
+            final raw = (controller.value + phaseOffset) % 1.0;
+            final wave = raw < 0.5 ? raw * 2 : (1.0 - raw) * 2;
+            final dy = reduceMotion ? 0.0 : (wave - 0.5) * 8.0;
+            return Transform.translate(offset: Offset(0, dy), child: child);
+          },
+          child: Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: bg,
+              shape: BoxShape.circle,
+              border: Border.all(color: context.colors.borderSubtle),
+            ),
+            child: Text(emoji, style: const TextStyle(fontSize: 14)),
           ),
-          child: Text(emoji, style: const TextStyle(fontSize: 14)),
         ),
       ),
     );

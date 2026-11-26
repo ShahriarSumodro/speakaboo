@@ -54,21 +54,37 @@ class _TalkScreenState extends State<TalkScreen> {
       body: SafeArea(
         child: Consumer<ConversationProvider>(
           builder: (context, conv, _) {
+            final colors = context.colors;
             return Column(
               children: [
                 // Header
                 _buildHeader(conv),
 
-                // Character face
+                // Character face (motion belongs to character & microphone only)
                 Expanded(
                   flex: 3,
                   child: Center(
-                    child: CharacterFace(
-                      isTalking: conv.status == ConversationStatus.playing,
-                      isListening: conv.status == ConversationStatus.recording,
-                      isThinking: conv.status == ConversationStatus.processing,
-                      characterId: conv.currentCharacterId ?? 'rule_farmer',
-                      size: 200,
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: conv.status == ConversationStatus.recording
+                            ? colors.coral.withValues(alpha: 0.16)
+                            : colors.surfaceWarm,
+                        border: Border.all(
+                          color: conv.status == ConversationStatus.recording
+                              ? colors.coral
+                              : colors.borderSubtle,
+                          width: conv.status == ConversationStatus.recording ? 3 : 1.5,
+                        ),
+                      ),
+                      child: CharacterFace(
+                        isTalking: conv.status == ConversationStatus.playing,
+                        isListening: conv.status == ConversationStatus.recording,
+                        isThinking: conv.status == ConversationStatus.processing,
+                        characterId: conv.currentCharacterId ?? 'rule_farmer',
+                        size: 184,
+                      ),
                     ),
                   ),
                 ),
@@ -114,10 +130,9 @@ class _TalkScreenState extends State<TalkScreen> {
                 conv.characterName ?? 'Speakaboo',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: SpeakabooTheme.headingSize,
-                  fontWeight: FontWeight.bold,
+                style: SpeakabooTheme.displayStyle(
                   color: colors.textPrimary,
+                  size: 20,
                 ),
               ),
             ),
@@ -440,33 +455,39 @@ class _TalkScreenState extends State<TalkScreen> {
           onLongPressEnd: isRecording ? (_) => conv.stopRecordingAndSend() : null,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            width: isRecording ? 80 : 72,
-            height: isRecording ? 80 : 72,
+            width: isRecording ? 84 : 74,
+            height: isRecording ? 84 : 74,
             decoration: BoxDecoration(
               color: isRecording
-                  ? colors.error
+                  ? colors.coral
                   : (isReady
-                      ? colors.accent
-                      : colors.surface),
+                      ? colors.coral
+                      : colors.surfaceWarm),
               shape: BoxShape.circle,
+              border: Border(
+                bottom: BorderSide(
+                  color: (isReady || isRecording) ? colors.coralEdge : colors.borderSubtle,
+                  width: 4,
+                ),
+              ),
               boxShadow: isRecording
                   ? [
                       BoxShadow(
-                        color: colors.error.withValues(alpha: 0.3),
-                        blurRadius: 20,
-                        spreadRadius: 5,
+                        color: colors.coral.withValues(alpha: 0.38),
+                        blurRadius: 24,
+                        spreadRadius: 6,
                       ),
                     ]
                   : null,
             ),
             child: Icon(
               isRecording
-                  ? Icons.mic
+                  ? Icons.mic_rounded
                   : (isProcessing || isPlaying
-                      ? Icons.hourglass_top
-                      : Icons.mic_none),
+                      ? Icons.hourglass_top_rounded
+                      : Icons.mic_none_rounded),
               color: (isReady || isRecording)
-                  ? Colors.white
+                  ? colors.accentText
                   : colors.textSecondary,
               size: 32,
             ),

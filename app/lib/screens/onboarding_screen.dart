@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../config/theme.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../widgets/playful/playful.dart';
 
 class OnboardingScreen extends StatefulWidget {
   final VoidCallback onFinish;
@@ -102,30 +103,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: SpeakabooTheme.spacingLg),
-              Center(
-                child: Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: colors.surface,
-                    borderRadius: BorderRadius.circular(SpeakabooTheme.radiusLg),
-                  ),
-                  child: Icon(
-                    Icons.record_voice_over,
-                    size: 44,
-                    color: colors.accent,
-                  ),
+              const Center(
+                child: PlayfulCharacter(
+                  mood: CharacterMood.encouraging,
+                  size: 104,
                 ),
               ),
               const SizedBox(height: SpeakabooTheme.spacingMd),
-              Text(
-                'Welcome to Speakaboo!',
+              const PlayfulMarkerText(
+                prefix: 'Welcome to ',
+                highlighted: 'Speakaboo!',
+                fontSize: 28,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: SpeakabooTheme.headingSize,
-                  fontWeight: FontWeight.bold,
-                  color: colors.textPrimary,
-                ),
               ),
               const SizedBox(height: SpeakabooTheme.spacingSm),
               Text(
