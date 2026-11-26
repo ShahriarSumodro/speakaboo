@@ -20,9 +20,9 @@ enum AudioState {
 
 /// Service for managing audio recording and playback.
 class AudioService extends ChangeNotifier {
-  final AudioRecorder _recorder = AudioRecorder();
-  final AudioPlayer _player = AudioPlayer();
-  final FlutterTts _tts = FlutterTts();
+  AudioRecorder? _recorder;
+  AudioPlayer? _player;
+  FlutterTts? _tts;
   bool _ttsInitialized = false;
 
   AudioState _state = AudioState.idle;
@@ -33,17 +33,26 @@ class AudioService extends ChangeNotifier {
   bool get isRecording => _state == AudioState.recording;
   bool get isPlaying => _state == AudioState.playing;
 
-  AudioService() {
-    _player.onPlayerComplete.listen((_) {
-      _state = AudioState.idle;
-      notifyListeners();
-    });
+  AudioRecorder _getRecorder() => _recorder ??= AudioRecorder();
+
+  AudioPlayer _getPlayer() {
+    if (_player == null) {
+      _player = AudioPlayer();
+      _player!.onPlayerComplete.listen((_) {
+        _state = AudioState.idle;
+        notifyListeners();
+      });
+    }
+    return _player!;
   }
+
+  FlutterTts _getTts() => _tts ??= FlutterTts();
 
   /// Start recording audio.
   Future<bool> startRecording() async {
     try {
-      if (!await _recorder.hasPermission()) {
+      final recorder = _getRecorder();
+      if (!await recorder.hasPermission()) {
         _errorMessage = 'Microphone permission denied';
         _state = AudioState.error;
         notifyListeners();
@@ -53,7 +62,7 @@ class AudioService extends ChangeNotifier {
       final dir = await getTemporaryDirectory();
       final path = '${dir.path}/speakaboo_recording.wav';
 
-      await _recorder.start(
+      await recorder.start(
         const RecordConfig(
           encoder: AudioEncoder.wav,
           sampleRate: 16000,
@@ -78,7 +87,7 @@ class AudioService extends ChangeNotifier {
   /// Stop recording and return the audio bytes.
   Future<Uint8List?> stopRecording() async {
     try {
-      final path = await _recorder.stop();
+      final path = await _getRecorder().stop();
       _state = AudioState.idle;
       notifyListeners();
 
@@ -107,14 +116,15 @@ class AudioService extends ChangeNotifier {
       final path = '${dir.path}/speakaboo_playback_${DateTime.now().microsecondsSinceEpoch}.wav';
       await File(path).writeAsBytes(audioBytes);
 
+      final player = _getPlayer();
       final completer = Completer<void>();
       late StreamSubscription<void> sub;
-      sub = _player.onPlayerComplete.listen((_) {
+      sub = player.onPlayerComplete.listen((_) {
         if (!completer.isCompleted) completer.complete();
         sub.cancel();
       });
 
-      await _player.play(DeviceFileSource(path));
+      await player.play(DeviceFileSource(path));
       await completer.future.timeout(
         const Duration(seconds: 20),
         onTimeout: () {
@@ -145,14 +155,15 @@ class AudioService extends ChangeNotifier {
     try {
       _state = AudioState.playing;
       notifyListeners();
+      final tts = _getTts();
       if (!_ttsInitialized) {
-        await _tts.setLanguage('en-US');
-        await _tts.awaitSpeakCompletion(true);
+        await tts.setLanguage('en-US');
+        await tts.awaitSpeakCompletion(true);
         _ttsInitialized = true;
       }
       final clampedRate = (speed * 0.5).clamp(0.25, 0.9);
-      await _tts.setSpeechRate(clampedRate);
-      await _tts.speak(text);
+      await tts.setSpeechRate(clampedRate);
+      await tts.speak(text);
       _state = AudioState.idle;
       notifyListeners();
       return true;
@@ -166,9 +177,13 @@ class AudioService extends ChangeNotifier {
 
   /// Stop playback.
   Future<void> stopPlayback() async {
-    await _player.stop();
     try {
-      await _tts.stop();
+      await _player?.stop();
+    } catch (e) {
+      debugPrint('[AudioService] stopPlayback player stop error: $e');
+    }
+    try {
+      await _tts?.stop();
     } catch (e) {
       debugPrint('[AudioService] stopPlayback tts stop error: $e');
     }
@@ -178,8 +193,8 @@ class AudioService extends ChangeNotifier {
 
   @override
   void dispose() {
-    _recorder.dispose();
-    _player.dispose();
+    _recorder?.dispose();
+    _player?.dispose();
     super.dispose();
   }
 }

@@ -29,6 +29,7 @@ class TurnResult {
   final bool isTrial;
   final int? trialSecondsRemaining;
   final String? ttsError;
+  final bool audioUnavailable;
 
   TurnResult({
     required this.conversationId,
@@ -44,6 +45,7 @@ class TurnResult {
     this.isTrial = false,
     this.trialSecondsRemaining,
     this.ttsError,
+    this.audioUnavailable = false,
   });
 
   factory TurnResult.fromJson(Map<String, dynamic> json) {
@@ -66,6 +68,7 @@ class TurnResult {
       isTrial: json['is_trial'] ?? false,
       trialSecondsRemaining: json['trial_seconds_remaining'] as int?,
       ttsError: json['tts_error'] as String?,
+      audioUnavailable: json['audio_unavailable'] ?? false,
     );
   }
 }

@@ -369,7 +369,9 @@ class _TalkScreenState extends State<TalkScreen> {
             ),
           ),
           TextButton(
-            onPressed: conv.clearError,
+            onPressed: isBusy
+                ? conv.clearError
+                : (conv.conversationId == null ? _startConversation : conv.retryLastTurn),
             child: Text(
               isBusy ? 'OK' : 'Retry',
               style: TextStyle(

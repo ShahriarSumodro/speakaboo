@@ -56,6 +56,8 @@ class ConversationProvider extends ChangeNotifier {
   bool _useStreaming = true;
   bool _isTrial = false;
   int? _trialSecondsRemaining;
+  Uint8List? _lastRecordedAudio;
+  bool _usingOnDeviceVoice = false;
 
   ConversationProvider({
     required this.api,
@@ -79,6 +81,8 @@ class ConversationProvider extends ChangeNotifier {
   String get coachMode => _coachMode;
   bool get isTrial => _isTrial;
   int? get trialSecondsRemaining => _trialSecondsRemaining;
+  bool get usingOnDeviceVoice => _usingOnDeviceVoice;
+  bool get canRetryLastAudio => _lastRecordedAudio != null && _conversationId != null;
 
   void setTrial({required bool isTrial, int? secondsRemaining}) {
     _isTrial = isTrial;
@@ -173,10 +177,25 @@ class ConversationProvider extends ChangeNotifier {
       return;
     }
 
+    _lastRecordedAudio = audioBytes;
+    await _sendAudio(audioBytes);
+  }
+
+  Future<void> _sendAudio(Uint8List audioBytes) async {
     if (_useStreaming) {
       await _processAudioStreaming(audioBytes);
     } else {
       await _processAudioBlocking(audioBytes);
+    }
+  }
+
+  /// Resend the last recorded audio (or restart conversation if needed) when retrying an error.
+  Future<void> retryLastTurn() async {
+    if (_lastRecordedAudio != null && _conversationId != null) {
+      _errorMessage = null;
+      await _sendAudio(_lastRecordedAudio!);
+    } else {
+      clearError();
     }
   }
 
@@ -284,17 +303,25 @@ class ConversationProvider extends ChangeNotifier {
 
       notifyListeners();
 
-      // Play audio response chunks
+      // Play audio response chunks, or use real on-device voice fallback if server TTS is unavailable
+      _lastRecordedAudio = null;
       if (audioChunks.isNotEmpty) {
+        _usingOnDeviceVoice = false;
         _status = ConversationStatus.playing;
         notifyListeners();
 
         await audio.playChunks(audioChunks);
 
         _status = ConversationStatus.ready;
-        if (ttsError != null) {
-          _errorMessage = ttsError;
-        }
+        notifyListeners();
+      } else if (replyText.isNotEmpty) {
+        _usingOnDeviceVoice = true;
+        _status = ConversationStatus.playing;
+        notifyListeners();
+
+        await audio.speakOnDevice(replyText);
+
+        _status = ConversationStatus.ready;
         notifyListeners();
       } else {
         _status = ConversationStatus.ready;
@@ -347,18 +374,23 @@ class ConversationProvider extends ChangeNotifier {
 
       notifyListeners();
 
-      // Handle TTS error gracefully
-      if (result.ttsError != null) {
-        debugPrint('Turn TTS error: ${result.ttsError}');
-        _errorMessage = 'I could not make my voice. Tap to retry.';
-      }
-
-      // Play audio response if present
+      // Play audio response if present, or fall back to on-device voice when audio_unavailable
+      _lastRecordedAudio = null;
       if (result.audioChunks.isNotEmpty) {
+        _usingOnDeviceVoice = false;
         _status = ConversationStatus.playing;
         notifyListeners();
 
         await audio.playChunks(result.audioChunks);
+
+        _status = ConversationStatus.ready;
+        notifyListeners();
+      } else if (result.reply.isNotEmpty && (result.audioUnavailable || result.ttsError != null)) {
+        _usingOnDeviceVoice = true;
+        _status = ConversationStatus.playing;
+        notifyListeners();
+
+        await audio.speakOnDevice(result.reply);
 
         _status = ConversationStatus.ready;
         notifyListeners();
@@ -429,6 +461,8 @@ class ConversationProvider extends ChangeNotifier {
     _topicId = null;
     _isTrial = false;
     _trialSecondsRemaining = null;
+    _lastRecordedAudio = null;
+    _usingOnDeviceVoice = false;
     _messages.clear();
     _status = ConversationStatus.idle;
     _errorMessage = null;
