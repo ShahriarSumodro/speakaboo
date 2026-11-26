@@ -245,16 +245,7 @@ class ConversationEngine:
         level = estimate_level(state.user_transcripts)
 
         # --- Step 4: Build messages for LLM ---
-        system_prompt = build_system_prompt(
-            character=character,
-            level=level,
-            practice_mode=state.practice_mode,
-            coach_mode=state.coach_mode,
-            age_band=state.age_band,
-        )
-        messages = [Message(role="system", content=system_prompt)]
-        messages.extend(self._trim_history(state.history))
-        messages.append(Message(role="user", content=user_text))
+        messages = self._build_llm_messages(state, character, user_text, level)
 
         # --- Step 5: LLM call with JSON parsing and retry ---
         response: Optional[TurnResponse] = None
@@ -324,28 +315,16 @@ class ConversationEngine:
 
         tts_chars = len(response.reply)
 
-        # --- Step 8: Update conversation state ---
-        state.history.append(Message(role="user", content=user_text))
-        state.history.append(Message(role="assistant", content=response.reply))
-        state.turn_count += 1
-        state.total_stt_seconds += stt_result.duration_seconds
-        user_words = len(user_text.split())
-        state.user_words_count += user_words
-        bot_words = len(response.reply.split())
-        state.bot_words_count += bot_words
-        state.bot_speech_seconds += max(1.0, round(bot_words / 2.5, 2))
-        if response.correction:
-            state.corrections_list.append(response.correction.__dict__)
-        state.new_words_learned.extend(response.new_words)
-        state.last_turn_at = time.time()
-
+        # --- Step 8: Update conversation state & compute cost ---
+        cost_usd = self._finalize_turn_state(
+            state=state,
+            user_text=user_text,
+            response=response,
+            stt_seconds=stt_result.duration_seconds,
+            llm_tokens_in=llm_tokens_in,
+            llm_tokens_out=llm_tokens_out,
+        )
         latency_ms = (time.time() - start_time) * 1000
-
-        # Cost tracking (USD)
-        stt_cost = (stt_result.duration_seconds / 60.0) * 0.006
-        llm_cost = (llm_tokens_in / 1_000_000) * 0.59 + (llm_tokens_out / 1_000_000) * 0.79
-        tts_cost = (tts_chars / 1000.0) * 0.015
-        cost_usd = round(stt_cost + llm_cost + tts_cost, 6)
 
         logger.info(
             f"Turn {turn_id} complete: {latency_ms:.0f}ms, "
@@ -513,17 +492,7 @@ class ConversationEngine:
         # 3. Level & Messages
         state.user_transcripts.append(user_text)
         level = estimate_level(state.user_transcripts)
-
-        system_prompt = build_system_prompt(
-            character=character,
-            level=level,
-            practice_mode=state.practice_mode,
-            coach_mode=state.coach_mode,
-            age_band=state.age_band,
-        )
-        messages = [Message(role="system", content=system_prompt)]
-        messages.extend(self._trim_history(state.history))
-        messages.append(Message(role="user", content=user_text))
+        messages = self._build_llm_messages(state, character, user_text, level)
 
         # 4. LLM
         response = None
@@ -618,27 +587,16 @@ class ConversationEngine:
 
         tts_ms = (time.time() - tts_t0) * 1000
 
-        # 6. Update State
-        state.history.append(Message(role="user", content=user_text))
-        state.history.append(Message(role="assistant", content=response.reply))
-        state.turn_count += 1
-        state.total_stt_seconds += stt_result.duration_seconds
-        user_words = len(user_text.split())
-        state.user_words_count += user_words
-        bot_words = len(response.reply.split())
-        state.bot_words_count += bot_words
-        state.bot_speech_seconds += max(1.0, round(bot_words / 2.5, 2))
-        if response.correction:
-            state.corrections_list.append(response.correction.__dict__)
-        state.new_words_learned.extend(response.new_words)
-        state.last_turn_at = time.time()
-
+        # 6. Update State & compute cost
+        cost_usd = self._finalize_turn_state(
+            state=state,
+            user_text=user_text,
+            response=response,
+            stt_seconds=stt_result.duration_seconds,
+            llm_tokens_in=llm_tokens_in,
+            llm_tokens_out=llm_tokens_out,
+        )
         latency_ms = (time.time() - start_time) * 1000
-        tts_chars = len(response.reply)
-        stt_cost = (stt_result.duration_seconds / 60.0) * 0.006
-        llm_cost = (llm_tokens_in / 1_000_000) * 0.59 + (llm_tokens_out / 1_000_000) * 0.79
-        tts_cost = (tts_chars / 1000.0) * 0.015
-        cost_usd = round(stt_cost + llm_cost + tts_cost, 6)
 
         record_turn_log({
             "turn_id": turn_id,
@@ -670,6 +628,51 @@ class ConversationEngine:
                 "tts_error": "I could not make my voice. Tap to retry." if tts_error else None,
             },
         }
+
+    def _build_llm_messages(
+        self, state: ConversationState, character: Character, user_text: str, level: str
+    ) -> list[Message]:
+        """Build system prompt, trimmed conversation history, and latest user message."""
+        system_prompt = build_system_prompt(
+            character=character,
+            level=level,
+            practice_mode=state.practice_mode,
+            coach_mode=state.coach_mode,
+            age_band=state.age_band,
+        )
+        messages = [Message(role="system", content=system_prompt)]
+        messages.extend(self._trim_history(state.history))
+        messages.append(Message(role="user", content=user_text))
+        return messages
+
+    @staticmethod
+    def _finalize_turn_state(
+        state: ConversationState,
+        user_text: str,
+        response: TurnResponse,
+        stt_seconds: float,
+        llm_tokens_in: int,
+        llm_tokens_out: int,
+    ) -> float:
+        """Update conversation metrics/history and return estimated turn cost in USD."""
+        state.history.append(Message(role="user", content=user_text))
+        state.history.append(Message(role="assistant", content=response.reply))
+        state.turn_count += 1
+        state.total_stt_seconds += stt_seconds
+        state.user_words_count += len(user_text.split())
+        bot_words = len(response.reply.split())
+        state.bot_words_count += bot_words
+        state.bot_speech_seconds += max(1.0, round(bot_words / 2.5, 2))
+        if response.correction:
+            state.corrections_list.append(response.correction.__dict__)
+        state.new_words_learned.extend(response.new_words)
+        state.last_turn_at = time.time()
+
+        tts_chars = len(response.reply)
+        stt_cost = (stt_seconds / 60.0) * 0.006
+        llm_cost = (llm_tokens_in / 1_000_000) * 0.59 + (llm_tokens_out / 1_000_000) * 0.79
+        tts_cost = (tts_chars / 1000.0) * 0.015
+        return round(stt_cost + llm_cost + tts_cost, 6)
 
     async def _synthesize_chunks(self, text: str, voice_id: str) -> list[bytes]:
         """Split text into ≤200 char chunks and synthesize each."""
