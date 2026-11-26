@@ -89,15 +89,31 @@ class PaymentGateway(ABC):
         ...
 
 
-class MockBkashGateway(PaymentGateway):
-    """Mock implementation of bKash payment gateway for development and testing."""
+class _BaseSandboxGateway(PaymentGateway):
+    """Shared implementation for sandbox/mock payment gateways."""
 
-    def __init__(self):
+    def __init__(
+        self,
+        gateway_name: str,
+        pid_prefix: str,
+        txn_prefix: str,
+        checkout_url_template: str,
+        not_found_message: str = "Payment session not found or expired.",
+        fail_message: str = "Transaction was declined by user.",
+        success_message: str = "Payment completed successfully.",
+    ):
+        self._gateway_name = gateway_name
+        self._pid_prefix = pid_prefix
+        self._txn_prefix = txn_prefix
+        self._checkout_url_template = checkout_url_template
+        self._not_found_message = not_found_message
+        self._fail_message = fail_message
+        self._success_message = success_message
         self._intents: Dict[str, PaymentIntent] = {}
 
     @property
     def name(self) -> str:
-        return "bkash"
+        return self._gateway_name
 
     async def create_payment_intent(
         self,
@@ -106,15 +122,18 @@ class MockBkashGateway(PaymentGateway):
         purpose: PaymentPurpose,
         target_id: str = "",
     ) -> PaymentIntent:
-        pid = f"bkash_{uuid.uuid4().hex[:12]}"
+        pid = f"{self._pid_prefix}_{uuid.uuid4().hex[:12]}"
+        checkout_url = self._checkout_url_template.format(
+            pid=pid, sku=target_id or "monthly_pro"
+        )
         intent = PaymentIntent(
             payment_id=pid,
-            gateway="bkash",
+            gateway=self._gateway_name,
             user_id=user_id,
             amount_bdt=amount_bdt,
             purpose=purpose,
             target_id=target_id,
-            checkout_url=f"https://sandbox.bkash.com/checkout?payment_id={pid}",
+            checkout_url=checkout_url,
             status=PaymentStatus.PENDING,
         )
         self._intents[pid] = intent
@@ -127,195 +146,34 @@ class MockBkashGateway(PaymentGateway):
         if not intent:
             return PaymentVerificationResult(
                 payment_id=payment_id,
-                gateway="bkash",
+                gateway=self._gateway_name,
                 success=False,
                 status=PaymentStatus.FAILED,
-                message="Payment session not found or expired.",
+                message=self._not_found_message,
             )
 
         if verification_token == "FAIL_TXN":
             intent.status = PaymentStatus.FAILED
             return PaymentVerificationResult(
                 payment_id=payment_id,
-                gateway="bkash",
+                gateway=self._gateway_name,
                 success=False,
                 status=PaymentStatus.FAILED,
-                message="Transaction was declined by user.",
+                message=self._fail_message,
             )
 
-        # Successful verification
         intent.status = PaymentStatus.COMPLETED
-        txn_id = f"TRX_{uuid.uuid4().hex[:8].upper()}"
-
+        txn_id = f"{self._txn_prefix}{uuid.uuid4().hex[:8].upper()}"
         ent_type = "plan" if intent.purpose == PaymentPurpose.MONTHLY_PLAN else "character"
         ent_val = "monthly" if intent.purpose == PaymentPurpose.MONTHLY_PLAN else intent.target_id
 
         return PaymentVerificationResult(
             payment_id=payment_id,
-            gateway="bkash",
+            gateway=self._gateway_name,
             success=True,
             status=PaymentStatus.COMPLETED,
             transaction_id=txn_id,
-            message="Payment completed successfully.",
-            entitlement_type=ent_type,
-            entitlement_value=ent_val,
-        )
-
-    async def process_webhook(
-        self, payload: Dict[str, Any], signature: str = ""
-    ) -> PaymentVerificationResult:
-        pid = payload.get("payment_id", "")
-        token = payload.get("verification_token", "")
-        return await self.verify_payment(pid, token)
-
-
-class MockNagadGateway(PaymentGateway):
-    """Mock implementation of Nagad payment gateway for development and testing."""
-
-    def __init__(self):
-        self._intents: Dict[str, PaymentIntent] = {}
-
-    @property
-    def name(self) -> str:
-        return "nagad"
-
-    async def create_payment_intent(
-        self,
-        user_id: str,
-        amount_bdt: int,
-        purpose: PaymentPurpose,
-        target_id: str = "",
-    ) -> PaymentIntent:
-        pid = f"nagad_{uuid.uuid4().hex[:12]}"
-        intent = PaymentIntent(
-            payment_id=pid,
-            gateway="nagad",
-            user_id=user_id,
-            amount_bdt=amount_bdt,
-            purpose=purpose,
-            target_id=target_id,
-            checkout_url=f"https://sandbox.nagad.com.bd/checkout?payment_id={pid}",
-            status=PaymentStatus.PENDING,
-        )
-        self._intents[pid] = intent
-        return intent
-
-    async def verify_payment(
-        self, payment_id: str, verification_token: str = ""
-    ) -> PaymentVerificationResult:
-        intent = self._intents.get(payment_id)
-        if not intent:
-            return PaymentVerificationResult(
-                payment_id=payment_id,
-                gateway="nagad",
-                success=False,
-                status=PaymentStatus.FAILED,
-                message="Payment session not found or expired.",
-            )
-
-        if verification_token == "FAIL_TXN":
-            intent.status = PaymentStatus.FAILED
-            return PaymentVerificationResult(
-                payment_id=payment_id,
-                gateway="nagad",
-                success=False,
-                status=PaymentStatus.FAILED,
-                message="Transaction was declined by user.",
-            )
-
-        intent.status = PaymentStatus.COMPLETED
-        txn_id = f"NGD_{uuid.uuid4().hex[:8].upper()}"
-
-        ent_type = "plan" if intent.purpose == PaymentPurpose.MONTHLY_PLAN else "character"
-        ent_val = "monthly" if intent.purpose == PaymentPurpose.MONTHLY_PLAN else intent.target_id
-
-        return PaymentVerificationResult(
-            payment_id=payment_id,
-            gateway="nagad",
-            success=True,
-            status=PaymentStatus.COMPLETED,
-            transaction_id=txn_id,
-            message="Payment completed successfully.",
-            entitlement_type=ent_type,
-            entitlement_value=ent_val,
-        )
-
-    async def process_webhook(
-        self, payload: Dict[str, Any], signature: str = ""
-    ) -> PaymentVerificationResult:
-        pid = payload.get("payment_id", "")
-        token = payload.get("verification_token", "")
-        return await self.verify_payment(pid, token)
-
-
-class GooglePlayBillingGateway(PaymentGateway):
-    """Google Play In-App Billing verification gateway for Play Store flavor."""
-
-    def __init__(self):
-        self._intents: Dict[str, PaymentIntent] = {}
-
-    @property
-    def name(self) -> str:
-        return "google_play"
-
-    async def create_payment_intent(
-        self,
-        user_id: str,
-        amount_bdt: int,
-        purpose: PaymentPurpose,
-        target_id: str = "",
-    ) -> PaymentIntent:
-        pid = f"gp_{uuid.uuid4().hex[:12]}"
-        intent = PaymentIntent(
-            payment_id=pid,
-            gateway="google_play",
-            user_id=user_id,
-            amount_bdt=amount_bdt,
-            purpose=purpose,
-            target_id=target_id,
-            checkout_url=f"play_billing://purchase?sku={target_id or 'monthly_pro'}&payment_id={pid}",
-            status=PaymentStatus.PENDING,
-        )
-        self._intents[pid] = intent
-        return intent
-
-    async def verify_payment(
-        self, payment_id: str, verification_token: str = ""
-    ) -> PaymentVerificationResult:
-        intent = self._intents.get(payment_id)
-        if not intent:
-            return PaymentVerificationResult(
-                payment_id=payment_id,
-                gateway="google_play",
-                success=False,
-                status=PaymentStatus.FAILED,
-                message="Google Play purchase session not found or expired.",
-            )
-
-        if verification_token == "FAIL_TXN":
-            intent.status = PaymentStatus.FAILED
-            return PaymentVerificationResult(
-                payment_id=payment_id,
-                gateway="google_play",
-                success=False,
-                status=PaymentStatus.FAILED,
-                message="Google Play purchase was cancelled by user.",
-            )
-
-        intent.status = PaymentStatus.COMPLETED
-        rand_order = f"{uuid.uuid4().hex[:4]}-{uuid.uuid4().hex[:4]}-{uuid.uuid4().hex[:4]}-{uuid.uuid4().hex[:5]}"
-        txn_id = f"GPA.{rand_order.upper()}"
-
-        ent_type = "plan" if intent.purpose == PaymentPurpose.MONTHLY_PLAN else "character"
-        ent_val = "monthly" if intent.purpose == PaymentPurpose.MONTHLY_PLAN else intent.target_id
-
-        return PaymentVerificationResult(
-            payment_id=payment_id,
-            gateway="google_play",
-            success=True,
-            status=PaymentStatus.COMPLETED,
-            transaction_id=txn_id,
-            message="Google Play purchase verified successfully.",
+            message=self._success_message,
             entitlement_type=ent_type,
             entitlement_value=ent_val,
         )
@@ -328,82 +186,58 @@ class GooglePlayBillingGateway(PaymentGateway):
         return await self.verify_payment(pid, token)
 
 
-class WebBillingGateway(PaymentGateway):
+class MockBkashGateway(_BaseSandboxGateway):
+    """Mock implementation of bKash payment gateway for development and testing."""
+
+    def __init__(self):
+        super().__init__(
+            gateway_name="bkash",
+            pid_prefix="bkash",
+            txn_prefix="TRX_",
+            checkout_url_template="https://sandbox.bkash.com/checkout?payment_id={pid}",
+        )
+
+
+class MockNagadGateway(_BaseSandboxGateway):
+    """Mock implementation of Nagad payment gateway for development and testing."""
+
+    def __init__(self):
+        super().__init__(
+            gateway_name="nagad",
+            pid_prefix="nagad",
+            txn_prefix="NGD_",
+            checkout_url_template="https://sandbox.nagad.com.bd/checkout?payment_id={pid}",
+        )
+
+
+class GooglePlayBillingGateway(_BaseSandboxGateway):
+    """Google Play In-App Billing verification gateway for Play Store flavor."""
+
+    def __init__(self):
+        super().__init__(
+            gateway_name="google_play",
+            pid_prefix="gp",
+            txn_prefix="GPA.",
+            checkout_url_template="play_billing://purchase?sku={sku}&payment_id={pid}",
+            not_found_message="Google Play purchase session not found or expired.",
+            fail_message="Google Play purchase was cancelled by user.",
+            success_message="Google Play purchase verified successfully.",
+        )
+
+
+class WebBillingGateway(_BaseSandboxGateway):
     """External Web Checkout gateway (e.g. for browser checkout / aggregator)."""
 
     def __init__(self):
-        self._intents: Dict[str, PaymentIntent] = {}
-
-    @property
-    def name(self) -> str:
-        return "web_checkout"
-
-    async def create_payment_intent(
-        self,
-        user_id: str,
-        amount_bdt: int,
-        purpose: PaymentPurpose,
-        target_id: str = "",
-    ) -> PaymentIntent:
-        pid = f"web_{uuid.uuid4().hex[:12]}"
-        intent = PaymentIntent(
-            payment_id=pid,
-            gateway="web_checkout",
-            user_id=user_id,
-            amount_bdt=amount_bdt,
-            purpose=purpose,
-            target_id=target_id,
-            checkout_url=f"https://pay.speakaboo.app/checkout?session={pid}",
-            status=PaymentStatus.PENDING,
+        super().__init__(
+            gateway_name="web_checkout",
+            pid_prefix="web",
+            txn_prefix="WEB_",
+            checkout_url_template="https://pay.speakaboo.app/checkout?session={pid}",
+            not_found_message="Web checkout session not found or expired.",
+            fail_message="Web payment failed.",
+            success_message="Web checkout completed successfully.",
         )
-        self._intents[pid] = intent
-        return intent
-
-    async def verify_payment(
-        self, payment_id: str, verification_token: str = ""
-    ) -> PaymentVerificationResult:
-        intent = self._intents.get(payment_id)
-        if not intent:
-            return PaymentVerificationResult(
-                payment_id=payment_id,
-                gateway="web_checkout",
-                success=False,
-                status=PaymentStatus.FAILED,
-                message="Web checkout session not found or expired.",
-            )
-
-        if verification_token == "FAIL_TXN":
-            intent.status = PaymentStatus.FAILED
-            return PaymentVerificationResult(
-                payment_id=payment_id,
-                gateway="web_checkout",
-                success=False,
-                status=PaymentStatus.FAILED,
-                message="Web payment failed.",
-            )
-
-        intent.status = PaymentStatus.COMPLETED
-        txn_id = f"WEB_{uuid.uuid4().hex[:8].upper()}"
-        ent_type = "plan" if intent.purpose == PaymentPurpose.MONTHLY_PLAN else "character"
-        ent_val = "monthly" if intent.purpose == PaymentPurpose.MONTHLY_PLAN else intent.target_id
-
-        return PaymentVerificationResult(
-            payment_id=payment_id,
-            gateway="web_checkout",
-            success=True,
-            status=PaymentStatus.COMPLETED,
-            transaction_id=txn_id,
-            message="Web checkout completed successfully.",
-            entitlement_type=ent_type,
-            entitlement_value=ent_val,
-        )
-
-    async def process_webhook(
-        self, payload: Dict[str, Any], signature: str = ""
-    ) -> PaymentVerificationResult:
-        pid = payload.get("payment_id", "")
-        token = payload.get("verification_token", "")
-        return await self.verify_payment(pid, token)
 
 
 _gateways: Dict[str, PaymentGateway] = {
