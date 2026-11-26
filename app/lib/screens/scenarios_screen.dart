@@ -22,6 +22,7 @@ class ScenariosScreen extends StatefulWidget {
 class _ScenariosScreenState extends State<ScenariosScreen> {
   List<ScenarioItem> _scenarios = [];
   bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -31,9 +32,15 @@ class _ScenariosScreenState extends State<ScenariosScreen> {
 
   Future<void> _loadScenarios() async {
     final api = context.read<ApiService>();
+    if (mounted) {
+      setState(() {
+        if (_scenarios.isEmpty) _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     final cached = await CacheService.get('scenarios_cache');
-    if (cached is List) {
+    if (cached is List && _scenarios.isEmpty && mounted) {
       setState(() {
         _scenarios = cached.map((s) => ScenarioItem.fromJson(s as Map<String, dynamic>)).toList();
         _isLoading = false;
@@ -42,9 +49,11 @@ class _ScenariosScreenState extends State<ScenariosScreen> {
 
     try {
       final remote = await api.getScenarios();
+      if (!mounted) return;
       setState(() {
         _scenarios = remote;
         _isLoading = false;
+        _errorMessage = null;
       });
       await CacheService.set('scenarios_cache', remote.map((s) => {
         'id': s.id,
@@ -55,9 +64,18 @@ class _ScenariosScreenState extends State<ScenariosScreen> {
         'roles': s.roles,
         'goals': s.goals,
       }).toList());
-    } catch (_) {
-      if (_scenarios.isEmpty) {
-        setState(() => _isLoading = false);
+    } catch (e) {
+      debugPrint('[scenarios_screen] load failed: $e');
+      final msg = e is ApiException
+          ? e.message
+          : 'Could not load scenarios. Check your server connection.';
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = msg;
+      });
+      if (_scenarios.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       }
     }
   }
@@ -103,17 +121,26 @@ class _ScenariosScreenState extends State<ScenariosScreen> {
         backgroundColor: colors.background,
         foregroundColor: colors.textPrimary,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Refresh',
+            onPressed: _loadScenarios,
+          ),
+        ],
       ),
       body: _isLoading
           ? const PlayfulLoadingState(message: 'Setting the stage...')
           : _scenarios.isEmpty
               ? PlayfulEmptyState(
-                  title: 'Scenarios are being stocked!',
-                  message: 'Connect to the backend or refresh to unlock real-life role-play scenes.',
+                  title: _errorMessage != null ? 'Could not load scenarios' : 'Scenarios are being stocked!',
+                  message: _errorMessage ?? 'Connect to the backend or refresh to unlock real-life role-play scenes.',
                   actionLabel: 'Refresh',
                   onAction: _loadScenarios,
                 )
-              : ListView.builder(
+              : RefreshIndicator(
+                  onRefresh: _loadScenarios,
+                  child: ListView.builder(
                   padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
                   itemCount: _scenarios.length,
                   itemBuilder: (context, index) {
@@ -179,6 +206,7 @@ class _ScenariosScreenState extends State<ScenariosScreen> {
                       ),
                     );
                   },
+                ),
                 ),
     );
   }

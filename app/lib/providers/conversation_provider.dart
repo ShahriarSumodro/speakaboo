@@ -153,6 +153,27 @@ class ConversationProvider extends ChangeNotifier {
     }
   }
 
+  /// Start a clean Free Talk session, clearing any prior scenario, topic, or error state.
+  Future<void> startFreeTalk({
+    required String userId,
+    String? characterId,
+  }) async {
+    final charId = characterId ?? _currentCharacterId ?? 'rule_farmer';
+    _conversationId = null;
+    _scenarioId = null;
+    _topicId = null;
+    _lastRecordedAudio = null;
+    _usingOnDeviceVoice = false;
+    _messages.clear();
+    _errorMessage = null;
+    await startConversation(
+      userId: userId,
+      characterId: charId,
+      scenarioId: null,
+      topicId: null,
+    );
+  }
+
   /// Start recording user audio.
   Future<void> startRecording() async {
     if (_conversationId == null) return;

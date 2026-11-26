@@ -11,6 +11,7 @@ import 'package:speakaboo/config/app_config.dart';
 import 'package:speakaboo/services/api_service.dart';
 import 'package:speakaboo/services/audio_service.dart';
 import 'package:speakaboo/services/analytics_service.dart';
+import 'package:speakaboo/services/cache_service.dart';
 import 'package:speakaboo/providers/auth_provider.dart';
 import 'package:speakaboo/providers/conversation_provider.dart';
 import 'package:speakaboo/widgets/character_face.dart';
@@ -60,8 +61,9 @@ class _FakeSpeakAudioService extends AudioService {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() {
+  setUp(() async {
     SharedPreferences.setMockInitialValues({});
+    await CacheService.clear();
   });
 
   testWidgets('CharacterFace renders properly', (WidgetTester tester) async {
@@ -972,6 +974,104 @@ void main() {
     expect(find.text('Monsoon Weather'), findsOneWidget);
   });
 
+  testWidgets('W5: TopicsScreen shows real error on failure and reloads on Refresh', (WidgetTester tester) async {
+    int attempts = 0;
+    final mockClient = MockClient((request) async {
+      if (request.url.path.endsWith('/api/learning/topics')) {
+        attempts++;
+        if (attempts == 1) {
+          return http.Response(jsonEncode({'detail': 'Topics service unavailable'}), 500);
+        }
+        return http.Response(
+          jsonEncode([
+            {
+              'id': 'top_weather',
+              'title': 'Monsoon Weather',
+              'category': 'Environment',
+              'difficulty': 'beginner',
+              'sample_questions': ['What is the weather like today?'],
+            }
+          ]),
+          200,
+        );
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
+
+    await tester.pumpWidget(
+      Provider<ApiService>.value(
+        value: api,
+        child: const MaterialApp(home: TopicsScreen()),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Could not load topics'), findsOneWidget);
+    expect(find.textContaining('Failed to load topics'), findsOneWidget);
+    await tester.tap(find.text('Refresh'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(attempts, 2);
+    expect(find.text('Monsoon Weather'), findsOneWidget);
+  });
+
+  testWidgets('W5: ScenariosScreen shows real error on failure and reloads on Refresh', (WidgetTester tester) async {
+    int attempts = 0;
+    final mockClient = MockClient((request) async {
+      if (request.url.path.endsWith('/api/learning/scenarios')) {
+        attempts++;
+        if (attempts == 1) {
+          return http.Response(jsonEncode({'detail': 'Scenarios database busy'}), 500);
+        }
+        return http.Response(
+          jsonEncode([
+            {
+              'id': 'scen_market',
+              'title': 'Vegetable Market',
+              'category': 'Daily Life',
+              'difficulty': 'beginner',
+              'description': 'Bargain and buy fresh produce',
+              'roles': ['Buyer', 'Seller'],
+              'goals': ['Ask price', 'Buy items'],
+            }
+          ]),
+          200,
+        );
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
+
+    await tester.pumpWidget(
+      Provider<ApiService>.value(
+        value: api,
+        child: const MaterialApp(home: ScenariosScreen()),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Could not load scenarios'), findsOneWidget);
+    expect(find.textContaining('Failed to load scenarios'), findsOneWidget);
+    await tester.tap(find.text('Refresh'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(attempts, 2);
+    expect(find.text('Vegetable Market'), findsOneWidget);
+  });
+
   testWidgets('VocabularyScreen renders search and empty state', (WidgetTester tester) async {
     final mockClient = MockClient((request) async {
       if (request.url.path.contains('/api/learning/vocabulary/')) {
@@ -1397,18 +1497,21 @@ void main() {
     final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
     final auth = AuthProvider(api: api);
 
+    final spoke = <String>[];
+    final fakeAudio = _FakeSpeakAudioService(spoke);
     await tester.pumpWidget(
       MultiProvider(
         providers: [
           Provider<ApiService>.value(value: api),
           ChangeNotifierProvider<AuthProvider>.value(value: auth),
-          ChangeNotifierProvider<AudioService>(create: (_) => AudioService()),
+          ChangeNotifierProvider<AudioService>.value(value: fakeAudio),
         ],
         child: const MaterialApp(home: DiagnosticsScreen()),
       ),
     );
 
     await tester.pump();
+    await tester.pump(const Duration(seconds: 3));
     await tester.pump(const Duration(milliseconds: 200));
 
     expect(find.text('Diagnostics'), findsOneWidget);

@@ -113,4 +113,53 @@ void main() {
     expect(conv.messages.last.text, equals('Howdy partner! How are you?'));
     expect(audio.spokenOnDevice, contains('Howdy partner! How are you?'));
   });
+
+  test('W5: startFreeTalk clears scenario, topic, and error state and starts fresh free-talk conversation', () async {
+    String? lastScenarioId = 'unset';
+    String? lastTopicId = 'unset';
+    final mockClient = MockClient((request) async {
+      if (request.url.path == '/api/conversation/start') {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        lastScenarioId = body['scenario_id'] as String?;
+        lastTopicId = body['topic_id'] as String?;
+        return http.Response(
+          jsonEncode({
+            'conversation_id': 'c_free',
+            'character_name': 'Farmer Reggie',
+            'greeting': 'Ready for free talk!',
+          }),
+          200,
+        );
+      }
+      if (request.url.path == '/api/conversation/stream-turn' ||
+          request.url.path == '/api/conversation/turn') {
+        return http.Response('Server error', 500);
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient, authToken: 'tok');
+    final audio = _TestAudioService(Uint8List.fromList([1, 2, 3, 4]));
+    final conv = ConversationProvider(api: api, audio: audio);
+
+    await conv.startConversation(
+      userId: 'u1',
+      characterId: 'rule_farmer',
+      scenarioId: 'scen_market',
+    );
+    expect(conv.scenarioId, equals('scen_market'));
+
+    await conv.startRecording();
+    await conv.stopRecordingAndSend();
+    expect(conv.status, equals(ConversationStatus.error));
+
+    await conv.startFreeTalk(userId: 'u1');
+    expect(conv.status, equals(ConversationStatus.ready));
+    expect(conv.scenarioId, isNull);
+    expect(conv.topicId, isNull);
+    expect(conv.errorMessage, isNull);
+    expect(lastScenarioId, isNull);
+    expect(lastTopicId, isNull);
+    expect(conv.messages.last.text, equals('Ready for free talk!'));
+  });
 }

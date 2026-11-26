@@ -251,7 +251,14 @@ class _HomeScreenState extends State<HomeScreen>
                         label: 'Start Speaking',
                         icon: Icons.mic_rounded,
                         fullWidth: true,
-                        onPressed: () => widget.onNavigateTab?.call(1),
+                        onPressed: () {
+                          if (conv.scenarioId != null ||
+                              conv.topicId != null ||
+                              conv.status == ConversationStatus.error) {
+                            conv.startFreeTalk(userId: auth.userId);
+                          }
+                          widget.onNavigateTab?.call(1);
+                        },
                       ),
                       const SizedBox(height: SpeakabooTheme.spacing12),
                       PlayfulButton(
@@ -351,7 +358,16 @@ class _HomeScreenState extends State<HomeScreen>
                           subtitle: 'Chat naturally',
                           washColor: c.pastelLavender,
                           iconColor: c.primary,
-                          onTap: () => widget.onNavigateTab?.call(1),
+                          onTap: () {
+                            if (conv.conversationId == null ||
+                                conv.scenarioId != null ||
+                                conv.topicId != null ||
+                                conv.status == ConversationStatus.error ||
+                                conv.status == ConversationStatus.idle) {
+                              conv.startFreeTalk(userId: auth.userId);
+                            }
+                            widget.onNavigateTab?.call(1);
+                          },
                         ),
                         PlayfulModeTile(
                           icon: Icons.theater_comedy_rounded,

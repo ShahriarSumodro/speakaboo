@@ -21,6 +21,7 @@ class TopicsScreen extends StatefulWidget {
 class _TopicsScreenState extends State<TopicsScreen> {
   List<TopicItem> _topics = [];
   bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -30,9 +31,15 @@ class _TopicsScreenState extends State<TopicsScreen> {
 
   Future<void> _loadTopics() async {
     final api = context.read<ApiService>();
+    if (mounted) {
+      setState(() {
+        if (_topics.isEmpty) _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     final cached = await CacheService.get('topics_cache');
-    if (cached is List) {
+    if (cached is List && _topics.isEmpty && mounted) {
       setState(() {
         _topics = cached.map((t) => TopicItem.fromJson(t as Map<String, dynamic>)).toList();
         _isLoading = false;
@@ -41,9 +48,11 @@ class _TopicsScreenState extends State<TopicsScreen> {
 
     try {
       final remote = await api.getTopics();
+      if (!mounted) return;
       setState(() {
         _topics = remote;
         _isLoading = false;
+        _errorMessage = null;
       });
       await CacheService.set('topics_cache', remote.map((t) => {
         'id': t.id,
@@ -52,9 +61,18 @@ class _TopicsScreenState extends State<TopicsScreen> {
         'difficulty': t.difficulty,
         'starters': t.starters,
       }).toList());
-    } catch (_) {
-      if (_topics.isEmpty) {
-        setState(() => _isLoading = false);
+    } catch (e) {
+      debugPrint('[topics_screen] load failed: $e');
+      final msg = e is ApiException
+          ? e.message
+          : 'Could not load topics. Check your server connection.';
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = msg;
+      });
+      if (_topics.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       }
     }
   }
@@ -85,17 +103,26 @@ class _TopicsScreenState extends State<TopicsScreen> {
         backgroundColor: colors.background,
         foregroundColor: colors.textPrimary,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Refresh',
+            onPressed: _loadTopics,
+          ),
+        ],
       ),
       body: _isLoading
           ? const PlayfulLoadingState(message: 'Gathering fun topics...')
           : _topics.isEmpty
               ? PlayfulEmptyState(
-                  title: 'Topics are being stocked!',
-                  message: 'Connect to the backend or pull to refresh for fresh conversation ideas.',
+                  title: _errorMessage != null ? 'Could not load topics' : 'Topics are being stocked!',
+                  message: _errorMessage ?? 'Connect to the backend or pull to refresh for fresh conversation ideas.',
                   actionLabel: 'Refresh',
                   onAction: _loadTopics,
                 )
-              : ListView.builder(
+              : RefreshIndicator(
+                  onRefresh: _loadTopics,
+                  child: ListView.builder(
                   padding: const EdgeInsets.all(SpeakabooTheme.spacingMd),
                   itemCount: _topics.length,
                   itemBuilder: (context, index) {
@@ -177,6 +204,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
                       ),
                     );
                   },
+                ),
                 ),
     );
   }
