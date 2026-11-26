@@ -47,6 +47,7 @@ def categorize_error(original: str, better: str, reason: str = "") -> str:
     5. General word choice
     """
     orig_l = original.lower()
+    better_l = better.lower()
     reason_l = reason.lower()
     if any(s in reason_l for s in ["agreement", "subject-verb"]):
         return "subject_verb_agreement"
@@ -56,9 +57,18 @@ def categorize_error(original: str, better: str, reason: str = "") -> str:
         return "tenses_and_verbs"
     if any(s in reason_l for s in ["plural", "singular"]):
         return "subject_verb_agreement"
-    if "preposition" in reason_l or any(re.search(rf"\b{p}\b", orig_l) for p in ["in", "on", "at", "to", "for", "with", "by", "from"]):
+    if "preposition" in reason_l:
         return "prepositions"
-    if "article" in reason_l or re.search(r"\b(a|an|the)\b", orig_l):
+    if "article" in reason_l:
+        return "articles"
+
+    orig_words = set(re.findall(r"\b\w+\b", orig_l))
+    better_words = set(re.findall(r"\b\w+\b", better_l)) if better_l else set()
+    changed_words = orig_words ^ better_words if better_words else orig_words
+
+    if changed_words & {"in", "on", "at", "to", "for", "with", "by", "from"}:
+        return "prepositions"
+    if changed_words & {"a", "an", "the"}:
         return "articles"
     return "word_choice"
 

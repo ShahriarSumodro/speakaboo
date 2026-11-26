@@ -125,3 +125,15 @@ class TestParseResponse:
         assert result.correction.original == "Yesterday I go"
         assert result.correction.better == "Yesterday I went"
         assert result.correction.category == "tenses_and_verbs"
+
+    def test_categorize_article_not_shadowed_by_unchanged_preposition(self):
+        """Unchanged 'to' in 'I went to a park' -> 'I went to the park' must be articles, not prepositions."""
+        from backend.engine.correction import categorize_error
+        cat = categorize_error("I went to a park", "I went to the park", "")
+        assert cat == "articles"
+
+    def test_categorize_preposition_when_preposition_changed(self):
+        from backend.engine.correction import categorize_error
+        cat = categorize_error("I arrived to Dhaka", "I arrived in Dhaka", "")
+        assert cat == "prepositions"
+

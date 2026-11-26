@@ -411,21 +411,6 @@ class ConversationEngine:
             llm_error=llm_error,
         )
 
-        return TurnResult(
-            conversation_id=conversation_id,
-            turn_id=turn_id,
-            user_transcript=user_text,
-            response=response,
-            audio_chunks=audio_chunks,
-            level=level,
-            stt_seconds=stt_result.duration_seconds,
-            tts_chars=tts_chars,
-            llm_tokens_in=llm_tokens_in,
-            llm_tokens_out=llm_tokens_out,
-            latency_ms=latency_ms,
-            cost_usd=cost_usd,
-        )
-
     async def stream_turn(
         self,
         conversation_id: str,
@@ -443,8 +428,18 @@ class ConversationEngine:
             raise ValueError(f"Conversation not found: {conversation_id}")
 
         # 1. STT
-        stt_result = await self._stt.transcribe(audio, format=audio_format)
-        user_text = stt_result.text.strip()
+        stt_error = None
+        try:
+            stt_result = await self._stt.transcribe(audio, format=audio_format)
+            user_text = stt_result.text.strip()
+        except Exception as e:
+            stt_error = str(e)
+            logger.error(f"Turn {turn_id} streaming STT failed: {e}")
+            yield {
+                "event": "error",
+                "data": {"stage": "stt", "error": "Could not hear audio.", "detail": stt_error},
+            }
+            return
 
         yield {
             "event": "transcript",
@@ -484,7 +479,11 @@ class ConversationEngine:
                     "redirect": redirect,
                 },
             }
-            redirect_audio = await self._synthesize_chunks(redirect, character.voice_id)
+            redirect_audio = []
+            try:
+                redirect_audio = await self._synthesize_chunks(redirect, character.voice_id)
+            except Exception as e:
+                logger.error(f"Turn {turn_id} streaming safety redirect TTS error: {e}")
             for idx, chunk in enumerate(redirect_audio):
                 yield {
                     "event": "audio_chunk",
@@ -530,18 +529,31 @@ class ConversationEngine:
         response = None
         llm_tokens_in = 0
         llm_tokens_out = 0
+        llm_error = None
 
         for attempt in range(max_llm_retries):
-            llm_result = await self._llm.chat(messages=messages, json_mode=True)
-            llm_tokens_in = llm_result.tokens_in
-            llm_tokens_out = llm_result.tokens_out
             try:
-                response = parse_turn_response(llm_result.content)
-                break
-            except ValueError as e:
-                if attempt < max_llm_retries - 1:
-                    messages.append(Message(role="assistant", content=llm_result.content))
-                    messages.append(Message(role="user", content="Please respond with VALID JSON only."))
+                llm_result = await self._llm.chat(messages=messages, json_mode=True)
+                llm_tokens_in = llm_result.tokens_in
+                llm_tokens_out = llm_result.tokens_out
+                try:
+                    response = parse_turn_response(llm_result.content)
+                    break
+                except ValueError as e:
+                    logger.warning(f"Turn {turn_id} streaming LLM JSON parse failed (attempt {attempt + 1}): {e}")
+                    if attempt < max_llm_retries - 1:
+                        messages.append(Message(role="assistant", content=llm_result.content))
+                        messages.append(Message(role="user", content="Please respond with VALID JSON only."))
+            except Exception as e:
+                llm_error = str(e)
+                logger.error(f"Turn {turn_id} streaming LLM attempt {attempt + 1} error: {e}")
+
+        if response is None and llm_error is not None:
+            yield {
+                "event": "error",
+                "data": {"stage": "llm", "error": "I could not think of a reply.", "detail": llm_error},
+            }
+            return
 
         if response is None:
             response = TurnResponse(reply="Good try! Let's keep practicing.")

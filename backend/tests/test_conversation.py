@@ -138,3 +138,31 @@ class TestTextSplitting:
         text = "x" * 200
         result = ConversationEngine._split_text(text, max_chars=200)
         assert len(result) == 1
+
+
+class TestStreamTurnErrorHandling:
+
+    @pytest.mark.asyncio
+    async def test_stream_turn_handles_stt_error(self, character, mock_llm, mock_tts):
+        class FailingStt(MockSttProvider):
+            async def transcribe(self, audio: bytes, language: str = "en", format: str = "wav"):
+                raise RuntimeError("STT connection timeout")
+
+        engine = ConversationEngine(stt=FailingStt(), llm=mock_llm, tts=mock_tts)
+        state = engine.start_conversation("rule_farmer", "user-1")
+        events = [e async for e in engine.stream_turn(state.id, b"\x00" * 100, character)]
+        event_types = [e["event"] for e in events]
+        assert "error" in event_types or "turn_complete" in event_types
+
+    @pytest.mark.asyncio
+    async def test_stream_turn_handles_llm_error(self, character, mock_stt, mock_tts):
+        class FailingLlm(MockLlmProvider):
+            async def chat(self, messages, max_tokens: int = 256, temperature: float = 0.7, json_mode: bool = False):
+                raise RuntimeError("LLM rate limit")
+
+        engine = ConversationEngine(stt=mock_stt, llm=FailingLlm(), tts=mock_tts)
+        state = engine.start_conversation("rule_farmer", "user-1")
+        events = [e async for e in engine.stream_turn(state.id, b"\x00" * 100, character)]
+        event_types = [e["event"] for e in events]
+        assert "error" in event_types or "turn_complete" in event_types
+
