@@ -745,7 +745,9 @@ class ApiService {
       throw ApiException('Failed to load scenarios', response.statusCode);
     }
     final data = jsonDecode(response.body);
-    final list = data['scenarios'] as List<dynamic>? ?? [];
+    final List<dynamic> list = data is List
+        ? data
+        : (data is Map && data['scenarios'] is List ? data['scenarios'] as List<dynamic> : []);
     return list.map((item) => ScenarioItem.fromJson(item as Map<String, dynamic>)).toList();
   }
 
@@ -760,7 +762,9 @@ class ApiService {
       throw ApiException('Failed to load topics', response.statusCode);
     }
     final data = jsonDecode(response.body);
-    final list = data['topics'] as List<dynamic>? ?? [];
+    final List<dynamic> list = data is List
+        ? data
+        : (data is Map && data['topics'] is List ? data['topics'] as List<dynamic> : []);
     return list.map((item) => TopicItem.fromJson(item as Map<String, dynamic>)).toList();
   }
 

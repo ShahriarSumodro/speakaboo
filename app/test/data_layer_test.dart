@@ -167,6 +167,52 @@ void main() {
       expect(prog.xp, equals(320));
       expect(prog.level, equals('intermediate'));
     });
+
+    test('getTopics and getScenarios parse top-level JSON list responses from backend', () async {
+      final mockClient = MockClient((request) async {
+        if (request.url.path == '/api/learning/topics') {
+          return http.Response(
+            jsonEncode([
+              {
+                'id': 'weather_monsoon',
+                'title': 'Monsoon Rains',
+                'category': 'Nature',
+                'description': 'Talk about rain',
+                'sample_questions': ['Do you enjoy monsoon rain?'],
+              }
+            ]),
+            200,
+          );
+        }
+        if (request.url.path == '/api/learning/scenarios') {
+          return http.Response(
+            jsonEncode([
+              {
+                'id': 'job_interview',
+                'title': 'First Job Interview',
+                'category': 'Career',
+                'description': 'Answer interview questions',
+                'difficulty': 'intermediate',
+                'suggested_vocabulary': ['teamwork', 'experience'],
+              }
+            ]),
+            200,
+          );
+        }
+        return http.Response('Not Found', 404);
+      });
+
+      final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
+      final topics = await api.getTopics();
+      expect(topics.length, equals(1));
+      expect(topics.first.title, equals('Monsoon Rains'));
+      expect(topics.first.starters, contains('Do you enjoy monsoon rain?'));
+
+      final scenarios = await api.getScenarios();
+      expect(scenarios.length, equals(1));
+      expect(scenarios.first.title, equals('First Job Interview'));
+      expect(scenarios.first.goals, contains('teamwork'));
+    });
   });
 
   group('AuthProvider Tests', () {

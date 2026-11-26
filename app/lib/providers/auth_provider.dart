@@ -130,6 +130,16 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// Force fresh device registration + profile refresh (e.g. after switching server URL).
+  Future<bool> reauthenticate() async {
+    _userId = null;
+    _authToken = null;
+    _api.setAuthToken(null);
+    await AuthStorage.clear();
+    await initialize();
+    return isAuthenticated && _serverConnected;
+  }
+
   /// Update user profile.
   Future<bool> updateProfile(Map<String, dynamic> updates) async {
     try {

@@ -146,7 +146,7 @@ class ScenarioItem {
       difficulty: json['difficulty'] ?? 'beginner',
       description: json['description'] ?? '',
       roles: List<String>.from(json['roles'] ?? []),
-      goals: List<String>.from(json['goals'] ?? []),
+      goals: List<String>.from(json['goals'] ?? json['suggested_vocabulary'] ?? []),
     );
   }
 }
@@ -172,7 +172,7 @@ class TopicItem {
       title: json['title'] ?? '',
       category: json['category'] ?? '',
       difficulty: json['difficulty'] ?? 'beginner',
-      starters: List<String>.from(json['starters'] ?? []),
+      starters: List<String>.from(json['starters'] ?? json['sample_questions'] ?? []),
     );
   }
 }
