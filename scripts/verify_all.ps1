@@ -62,7 +62,7 @@ try {
 }
 
 # --- 4. check_docs.py (Phase 5, may not exist yet) ---
-$checkDocs = Join-Path $repoRoot "scripts" "check_docs.py"
+$checkDocs = Join-Path $PSScriptRoot "check_docs.py"
 if (Test-Path $checkDocs) {
     Write-Host "`n[4/4] check_docs.py..." -ForegroundColor Yellow
     $proc2 = Start-Process -FilePath $python -ArgumentList $checkDocs `
