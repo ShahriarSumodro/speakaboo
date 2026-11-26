@@ -187,3 +187,31 @@ async def test_locked_character_requires_unlock(repo, client):
         assert "unlock" in res.json()["detail"].lower()
     finally:
         conv_mod.load_character = orig_load
+
+
+@pytest.mark.asyncio
+async def test_daily_usage_reflects_paid_plan_entitlement(client, repo):
+    """Purchasing a monthly plan entitlement should raise /api/usage/{user_id}/daily limit to 30 min."""
+    user = User(id="usage-plan-user", device_id="dev-usage-plan")
+    await repo.create_user(user)
+
+    # Initiate and verify monthly plan payment
+    init_res = client.post("/api/payment/checkout", json={
+        "user_id": user.id,
+        "gateway": "bkash",
+        "purpose": "monthly_plan",
+    })
+    assert init_res.status_code == 200
+    pid = init_res.json()["payment_id"]
+
+    ver_res = client.post("/api/payment/verify", json={
+        "payment_id": pid,
+        "gateway": "bkash",
+    })
+    assert ver_res.status_code == 200
+    assert ver_res.json()["success"] is True
+
+    usage_res = client.get(f"/api/usage/{user.id}/daily")
+    assert usage_res.status_code == 200
+    assert usage_res.json()["daily_limit_minutes"] == 30
+

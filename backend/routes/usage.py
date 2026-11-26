@@ -5,9 +5,11 @@ Track and report real usage statistics per user from the database repository.
 Enforces user token verification.
 """
 
+import time
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from backend.config import load_settings
 from backend.repositories import get_repository
 from backend.repositories.sqlite_repo import dhaka_today
 from backend.models.user import Plan
@@ -35,15 +37,21 @@ async def get_daily_usage(
     repo = await get_repository()
     today = dhaka_today()
 
+    settings = load_settings()
     usage = await repo.get_daily_usage(user_id, today)
     user = await repo.get_user(user_id)
+    ents = await repo.get_entitlements(user_id)
+    now = time.time()
+    has_active_plan_entitlement = any(
+        e.type == "plan" and (e.expires_at is None or e.expires_at > now)
+        for e in ents
+    )
 
-    daily_limit = 10
-    if user:
-        if user.plan == Plan.BASIC:
-            daily_limit = 30
-        elif user.plan == Plan.PREMIUM:
-            daily_limit = 120
+    daily_limit = settings.usage.free_daily_minutes
+    if user and user.plan == Plan.PREMIUM:
+        daily_limit = settings.usage.premium_daily_minutes
+    elif (user and user.plan == Plan.BASIC) or has_active_plan_entitlement:
+        daily_limit = settings.usage.basic_daily_minutes
 
     minutes = usage.minutes_spoken if usage else 0.0
     turns = usage.turns_count if usage else 0
