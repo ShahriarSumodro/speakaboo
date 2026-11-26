@@ -25,6 +25,7 @@ class _ShadowingScreenState extends State<ShadowingScreen> {
   DateTime? _recordingStartTime;
   Map<String, dynamic>? _lastEvaluation;
   bool _isEvaluating = false;
+  bool _isPlayingReference = false;
 
   @override
   void initState() {
@@ -66,6 +67,24 @@ class _ShadowingScreenState extends State<ShadowingScreen> {
     }
   }
 
+  Future<void> _playReferenceAudio() async {
+    if (_selectedItem == null || _isPlayingReference) return;
+    final audio = context.read<AudioService>();
+    setState(() => _isPlayingReference = true);
+    try {
+      final spoke = await audio.speakOnDevice(_selectedItem!.targetText, speed: _selectedSpeed);
+      if (!spoke && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Device voice playback is not available on this device.')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isPlayingReference = false);
+      }
+    }
+  }
+
   Future<void> _toggleRecording() async {
     final audio = context.read<AudioService>();
     final api = context.read<ApiService>();
@@ -78,6 +97,10 @@ class _ShadowingScreenState extends State<ShadowingScreen> {
           _recordingStartTime = DateTime.now();
           _lastEvaluation = null;
         });
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(audio.errorMessage ?? 'Could not start microphone.')),
+        );
       }
     } else {
       final bytes = await audio.stopRecording();
@@ -90,25 +113,39 @@ class _ShadowingScreenState extends State<ShadowingScreen> {
         _isEvaluating = true;
       });
 
-      if (bytes != null && _selectedItem != null) {
+      if (bytes == null || bytes.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No audio recorded. Speak clearly and try again.')),
+          );
+        }
+      } else if (_selectedItem != null) {
         try {
-          // Evaluate attempt with backend
-          final eval = await api.evaluateShadowing(
+          final eval = await api.evaluateShadowingAudio(
             itemId: _selectedItem!.id,
-            transcript: _selectedItem!.targetText, // simulated target alignment
+            audioBytes: bytes,
             durationSec: duration,
           );
-          setState(() {
-            _lastEvaluation = eval;
-          });
+          if (mounted) {
+            setState(() {
+              _lastEvaluation = eval;
+            });
+          }
         } catch (e) {
-          debugPrint('[shadowing_screen] ignored error: $e');
+          debugPrint('[shadowing_screen] evaluate audio error: $e');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Could not evaluate speech: $e')),
+            );
+          }
         }
       }
 
-      setState(() {
-        _isEvaluating = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isEvaluating = false;
+        });
+      }
     }
   }
 
@@ -192,6 +229,13 @@ class _ShadowingScreenState extends State<ShadowingScreen> {
                               _selectedItem!.targetText,
                               style: TextStyle(fontSize: 17, height: 1.5, fontWeight: FontWeight.w500, color: colors.textPrimary),
                             ),
+                            const SizedBox(height: 12),
+                            OutlinedButton.icon(
+                              key: const Key('shadowing_listen_btn'),
+                              onPressed: _isPlayingReference ? null : _playReferenceAudio,
+                              icon: Icon(_isPlayingReference ? Icons.volume_up_rounded : Icons.play_arrow_rounded),
+                              label: Text(_isPlayingReference ? 'Playing...' : 'Listen (${_selectedSpeed}x)'),
+                            ),
                           ],
                         ),
                       ),
@@ -253,20 +297,27 @@ class _ShadowingScreenState extends State<ShadowingScreen> {
                                 children: [
                                   Expanded(
                                     child: _buildMetricTile(
-                                      '${(_lastEvaluation!['accuracy_score'] as num?)?.round() ?? 85}%',
-                                      'Accuracy (Approx.)',
+                                      '${(_lastEvaluation!['accuracy_score'] as num?)?.round() ?? 0}%',
+                                      'Accuracy',
                                     ),
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: _buildMetricTile(
-                                      '${(_lastEvaluation!['pace_wpm'] as num?)?.round() ?? 110} WPM',
+                                      '${(_lastEvaluation!['pace_wpm'] as num?)?.round() ?? 0} WPM',
                                       'Speaking Pace',
                                     ),
                                   ),
                                 ],
                               ),
-                              if (_lastEvaluation!['feedback'] != null) ...[
+                              if ((_lastEvaluation!['transcript'] as String?)?.isNotEmpty == true) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  'You said: "${_lastEvaluation!['transcript']}"',
+                                  style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: colors.textPrimary),
+                                ),
+                              ],
+                              if ((_lastEvaluation!['feedback'] as String?)?.isNotEmpty == true) ...[
                                 const SizedBox(height: 8),
                                 Text(
                                   _lastEvaluation!['feedback'],
@@ -275,7 +326,7 @@ class _ShadowingScreenState extends State<ShadowingScreen> {
                               ],
                               _buildWordAlignment(
                                 _selectedItem!.targetText,
-                                _lastEvaluation!['transcript'] as String? ?? _selectedItem!.targetText,
+                                _lastEvaluation!['transcript'] as String? ?? '',
                               ),
                             ],
                           ),

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -40,13 +41,20 @@ import 'package:speakaboo/screens/parent_dashboard_screen.dart';
 
 class _FakeSpeakAudioService extends AudioService {
   final List<String> spoke;
-  _FakeSpeakAudioService(this.spoke);
+  final Uint8List? recordedBytes;
+  _FakeSpeakAudioService(this.spoke, {this.recordedBytes});
 
   @override
   Future<bool> speakOnDevice(String text, {double speed = 1.0}) async {
     spoke.add(text);
     return true;
   }
+
+  @override
+  Future<bool> startRecording() async => recordedBytes != null;
+
+  @override
+  Future<Uint8List?> stopRecording() async => recordedBytes;
 }
 
 void main() {
@@ -1216,13 +1224,13 @@ void main() {
           200,
         );
       }
-      if (request.url.path.endsWith('/api/learning/shadowing/evaluate')) {
+      if (request.url.path.endsWith('/api/learning/shadowing/evaluate-audio')) {
         return http.Response(
           jsonEncode({
-            'accuracy_score': 88.0,
-            'pace_wpm': 115.0,
-            'feedback': 'Good rhythm and flow.',
-            'transcript': 'I enjoy walking in the fresh morning air.',
+            'accuracy_score': 0.0,
+            'pace_wpm': 0.0,
+            'feedback': 'Try matching the passage words closely.',
+            'transcript': 'I kill people',
           }),
           200,
         );
@@ -1230,6 +1238,8 @@ void main() {
       return http.Response('Not Found', 404);
     });
 
+    final spoke = <String>[];
+    final fakeAudio = _FakeSpeakAudioService(spoke, recordedBytes: Uint8List.fromList([1, 2, 3, 4]));
     final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
     final auth = AuthProvider(api: api);
 
@@ -1238,6 +1248,7 @@ void main() {
         providers: [
           Provider<ApiService>.value(value: api),
           ChangeNotifierProvider<AuthProvider>.value(value: auth),
+          ChangeNotifierProvider<AudioService>.value(value: fakeAudio),
         ],
         child: const MaterialApp(home: ShadowingScreen()),
       ),
@@ -1251,6 +1262,22 @@ void main() {
     expect(find.text('0.8x'), findsOneWidget);
     expect(find.text('1.0x'), findsOneWidget);
     expect(find.text('1.2x'), findsOneWidget);
+    expect(find.byKey(const Key('shadowing_listen_btn')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('shadowing_listen_btn')));
+    await tester.pump();
+    expect(spoke, ['I enjoy walking in the fresh morning air.']);
+
+    // Tap mic to start recording, then tap stop to send audio for real STT scoring
+    await tester.tap(find.byIcon(Icons.mic));
+    await tester.pump();
+    await tester.tap(find.byIcon(Icons.stop));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('0%'), findsOneWidget);
+    expect(find.text('0 WPM'), findsOneWidget);
+    expect(find.text('You said: "I kill people"'), findsOneWidget);
   });
 
   testWidgets('SettingsScreen renders settings items', (WidgetTester tester) async {

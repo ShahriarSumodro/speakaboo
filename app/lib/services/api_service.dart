@@ -817,6 +817,41 @@ class ApiService {
     return jsonDecode(response.body);
   }
 
+  /// Evaluate a learner's recorded shadowing audio via backend STT + scoring.
+  Future<Map<String, dynamic>> evaluateShadowingAudio({
+    required String itemId,
+    required Uint8List audioBytes,
+    required double durationSec,
+    String audioFormat = 'wav',
+    String? userId,
+  }) async {
+    await _ensureAuthToken();
+    final effectiveUserId = userId ?? await AuthStorage.getUserId() ?? 'anonymous';
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$baseUrl/api/learning/shadowing/evaluate-audio'),
+    );
+    if (_authToken != null) {
+      request.headers['Authorization'] = 'Bearer $_authToken';
+    }
+    request.fields['script_id'] = itemId;
+    request.fields['duration_seconds'] = durationSec.toStringAsFixed(2);
+    request.fields['user_id'] = effectiveUserId;
+    request.fields['audio_format'] = audioFormat;
+    request.files.add(http.MultipartFile.fromBytes(
+      'audio',
+      audioBytes,
+      filename: 'shadowing.$audioFormat',
+    ));
+
+    final streamedResponse = await _client.send(request).timeout(AppConfig.requestTimeout);
+    final response = await http.Response.fromStream(streamedResponse);
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to evaluate shadowing audio: ${response.body}', response.statusCode);
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
   /// Get vocabulary notebook cards.
   Future<List<VocabCard>> getVocabulary(String userId) async {
     final response = await _sendWithAuthRetry(

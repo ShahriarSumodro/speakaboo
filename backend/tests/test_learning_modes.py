@@ -76,3 +76,38 @@ class TestShadowingEngine:
         assert eval_res.accuracy_score < 80.0
         assert len(eval_res.missed_words) > 0
         assert "fresh" in eval_res.missed_words or "harvest" in eval_res.missed_words
+
+    def test_wrong_and_short_speech_never_returns_930_wpm_or_high_score(self):
+        engine = ShadowingEngine()
+        script = engine.get_script("script_morning_market")
+        assert script is not None
+
+        # Wrong speech + tiny duration (0.2s) must clamp WPM <= 300 and give 0 accuracy
+        eval_res = engine.evaluate(
+            script_id=script.id,
+            transcript="I kill people " * 3,
+            duration_seconds=0.2,
+        )
+        assert eval_res.accuracy_score == 0.0
+        assert eval_res.pace_wpm <= 300.0
+        assert eval_res.overall_score < 20.0
+        assert "try again" in eval_res.feedback.lower()
+
+        # Empty speech must score 0 across the board
+        empty_res = engine.evaluate(script_id=script.id, transcript="   ", duration_seconds=2.0)
+        assert empty_res.accuracy_score == 0.0
+        assert empty_res.pace_wpm == 0.0
+        assert empty_res.overall_score == 0.0
+
+    def test_shadowing_evaluate_audio_route(self, client):
+        res = client.post(
+            "/api/learning/shadowing/evaluate-audio",
+            data={"script_id": "script_morning_market", "duration_seconds": "5.0", "user_id": "test-user"},
+            files={"audio": ("attempt.wav", b"\x00" * 1000, "audio/wav")},
+        )
+        assert res.status_code == 200
+        body = res.json()
+        assert body["script_id"] == "script_morning_market"
+        assert "transcript" in body
+        assert body["pace_wpm"] <= 300.0
+        assert body["accuracy_score"] < 100.0

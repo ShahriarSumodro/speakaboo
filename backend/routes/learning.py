@@ -6,7 +6,7 @@ shadowing evaluation, and spaced-repetition vocabulary notebook.
 """
 
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from pydantic import BaseModel
 
 from backend.repositories import get_repository
@@ -93,6 +93,7 @@ class ShadowingEvaluateResponse(BaseModel):
     missed_words: List[str]
     added_words: List[str]
     xp_earned: int
+    feedback: str = ""
 
 
 class VocabularyItemResponse(BaseModel):
@@ -334,6 +335,81 @@ async def evaluate_shadowing(
         missed_words=eval_result.missed_words,
         added_words=eval_result.added_words,
         xp_earned=xp_earned,
+        feedback=eval_result.feedback,
+    )
+
+
+@router.post("/shadowing/evaluate-audio", response_model=ShadowingEvaluateResponse)
+async def evaluate_shadowing_audio(
+    audio: UploadFile = File(...),
+    script_id: str = Form(...),
+    duration_seconds: float = Form(1.0),
+    user_id: str = Form("anonymous"),
+    audio_format: str = Form("wav"),
+    repo: BaseRepository = Depends(get_repository),
+):
+    """Transcribe learner audio with real STT and evaluate against the shadowing script."""
+    from backend.routes.conversation import get_engine
+    from backend.engine.safety import check_content_safety
+
+    script = shadowing_engine.get_script(script_id)
+    if not script:
+        raise HTTPException(status_code=404, detail=f"Script not found: {script_id}")
+
+    audio_bytes = await audio.read()
+    if not audio_bytes:
+        raise HTTPException(status_code=400, detail="Empty audio file")
+
+    engine = get_engine()
+    try:
+        stt_res = await engine._stt.transcribe(audio_bytes, language="en", format=audio_format)
+        transcript = stt_res.text.strip()
+        real_duration = stt_res.duration_seconds if stt_res.duration_seconds > 0 else duration_seconds
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Speech recognition failed: {e}")
+
+    # Safety check: reject unsafe speech with 0 score and gentle prompt
+    blocked = check_content_safety(transcript, is_user_message=True, age_band="kid")
+    if blocked:
+        return ShadowingEvaluateResponse(
+            script_id=script_id,
+            transcript="",
+            accuracy_score=0.0,
+            pace_wpm=0.0,
+            pace_score=0.0,
+            overall_score=0.0,
+            missed_words=[],
+            added_words=[],
+            xp_earned=0,
+            feedback="Let's keep our practice kind and friendly! Please read the passage aloud.",
+        )
+
+    eval_result = shadowing_engine.evaluate(
+        script_id=script_id,
+        transcript=transcript,
+        duration_seconds=max(1.0, real_duration),
+    )
+
+    xp_earned = 0
+    if eval_result.accuracy_score >= 30.0:
+        gamification = GamificationEngine(repo)
+        missions = MissionsEngine(repo)
+        _, xp_earned = await gamification.on_shadowing_completed(
+            user_id=user_id, accuracy_score=eval_result.accuracy_score
+        )
+        await missions.track_shadowing_completed(user_id)
+
+    return ShadowingEvaluateResponse(
+        script_id=eval_result.script_id,
+        transcript=eval_result.transcript,
+        accuracy_score=eval_result.accuracy_score,
+        pace_wpm=eval_result.pace_wpm,
+        pace_score=eval_result.pace_score,
+        overall_score=eval_result.overall_score,
+        missed_words=eval_result.missed_words,
+        added_words=eval_result.added_words,
+        xp_earned=xp_earned,
+        feedback=eval_result.feedback,
     )
 
 

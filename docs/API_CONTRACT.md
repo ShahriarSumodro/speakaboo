@@ -39,6 +39,7 @@ All REST and SSE endpoints exposed by `backend/routes/*.py` and consumed by `app
 - `GET /api/learning/topics` / `GET /api/learning/topics/{topic_id}`
 - `GET /api/learning/shadowing` & `GET /api/learning/shadowing/scripts` — List scripts
 - `POST /api/learning/shadowing/evaluate` — Evaluate transcript + duration vs target script
+- `POST /api/learning/shadowing/evaluate-audio` — Transcribe recorded audio via STT & evaluate vs script
 - `GET /api/learning/vocabulary/{user_id}` — Full vocabulary notebook
 - `GET /api/learning/vocabulary/{user_id}/due` — Due Leitner review cards
 - `POST /api/learning/vocabulary/{user_id}` — Add word/phrase

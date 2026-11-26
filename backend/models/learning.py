@@ -94,6 +94,7 @@ class ShadowingEvaluation:
     overall_score: float  # 0 to 100
     missed_words: List[str] = field(default_factory=list)
     added_words: List[str] = field(default_factory=list)
+    feedback: str = ""
 
 
 @dataclass

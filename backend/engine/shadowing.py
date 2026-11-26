@@ -79,7 +79,7 @@ class ShadowingEngine:
         target_words = _clean_words(script.target_text)
         user_words = _clean_words(transcript)
 
-        if not target_words:
+        if not target_words or not user_words:
             return ShadowingEvaluation(
                 script_id=script_id,
                 transcript=transcript,
@@ -87,6 +87,9 @@ class ShadowingEngine:
                 pace_wpm=0.0,
                 pace_score=0.0,
                 overall_score=0.0,
+                missed_words=list(dict.fromkeys(target_words))[:5],
+                added_words=[],
+                feedback="No matching speech detected. Let's try again — speak clearly into the mic.",
             )
 
         # 1. Word Accuracy Calculation
@@ -117,21 +120,30 @@ class ShadowingEngine:
         missed = [w for w in target_words if w not in user_counts]
         added = [w for w in user_words if w not in target_counts]
 
-        # 2. Pace (WPM) calculation
-        if duration_seconds > 0:
-            pace_wpm = (len(user_words) / duration_seconds) * 60.0
+        # 2. Pace (WPM) based on matched words & clamped to [0, 300]
+        effective_duration = max(1.0, duration_seconds)
+        if matched_words > 0:
+            raw_wpm = (matched_words / effective_duration) * 60.0
+            pace_wpm = min(300.0, max(0.0, raw_wpm))
         else:
             pace_wpm = 0.0
 
-        # Target pace comparison: score drops if >30% too fast or too slow
+        # Target pace comparison (only award pace points if learner matched some passage words)
         target_wpm = script.target_wpm
-        if target_wpm > 0 and pace_wpm > 0:
+        if accuracy_score >= 25.0 and target_wpm > 0 and pace_wpm > 0:
             diff_ratio = abs(pace_wpm - target_wpm) / target_wpm
             pace_score = max(0.0, 100.0 - (diff_ratio * 100.0))
         else:
-            pace_score = 50.0
+            pace_score = 0.0
 
         overall_score = round(0.7 * accuracy_score + 0.3 * pace_score, 1)
+
+        if accuracy_score < 50.0:
+            feedback = "Let's try again! Listen to the companion voice and match the words in the passage."
+        elif accuracy_score < 85.0:
+            feedback = "Good effort! Practice the highlighted words and keep a steady pace."
+        else:
+            feedback = "Great job! Your pronunciation and rhythm matched the passage well."
 
         return ShadowingEvaluation(
             script_id=script_id,
@@ -142,4 +154,5 @@ class ShadowingEngine:
             overall_score=overall_score,
             missed_words=list(dict.fromkeys(missed))[:5],  # Unique, up to 5
             added_words=list(dict.fromkeys(added))[:5],
+            feedback=feedback,
         )
