@@ -198,4 +198,27 @@ Generated from code reading in Phase 0/1.
 - `build_system_prompt()` — ~90 lines
 
 ## Smells Found
-- See `FINDINGS.md` for all findings (F-001 through F-015)
+- See `FINDINGS.md` for all findings (F-001 through F-019)
+
+## Dependency Graph & Layering
+
+### Backend Layers
+```
+routes/ (HTTP/FastAPI, Depends(get_current_user_id))
+  ├── engine/ (pure business logic, prompt building, scoring, auth tokens)
+  ├── providers/ (STT, LLM, TTS, Payment gateway adapters)
+  └── repositories/ (BaseRepository interface + SqliteRepository)
+        └── models/ (dataclasses & enums)
+```
+- **Layering check (`[RAN]` AST/regex scan):** 0 violations where `engine/`, `repositories/`, `models/`, or `providers/` import `fastapi` or `backend.routes`. (Note: `engine/auth_token.py` imports `fastapi` for `Header, HTTPException, Depends` — acceptable since it houses the FastAPI auth dependency `get_current_user_id`.)
+- **Mocks outside tests (`[RAN]` scan):** `routes/characters.py:99` and `routes/conversation.py:51` instantiate `Mock*Provider` ONLY when `TEST_MODE` or `provider == "mock"` is set. `cli_chat.py` and `scripts/load_test.py` are dev tools. `providers/payment.py` contains `MockBkashGateway` / `MockNagadGateway` for sandbox mode.
+
+### Flutter Layers
+```
+screens/ (UI pages) + widgets/ (reusable UI components)
+  └── providers/ (ChangeNotifier state machines: AuthProvider, ConversationProvider)
+        └── services/ (ApiService, AudioService, AuthStorage, CacheService, BillingProvider)
+              └── models/ (JSON-serializable data classes) + config/ (AppConfig, theme)
+```
+- **Layering check (`[RAN]` scan):** 0 violations where `models/` or `services/` import `package:flutter/material.dart`.
+

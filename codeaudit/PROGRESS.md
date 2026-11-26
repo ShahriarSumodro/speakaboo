@@ -1,10 +1,10 @@
 # Code Truth Loop — Progress
 
-## Status: Phase 1 — Map the Codebase
+## Status: Phase 2 — Core Logic Audit
 
 ## Phase Checklist
 - [x] Phase 0: Baseline (create state files, verify_all.ps1, run baseline, fix broken tests)
-- [ ] Phase 1: Map the codebase (inventory, dependency graph, dead code, big files, smells)
+- [x] Phase 1: Map the codebase (inventory, dependency graph, dead code, big files, smells)
 - [ ] Phase 2: Core logic audit (16 units, specs, tests, verdicts)
 - [ ] Phase 3: Clean-code refactor (split big files, fix smells, one commit per refactor)
 - [ ] Phase 4: Architecture handoff pack (AGENTS.md, docs/*)

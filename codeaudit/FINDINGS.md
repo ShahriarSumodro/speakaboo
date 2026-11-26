@@ -38,4 +38,10 @@ F-014: P2 duplication — `process_turn()` and `stream_turn()` duplicate the ent
 
 F-015: P3 naming — `sqlite_repo.py:14` uses `from typing import ... List, Dict, Any, Optional` (old style) alongside Python 3.14 which supports `list`, `dict`, etc. natively. [READ]
 
-F-016: P0 bug — `backend/routes/conversation.py:47` calls `os.environ.get("TEST_MODE", ...)` without `import os`, causing `NameError: name 'os' is not defined` on `POST /api/conversation/start` and breaking 6 backend tests. [RAN pytest]
+F-016: P0 bug — `backend/routes/conversation.py:47` calls `os.environ.get("TEST_MODE", ...)` without `import os`, causing `NameError: name 'os' is not defined` on `POST /api/conversation/start` and breaking 6 backend tests. [FIXED in 3f5d0d4] [RAN pytest]
+
+F-017: P2 swallowed-error — 18 instances of `} catch (_) {}` in `app/lib/` (`app_config.dart`, `auth_provider.dart`, `api_service.dart`, `cache_service.dart`, `dev_server_dialog.dart`, and 6 screens). [RAN static scan]
+
+F-018: P2 size — 21 files exceed 300 lines (largest: `sqlite_repo.py` 1367, `api_service.dart` 1096, `conversation.py` 859, `profile_screen.dart` 768). [RAN static scan]
+
+F-019: P3 size — 48 Python functions exceed 40 lines (largest: `process_turn` 289, `initialize` 237, `stream_turn` 232). [RAN static scan]
