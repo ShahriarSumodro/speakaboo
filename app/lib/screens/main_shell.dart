@@ -1,14 +1,16 @@
-/// Main application shell with bottom navigation bar conforming to DESIGN.md.
+/// Main application shell with playful bottom navigation bar.
 ///
-/// 4 tabs (max 5): Talk | Characters | Missions | Profile
-/// All tap targets >= 44px
+/// 5 tabs (max 5): Home | Talk | Characters | Missions | Profile
+/// All tap targets >= 48px.
 library;
 
 import 'package:flutter/material.dart';
-import 'talk_screen.dart';
+import '../widgets/playful/playful.dart';
 import 'characters_screen.dart';
+import 'home_screen.dart';
 import 'missions_screen.dart';
 import 'profile_screen.dart';
+import 'talk_screen.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -20,46 +22,53 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = const [
-    TalkScreen(),
-    CharactersScreen(),
-    MissionsScreen(),
-    ProfileScreen(),
-  ];
+  void _selectTab(int index) {
+    if (index == _currentIndex) return;
+    setState(() => _currentIndex = index);
+  }
 
   @override
   Widget build(BuildContext context) {
+    final screens = [
+      HomeScreen(onNavigateTab: _selectTab),
+      const TalkScreen(),
+      const CharactersScreen(),
+      const MissionsScreen(),
+      const ProfileScreen(),
+    ];
+
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
-        children: _screens,
+        children: screens,
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline),
-            selectedIcon: Icon(Icons.chat_bubble),
+      bottomNavigationBar: PlayfulBottomNav(
+        currentIndex: _currentIndex,
+        onTap: _selectTab,
+        items: const [
+          PlayfulNavItem(
+            icon: Icons.home_outlined,
+            activeIcon: Icons.home_rounded,
+            label: 'Home',
+          ),
+          PlayfulNavItem(
+            icon: Icons.chat_bubble_outline_rounded,
+            activeIcon: Icons.chat_bubble_rounded,
             label: 'Talk',
           ),
-          NavigationDestination(
-            icon: Icon(Icons.people_outline),
-            selectedIcon: Icon(Icons.people),
+          PlayfulNavItem(
+            icon: Icons.people_outline_rounded,
+            activeIcon: Icons.people_rounded,
             label: 'Characters',
           ),
-          NavigationDestination(
-            icon: Icon(Icons.flag_outlined),
-            selectedIcon: Icon(Icons.flag),
+          PlayfulNavItem(
+            icon: Icons.flag_outlined,
+            activeIcon: Icons.flag_rounded,
             label: 'Missions',
           ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
+          PlayfulNavItem(
+            icon: Icons.person_outline_rounded,
+            activeIcon: Icons.person_rounded,
             label: 'Profile',
           ),
         ],

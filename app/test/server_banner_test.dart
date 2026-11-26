@@ -41,7 +41,8 @@ void main() {
     final api = ApiService(client: mockClient);
 
     await tester.pumpWidget(SpeakabooApp(apiService: api));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
 
     // Banner must be visible because isHealthy was false
     expect(find.byKey(const Key('server_not_ready_banner')), findsOneWidget);
@@ -54,7 +55,8 @@ void main() {
     final refreshButton = find.byKey(const Key('server_banner_refresh_button'));
     expect(refreshButton, findsOneWidget);
     await tester.tap(refreshButton);
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
 
     // Banner should now be cleared
     expect(find.byKey(const Key('server_not_ready_banner')), findsNothing);

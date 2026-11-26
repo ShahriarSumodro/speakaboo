@@ -141,14 +141,16 @@ class PlayfulBottomNav extends StatelessWidget {
                           color: selected ? c.primary : c.textSecondary,
                         ),
                         const SizedBox(height: 2),
-                        Text(
-                          item.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: SpeakabooTheme.bodyStyle(
-                            color: selected ? c.primary : c.textSecondary,
-                            size: SpeakabooTheme.captionSize,
-                            weight: selected ? FontWeight.w800 : FontWeight.w600,
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            item.label,
+                            maxLines: 1,
+                            style: SpeakabooTheme.bodyStyle(
+                              color: selected ? c.primary : c.textSecondary,
+                              size: 11.5,
+                              weight: selected ? FontWeight.w800 : FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
