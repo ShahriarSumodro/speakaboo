@@ -29,7 +29,7 @@ class GroqLlmProvider(LlmProvider):
     def __init__(
         self,
         api_key: str,
-        model: str = "openai/gpt-oss-120b",
+        model: str = "qwen/qwen3.8-27b",
         fallback_models: Optional[list[str]] = None,
     ):
         if not api_key:
@@ -38,9 +38,9 @@ class GroqLlmProvider(LlmProvider):
         self._model = model
         self._fallback_models = fallback_models or [
             model,
+            "qwen/qwen3.8-27b",
             "openai/gpt-oss-120b",
-            "llama-3.3-70b-versatile",
-            "llama-3.1-8b-instant",
+            "openai/gpt-oss-20b",
         ]
         # Ensure unique order
         seen = set()

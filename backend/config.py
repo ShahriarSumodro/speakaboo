@@ -51,14 +51,14 @@ class SttConfig:
 @dataclass(frozen=True)
 class LlmConfig:
     provider: str = "groq"
-    model: str = "openai/gpt-oss-120b"
+    model: str = "qwen/qwen3.8-27b"
     fallback_models: tuple[str, ...] = (
+        "qwen/qwen3.8-27b",
         "openai/gpt-oss-120b",
-        "llama-3.3-70b-versatile",
-        "llama-3.1-8b-instant",
+        "openai/gpt-oss-20b",
     )
     api_key: str = ""
-    max_tokens: int = 256
+    max_tokens: int = 512
     temperature: float = 0.7
 
 
@@ -178,9 +178,9 @@ def load_settings() -> Settings:
         fallback_models = tuple(m.strip() for m in fallback_str.split(",") if m.strip())
     else:
         fallback_models = (
+            "qwen/qwen3.8-27b",
             "openai/gpt-oss-120b",
-            "llama-3.3-70b-versatile",
-            "llama-3.1-8b-instant",
+            "openai/gpt-oss-20b",
         )
 
     return Settings(
@@ -198,10 +198,10 @@ def load_settings() -> Settings:
         ),
         llm=LlmConfig(
             provider=_env("LLM_PROVIDER", "groq"),
-            model=_env("LLM_MODEL", "openai/gpt-oss-120b"),
+            model=_env("LLM_MODEL", "qwen/qwen3.8-27b"),
             fallback_models=fallback_models,
             api_key=groq_key,
-            max_tokens=_env_int("LLM_MAX_TOKENS", 256),
+            max_tokens=_env_int("LLM_MAX_TOKENS", 512),
             temperature=_env_float("LLM_TEMPERATURE", 0.7),
         ),
         tts=TtsConfig(

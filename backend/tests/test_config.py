@@ -32,3 +32,13 @@ def test_usage_config_defaults():
     assert settings.usage.free_daily_minutes == 10
     assert settings.usage.basic_daily_minutes == 30
     assert settings.usage.premium_daily_minutes == 120
+
+
+def test_llm_defaults_use_available_non_404_models():
+    """Default LLM model and fallbacks should use models available on the Groq key."""
+    from backend.config import LlmConfig
+    cfg = LlmConfig()
+    assert cfg.model == "qwen/qwen3.8-27b"
+    assert cfg.max_tokens >= 512
+    assert "llama-3.3-70b-versatile" not in cfg.fallback_models
+    assert "llama-3.1-8b-instant" not in cfg.fallback_models

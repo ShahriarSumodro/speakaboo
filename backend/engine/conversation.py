@@ -63,6 +63,7 @@ class TurnResult:
     tts_error: Optional[str] = None
     stt_error: Optional[str] = None
     llm_error: Optional[str] = None
+    audio_unavailable: bool = False
 
 
 @dataclass
@@ -96,11 +97,13 @@ class ConversationEngine:
         llm: LlmProvider,
         tts: TtsProvider,
         tts_cache: Optional[dict] = None,
+        llm_max_tokens: int = 512,
     ):
         self._stt = stt
         self._llm = llm
         self._tts = tts
         self._tts_cache = tts_cache if tts_cache is not None else {}
+        self._llm_max_tokens = llm_max_tokens
         self._conversations: dict[str, ConversationState] = {}
 
     def start_conversation(
@@ -258,6 +261,7 @@ class ConversationEngine:
             try:
                 llm_result = await self._llm.chat(
                     messages=messages,
+                    max_tokens=self._llm_max_tokens,
                     json_mode=True,
                 )
                 llm_tokens_in = llm_result.tokens_in
@@ -388,6 +392,7 @@ class ConversationEngine:
             tts_error=tts_error,
             stt_error=stt_error,
             llm_error=llm_error,
+            audio_unavailable=bool(tts_error or not audio_chunks),
         )
 
     async def stream_turn(
@@ -407,10 +412,19 @@ class ConversationEngine:
             raise ValueError(f"Conversation not found: {conversation_id}")
 
         # 1. STT
+        logger.info(
+            f"Turn {turn_id} stream request received: cid={conversation_id}, audio_bytes={len(audio)}, format={audio_format}"
+        )
+        stt_t0 = time.time()
         stt_error = None
         try:
             stt_result = await self._stt.transcribe(audio, format=audio_format)
             user_text = stt_result.text.strip()
+            stt_ms = (time.time() - stt_t0) * 1000
+            logger.info(
+                f"Turn {turn_id} stream STT: provider={getattr(self._stt, 'name', 'stt')}, "
+                f"ms={stt_ms:.1f}, transcript_len={len(user_text)}"
+            )
         except Exception as e:
             stt_error = str(e)
             logger.error(f"Turn {turn_id} streaming STT failed: {e}")
@@ -502,7 +516,9 @@ class ConversationEngine:
 
         for attempt in range(max_llm_retries):
             try:
-                llm_result = await self._llm.chat(messages=messages, json_mode=True)
+                llm_result = await self._llm.chat(
+                    messages=messages, max_tokens=self._llm_max_tokens, json_mode=True
+                )
                 llm_tokens_in = llm_result.tokens_in
                 llm_tokens_out = llm_result.tokens_out
                 try:
@@ -625,7 +641,8 @@ class ConversationEngine:
                 "cost_usd": cost_usd,
                 "safety_blocked": False,
                 "stt_seconds": stt_result.duration_seconds,
-                "tts_error": "I could not make my voice. Tap to retry." if tts_error else None,
+                "audio_unavailable": bool(tts_error or not audio_b64_list),
+                "tts_error": "I could not make my voice. Using device voice fallback." if tts_error else None,
             },
         }
 

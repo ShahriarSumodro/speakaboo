@@ -166,3 +166,16 @@ class TestStreamTurnErrorHandling:
         event_types = [e["event"] for e in events]
         assert "error" in event_types or "turn_complete" in event_types
 
+    @pytest.mark.asyncio
+    async def test_tts_failure_sets_audio_unavailable_flag(self, character, mock_stt, mock_llm):
+        class FailingTts(MockTtsProvider):
+            async def synthesize(self, text: str, voice_id: str, speed: float = 1.0):
+                raise RuntimeError("400 model_terms_required")
+
+        engine = ConversationEngine(stt=mock_stt, llm=mock_llm, tts=FailingTts())
+        state = engine.start_conversation("rule_farmer", "user-1")
+        res = await engine.process_turn(state.id, b"\x00" * 100, character)
+        assert res.audio_chunks == []
+        assert res.audio_unavailable is True
+        assert res.tts_error is not None
+

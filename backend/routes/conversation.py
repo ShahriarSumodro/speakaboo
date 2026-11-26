@@ -67,6 +67,7 @@ def get_engine() -> ConversationEngine:
                     model=settings.tts.model,
                     default_voice=settings.tts.voice,
                 ),
+                llm_max_tokens=settings.llm.max_tokens,
             )
     return _engine
 
@@ -93,6 +94,7 @@ class StartConversationResponse(BaseModel):
     is_trial: bool = False
     trial_seconds_remaining: Optional[int] = None
     tts_error: Optional[str] = None
+    audio_unavailable: bool = False
 
 
 class HintRequest(BaseModel):
@@ -131,6 +133,7 @@ class TurnResponseModel(BaseModel):
     is_trial: bool = False
     trial_seconds_remaining: Optional[int] = None
     tts_error: Optional[str] = None
+    audio_unavailable: bool = False
 
 
 async def _check_entitlements_and_caps(state, character):
@@ -373,6 +376,7 @@ async def process_turn(
         is_trial=is_trial,
         trial_seconds_remaining=trial_seconds_remaining,
         tts_error=result.tts_error,
+        audio_unavailable=result.audio_unavailable,
     )
 
 
