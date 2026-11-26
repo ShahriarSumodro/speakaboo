@@ -6,6 +6,7 @@ and adjusts vocabulary in replies accordingly.
 """
 
 import logging
+import re
 from typing import Optional
 
 logger = logging.getLogger("speakaboo.engine.level")
@@ -115,5 +116,4 @@ def estimate_level(recent_transcripts: list[str], window: int = 5) -> str:
 
 def _extract_words(text: str) -> list[str]:
     """Extract lowercase words from text."""
-    import re
     return [w.lower() for w in re.findall(r"[a-zA-Z']+", text) if len(w) > 0]

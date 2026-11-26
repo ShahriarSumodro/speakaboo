@@ -19,7 +19,9 @@ from pydantic import BaseModel
 from backend.config import load_settings
 from backend.engine.characters import load_character
 from backend.engine.conversation import ConversationEngine, TurnResult
-from backend.engine.correction import TurnResponse
+from backend.engine.correction import TurnResponse, categorize_error
+
+_categorize_error = categorize_error
 from backend.providers.base import ProviderError, RateLimitError
 from backend.providers.mock import MockSttProvider, MockLlmProvider, MockTtsProvider
 from backend.providers.groq_stt import GroqSttProvider
@@ -131,26 +133,6 @@ class TurnResponseModel(BaseModel):
     tts_error: Optional[str] = None
 
 
-def _categorize_error(original: str, better: str, reason: str) -> str:
-    """Categorize grammar mistakes to track learner error patterns (Bengali learner hypotheses)."""
-    import re
-    orig_l = original.lower()
-    reason_l = reason.lower()
-    if any(s in reason_l for s in ["agreement", "subject-verb"]):
-        return "subject_verb_agreement"
-    if "preposition" in reason_l or any(re.search(rf"\b{p}\b", orig_l) for p in ["in", "on", "at", "to", "for", "with", "by", "from"]):
-        return "prepositions"
-    if "article" in reason_l or re.search(r"\b(a|an|the)\b", orig_l):
-        return "articles"
-    if any(k in reason_l for k in ["tense", "past", "went", "did", "was", "were"]) or (
-        "verb" in reason_l and "subject-verb" not in reason_l
-    ):
-        return "tenses_and_verbs"
-    if any(s in reason_l for s in ["plural", "singular"]):
-        return "subject_verb_agreement"
-    return "word_choice"
-
-
 async def _check_entitlements_and_caps(state, character):
     """Enforce character unlock entitlements and daily practice limits."""
     settings = load_settings()
@@ -222,7 +204,7 @@ async def _record_turn_metrics(state, result):
 
             # Record mistake category in mistake_logs
             if corr_dict and corr_dict.get("original") and corr_dict.get("better"):
-                cat = _categorize_error(
+                cat = categorize_error(
                     corr_dict.get("original", ""),
                     corr_dict.get("better", ""),
                     corr_dict.get("reason_short", ""),

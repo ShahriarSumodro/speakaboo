@@ -956,7 +956,6 @@ class SqliteRepository(BaseRepository):
         self, user_id: str, mission_type: str, increment: float, date: Optional[str] = None
     ) -> List[UserMissionProgress]:
         missions = await self.get_daily_missions(user_id, date)
-        type_to_mission = {m.type: m for m in DEFAULT_MISSIONS}
 
         updated = []
         for ump in missions:
