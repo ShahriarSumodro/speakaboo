@@ -47,3 +47,13 @@ def test_debug_last_requests_endpoint(monkeypatch):
     assert data["status"] == "ok"
     assert data["count"] >= 1
     assert any(r.get("path") == "/health" for r in data["requests"])
+
+
+def test_diagnostics_probe_endpoints():
+    client = TestClient(app)
+    for stage in ("stt", "llm", "tts"):
+        res = client.post(f"/api/debug/diagnostics/{stage}")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["ok"] is True
+        assert "ms" in data

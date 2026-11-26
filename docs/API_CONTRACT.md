@@ -5,6 +5,8 @@ All REST and SSE endpoints exposed by `backend/routes/*.py` and consumed by `app
 ## Health & Debug
 - `GET /health` — Server + provider health (`ok` / `degraded`)
 - `GET /api/debug/last_turns` — Last 20 turn diagnostics (timings, errors, costs)
+- `GET /api/debug/last_requests` — Last 30 HTTP requests (when `DEBUG=true`)
+- `POST /api/debug/diagnostics/{stage}` — Live diagnostic probe for `stt`, `llm`, `tts`
 
 ## Auth & Profile (`/api/auth`)
 - `POST /api/auth/device` — Register/login device, returns `user_id`, `token`, `auth_token`, `profile`

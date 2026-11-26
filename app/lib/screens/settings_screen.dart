@@ -11,6 +11,7 @@ import '../services/api_service.dart';
 import '../services/notification_service.dart';
 import '../widgets/dev_server_dialog.dart';
 import 'debug_gallery_screen.dart';
+import 'diagnostics_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -251,6 +252,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 setState(() {});
                 auth.initialize();
               });
+            },
+          ),
+          const SizedBox(height: 8),
+
+          // Live Diagnostics (Phase 3)
+          ListTile(
+            key: const Key('settings_diagnostics_tile'),
+            tileColor: colors.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SpeakabooTheme.radiusSm)),
+            leading: Icon(Icons.health_and_safety_outlined, color: colors.accent),
+            title: Text('Diagnostics', style: TextStyle(color: colors.textPrimary)),
+            subtitle: Text('Test server, auth, STT, AI reply, voice, topics & vocab', style: TextStyle(color: colors.textSecondary)),
+            trailing: Icon(Icons.chevron_right, color: colors.textSecondary),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const DiagnosticsScreen()),
+              );
             },
           ),
           const SizedBox(height: 8),

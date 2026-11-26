@@ -35,6 +35,7 @@ import 'package:speakaboo/screens/topics_screen.dart';
 import 'package:speakaboo/screens/shadowing_screen.dart';
 import 'package:speakaboo/screens/vocabulary_screen.dart';
 import 'package:speakaboo/screens/settings_screen.dart';
+import 'package:speakaboo/screens/diagnostics_screen.dart';
 import 'package:speakaboo/screens/parent_dashboard_screen.dart';
 
 void main() {
@@ -1276,5 +1277,54 @@ void main() {
     await tester.tap(find.byKey(const Key('whatsapp_parent_report_btn')));
     await tester.pump();
     expect(find.text('Weekly achievement report copied for WhatsApp!'), findsOneWidget);
+  });
+
+  testWidgets('DiagnosticsScreen runs checks and displays rows + Copy report', (WidgetTester tester) async {
+    final mockClient = MockClient((request) async {
+      final path = request.url.path;
+      if (path == '/health') {
+        return http.Response(jsonEncode({'status': 'ok'}), 200);
+      }
+      if (path == '/api/auth/device') {
+        return http.Response(jsonEncode({'user_id': 'u_diag', 'token': 'tok_diag'}), 200);
+      }
+      if (path == '/api/auth/profile') {
+        return http.Response(jsonEncode({'user_id': 'u_diag', 'display_name': 'Tester', 'age_band': 'teen', 'goal': 'confidence', 'level': 'beginner', 'daily_goal_minutes': 10, 'reminder_time': '20:00', 'theme': 'system', 'has_parent_pin': false, 'language': 'en'}), 200);
+      }
+      if (path.startsWith('/api/debug/diagnostics/')) {
+        return http.Response(jsonEncode({'ok': true, 'ms': 12.0, 'model': 'qwen', 'detail': 'ok', 'error': null}), 200);
+      }
+      if (path == '/api/learning/topics') {
+        return http.Response(jsonEncode({'topics': [{'id': 't1', 'title': 'Monsoon', 'category': 'Nature', 'difficulty': 'beginner', 'starters': []}]}), 200);
+      }
+      if (path.startsWith('/api/learning/vocabulary/u_diag') && request.method == 'POST') {
+        return http.Response(jsonEncode({'id': 'v1', 'word_or_phrase': 'diagcheck'}), 200);
+      }
+      if (path.startsWith('/api/learning/vocabulary/u_diag') && request.method == 'GET') {
+        return http.Response(jsonEncode([{'id': 'v1', 'word_or_phrase': 'diagcheck_0', 'box': 1}]), 200);
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final api = ApiService(baseUrl: 'http://localhost:8000', client: mockClient);
+    final auth = AuthProvider(api: api);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<ApiService>.value(value: api),
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
+          ChangeNotifierProvider<AudioService>(create: (_) => AudioService()),
+        ],
+        child: const MaterialApp(home: DiagnosticsScreen()),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.text('Diagnostics'), findsOneWidget);
+    expect(find.text('Server reachable (/health)'), findsOneWidget);
+    expect(find.text('Copy report'), findsOneWidget);
   });
 }

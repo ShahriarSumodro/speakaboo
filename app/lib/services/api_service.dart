@@ -1070,6 +1070,26 @@ class ApiService {
     return list.map((e) => Entitlement.fromJson(e as Map<String, dynamic>)).toList();
   }
 
+  /// Run backend diagnostic probe for a pipeline stage (`stt`, `llm`, or `tts`).
+  Future<Map<String, dynamic>> runDiagnosticProbe(String stage) async {
+    final path = switch (stage) {
+      'stt' => '$baseUrl/api/debug/diagnostics/stt',
+      'llm' => '$baseUrl/api/debug/diagnostics/llm',
+      'tts' => '$baseUrl/api/debug/diagnostics/tts',
+      _ => throw ArgumentError('Unknown diagnostic stage: $stage'),
+    };
+    final response = await _sendWithAuthRetry(
+      () => _client.post(
+        Uri.parse(path),
+        headers: _headers(),
+      ),
+    );
+    if (response.statusCode != 200) {
+      throw ApiException('Diagnostic probe ($stage) failed', response.statusCode);
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
   void dispose() {
     _client.close();
   }
